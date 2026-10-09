@@ -90,24 +90,14 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px s
 
 /* ---- loco cards ---- */
 
-#lists section { display: grid; gap: 8px; grid-template-columns: 1fr; }
-#lists .section-title, #lists .empty { grid-column: 1 / -1; margin-bottom: 0; }
-@media (min-width: 760px) { #lists section { grid-template-columns: 1fr 1fr; } }
+#lists section { display: grid; gap: 8px; grid-template-columns: 1fr; max-width: 520px; }
+#lists .section-title, #lists .empty { margin-bottom: 0; }
 
-.card { display: flex; gap: 12px; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); text-align: left; cursor: pointer; }
+.card { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); text-align: left; cursor: pointer; }
 .card:active { background: var(--bg); }
-.serial { flex: 0 0 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: var(--amber); color: #1b1300; font-weight: 700; font-size: 14px; }
+.serial { flex: 0 0 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--amber); color: #1b1300; font-weight: 700; font-size: 13px; }
 .serial:empty { background: none; }
-.card-body { flex: 1; min-width: 0; display: grid; gap: 3px; }
-.card-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.loco-no { font-size: 17px; font-variant-numeric: tabular-nums; }
-.chip { padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--soft); }
-.chip.ok { color: var(--green); border-color: currentColor; }
-.card-line { font-size: 14px; overflow-wrap: anywhere; }
-.label { color: var(--soft); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
-.label.gap { margin-left: 12px; }
-.remarks { color: var(--soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.stamp { font-size: 12px; color: var(--soft); }
+.loco-no { min-width: 0; font-size: 15px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
 /* ---- editor ---- */
 

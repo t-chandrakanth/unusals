@@ -134,22 +134,9 @@ function exportBar(sheet, fileBase, title, getText, before) {
 
 function locoCard(row) {
   const l = row.loco;
-  const other = l.division === 'OTHER';
   return h('button', { class: 'card', onclick: () => openEditor(l) },
     h('span', { class: 'serial' }, row.span === 0 ? '' : String(row.serial)),
-    h('span', { class: 'card-body' },
-      h('span', { class: 'card-top' },
-        h('strong', { class: 'loco-no' }, l.locoNo || '(no number)'),
-        l.dueDate && h('span', { class: `chip ${/fresh/i.test(l.dueDate) ? 'ok' : ''}` }, `Due ${l.dueDate}`)),
-      h('span', { class: 'card-line' },
-        h('span', { class: 'label' }, 'TR '), l.trainNo || '-',
-        h('span', { class: 'label gap' }, 'At '), l.location || '-'),
-      other
-        ? h('span', { class: 'card-line' }, h('span', { class: 'label' }, 'H/O '),
-          `${l.hoTrain || '-'} at ${l.hoPoint || '-'}, ${l.hoTime || '-'}`)
-        : (l.working && h('span', { class: 'card-line' }, h('span', { class: 'label' }, 'Working '), l.working)),
-      l.remarks && h('span', { class: 'card-line remarks' }, l.remarks),
-      l.updatedAt && h('span', { class: 'card-line stamp' }, `Updated ${L.fmtDateTime(l.updatedAt)}`)));
+    h('strong', { class: 'loco-no' }, l.locoNo || '(no number)'));
 }
 
 function viewLocos() {
@@ -178,7 +165,7 @@ function viewLocos() {
   return h('div', null,
     h('div', { class: 'toolbar' }, search,
       h('button', { class: 'btn primary', onclick: () => openEditor(null) }, '+ Add loco')),
-    h('p', { class: 'hint' }, 'Tap a loco to update its train, location or remarks. Every change is saved with its date and time.'),
+    h('p', { class: 'hint' }, 'Tap a loco number to see and update its details.'),
     h('div', { id: 'lists' }, buildLists()));
 }
 
