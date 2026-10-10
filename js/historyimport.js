@@ -16,7 +16,9 @@ import { pick, sameFields, foisDateFromRemarks } from './logic.js';
 
 export const IMPORT_TAG = 'imp1';
 
-// The sheet types this consist's second loco as both 27764 and 27767.
+// 27764 was a typing mistake for 27767 in some reports. The records are
+// corrected when the data file is built; this keeps a device that still
+// holds the old number matched to the same consist.
 const ALIASES = { '27592+27764': '27592+27767' };
 // This consist was later split, and the two locos are now tracked singly.
 // Its older history is filed under both.

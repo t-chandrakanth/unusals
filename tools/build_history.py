@@ -14,6 +14,14 @@ MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split()
 TITLE = re.compile(r'DATA\s+DT-(\d\d)-(\d\d)-(\d{4})')
 
 
+# Confirmed typing mistakes in loco numbers, corrected on the way in.
+LOCO_FIXES = {'27764': '27767'}
+
+
+def loco(v):
+    return re.sub(r'\d{5}', lambda m: LOCO_FIXES.get(m.group(0), m.group(0)), clean(v))
+
+
 def clean(v):
     return re.sub(r'\s+', ' ', (v or '').replace('\t', ' ')).strip()
 
@@ -55,7 +63,7 @@ def parse(text):
             i += 1
             if not re.search(r'\d{5}', c[1]):
                 continue
-            row = dict(locoNo=clean(c[1]), dueDate=due(c[2]), trainNo=clean(c[3]), location=clean(c[4]),
+            row = dict(locoNo=loco(c[1]), dueDate=due(c[2]), trainNo=clean(c[3]), location=clean(c[4]),
                        division='OTHER' if other else 'SC', hoTrain='', hoPoint='', hoTime='',
                        working='', remarks='', sameSerial=bool(rows) and clean(c[0]) == '')
             if other:
@@ -114,7 +122,7 @@ def parse_shed(path):
             work, train = get(r, c_work), get(r, c_train)
             dest = get(r, c_dest)
             out.append(dict(
-                locoNo=get(r, c_loco), dueDate=get(r, c_due),
+                locoNo=loco(get(r, c_loco)), dueDate=get(r, c_due),
                 # Older sheets have train and location in separate columns;
                 # later ones combine them, so the text is kept whole.
                 trainNo=get(r, c_now) if c_loc is not None else '',

@@ -8221,7 +8221,7 @@ export const SNAPSHOTS = [
     "sameSerial": false
    },
    {
-    "locoNo": "27764+27592",
+    "locoNo": "27767+27592",
     "dueDate": "FRESH",
     "trainNo": "KSNK",
     "location": "ON RUN NPHR",
@@ -8814,7 +8814,7 @@ export const SNAPSHOTS = [
     "sameSerial": false
    },
    {
-    "locoNo": "27764+27592",
+    "locoNo": "27767+27592",
     "dueDate": "FRESH",
     "trainNo": "KSNK",
     "location": "ADB/NED/SCR",
@@ -9042,7 +9042,7 @@ export const SNAPSHOTS = [
     "sameSerial": false
    },
    {
-    "locoNo": "27592+27764",
+    "locoNo": "27592+27767",
     "dueDate": "FRESH",
     "trainNo": "KSNK",
     "location": "DHNR/NED/SCR",
