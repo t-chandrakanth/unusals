@@ -29,6 +29,8 @@ const ui = {
   histFrom: L.addDays(today(), -6),
   histTo: today(),
   histChangesOnly: false,
+  histMode: 'date', // 'date': all locos on one day; 'loco': one loco over many days
+  histDay: today(),
 };
 
 // ---------- small helpers ----------
@@ -292,7 +294,7 @@ function openEditor(loco) {
     !isNew && h('div', { class: 'editor-more' },
       h('button', { type: 'button', class: 'link', onclick: () => { dlg.close(); dispatch({ type: 'move', id: loco.id, dir: -1 }); } }, 'Move up'),
       h('button', { type: 'button', class: 'link', onclick: () => { dlg.close(); dispatch({ type: 'move', id: loco.id, dir: 1 }); } }, 'Move down'),
-      h('button', { type: 'button', class: 'link', onclick: () => { dlg.close(); ui.view = 'history'; ui.histLoco = loco.id; render(); } }, 'History'),
+      h('button', { type: 'button', class: 'link', onclick: () => { dlg.close(); ui.view = 'history'; ui.histMode = 'loco'; ui.histLoco = loco.id; render(); } }, 'History'),
       h('button', {
         type: 'button', class: 'link danger',
         onclick: () => {
@@ -366,7 +368,60 @@ function viewReport() {
 
 // ---------- History ----------
 
+/** Days that have any record, newest first. */
+function recordDays() {
+  const days = new Set(state.log.map((e) => L.dayKey(e.at)));
+  for (const r of state.reports) days.add(r.day);
+  return [...days].filter((d) => d <= today()).sort().reverse();
+}
+
 function viewHistory() {
+  const tab = (mode, text) => h('button', {
+    type: 'button', class: `seg ${ui.histMode === mode ? 'on' : ''}`,
+    onclick: () => { ui.histMode = mode; render(); },
+  }, text);
+  return h('div', null,
+    h('div', { class: 'segs' }, tab('date', 'Day-wise, all locos'), tab('loco', 'One loco')),
+    ui.histMode === 'date' ? viewHistoryDay() : viewHistoryLoco());
+}
+
+function viewHistoryDay() {
+  const days = recordDays();
+  const day = ui.histDay;
+  const locos = day === today() ? state.locos : L.locosOnDay(state, day);
+  const sheet = reportSheet(locos, day);
+  const sent = state.reports.filter((r) => r.day === day);
+  const pick = (d) => { ui.histDay = d; render(); };
+  return h('div', null,
+    h('p', { class: 'hint' }, 'Pick a date to see the position of every loco on that day.'),
+    h('div', { class: 'toolbar wrap' },
+      h('label', { class: 'inline' }, 'Date',
+        h('input', { type: 'date', value: day, max: today(), onchange: (e) => pick(e.target.value || today()) })),
+      h('button', { class: 'btn small', onclick: () => pick(L.addDays(day, -1)) }, 'Previous day'),
+      h('button', { class: 'btn small', disabled: day >= today(), onclick: () => pick(L.addDays(day, 1)) }, 'Next day')),
+    h('div', { class: 'days', 'aria-label': 'Dates with records' }, days.map((d) => h('button', {
+      class: `day ${d === day ? 'on' : ''}`, onclick: () => pick(d),
+    }, L.fmtDay(d).slice(0, 5)))),
+    locos.length
+      ? [
+        h('p', { class: 'hint' }, days.includes(day)
+          ? `Position of all locos at the end of ${L.fmtDay(day)}.`
+          : `No report was recorded on ${L.fmtDay(day)}. Showing the last known position before it.`),
+        exportBar(sheet, `DPWS-locos-${L.fmtDay(day)}`, sheet.rows[0][0].v, () => L.reportText(locos, day)),
+        h('div', { class: 'sheet-wrap', id: 'printable' }, sheetTable(sheet)),
+      ]
+      : h('p', { class: 'empty' }, `There are no records on or before ${L.fmtDay(day)}.`),
+    sent.length > 0 && [
+      h('h2', { class: 'section-title' }, `Reports sent on ${L.fmtDay(day)}`, h('span', { class: 'count' }, sent.length)),
+      h('ul', { class: 'rows' }, sent.map((r) => h('li', null,
+        h('button', {
+          class: 'row-main',
+          onclick: () => { ui.view = 'report'; ui.reportId = r.id; render(); window.scrollTo(0, 0); },
+        }, `${L.fmtTime(r.at)}${r.by ? `  ${r.by}` : ''}  (open as sent)`)))),
+    ]);
+}
+
+function viewHistoryLoco() {
   const choices = L.locoChoices(state);
   if (!choices.some((ch) => ch.id === ui.histLoco)) ui.histLoco = choices[0] ? choices[0].id : null;
   const choice = choices.find((ch) => ch.id === ui.histLoco);

@@ -169,3 +169,11 @@ dialog::backdrop { background: rgba(8, 16, 28, 0.55); }
 .signin input { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); font-size: 16px; }
 .signin .btn { padding: 12px; }
 .form-error { color: var(--red); font-size: 14px; min-height: 1.2em; }
+
+/* ---- history: dates with records ---- */
+
+.days { display: flex; flex-wrap: wrap; gap: 6px; max-height: 118px; overflow-y: auto; margin: 0 0 12px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.day { padding: 6px 10px; border: 1px solid var(--line); border-radius: 99px; background: none; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; }
+.day.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+main > div > .segs { max-width: 420px; }
+.btn:disabled { opacity: 0.45; cursor: default; }
