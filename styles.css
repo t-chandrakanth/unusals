@@ -192,3 +192,18 @@ main > div > .segs { max-width: 420px; }
 .help li { margin: 3px 0; }
 .help p { margin: 0; font-size: 14px; color: var(--soft); }
 @media print { .install { display: none; } }
+
+/* ---- loco list: a phone shows numbers only, a wide screen shows a table ---- */
+
+.card .col, .list-head { display: none; }
+@media (min-width: 760px) {
+  #lists section { max-width: 900px; gap: 0; }
+  #lists .section-title { margin-bottom: 8px; }
+  .list-head, .card { display: grid; grid-template-columns: 64px 1.1fr 1fr 1.4fr; align-items: center; gap: 12px; padding: 9px 14px; }
+  .list-head { border: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; background: var(--line); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--soft); }
+  .card { border-top: 0; border-radius: 0; }
+  .card:last-child { border-radius: 0 0 var(--radius) var(--radius); }
+  .card:hover { background: var(--bg); }
+  .card .col { display: block; min-width: 0; font-size: 15px; overflow-wrap: anywhere; }
+  .serial { width: 28px; }
+}

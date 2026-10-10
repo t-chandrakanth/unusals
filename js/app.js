@@ -187,7 +187,10 @@ function locoCard(row) {
   const l = row.loco;
   return h('button', { class: 'card', onclick: () => openEditor(l) },
     h('span', { class: 'serial' }, row.span === 0 ? '' : String(row.serial)),
-    h('strong', { class: 'loco-no' }, l.locoNo || '(no number)'));
+    h('strong', { class: 'loco-no' }, l.locoNo || '(no number)'),
+    // Shown as extra columns on a wide screen; a phone shows the number only.
+    h('span', { class: 'col train' }, l.trainNo || '-'),
+    h('span', { class: 'col place' }, l.location || '-'));
 }
 
 function viewLocos() {
@@ -200,6 +203,8 @@ function viewLocos() {
       const list = rows.filter((r) => r.loco.division === division);
       return h('section', null,
         h('h2', { class: `section-title ${division.toLowerCase()}` }, title, h('span', { class: 'count' }, list.length)),
+        list.length > 0 && h('div', { class: 'list-head', 'aria-hidden': 'true' },
+          h('span', null, 'Sr. No'), h('span', null, 'Loco No'), h('span', null, 'Train No'), h('span', null, 'Current location')),
         list.length ? list.map(locoCard) : h('p', { class: 'empty' }, q ? 'No match.' : 'No locos here.'));
     };
     return [section('OTHER', 'In other divisions'), section('SC', 'In SC division')];
