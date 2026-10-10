@@ -107,3 +107,31 @@ create policy "signed-in update" on public.reports for update to authenticated u
 revoke all on public.locos, public.log, public.reports from anon, authenticated;
 grant select, insert, update on public.locos, public.reports to authenticated;
 grant select, insert         on public.log                   to authenticated;
+
+-- Unusuals tab: the unusual reports (also in setup-unusuals.sql, for
+-- databases that were set up before this tab existed).
+create table if not exists public.unusuals (
+  id         text primary key,
+  day        text        not null,
+  deleted    boolean     not null default false,
+  data       jsonb       not null,
+  updated_by text        not null default '',
+  synced_at  timestamptz not null default now()
+);
+create index if not exists unusuals_synced_at on public.unusuals (synced_at);
+create index if not exists unusuals_day       on public.unusuals (day);
+drop trigger if exists unusuals_touch on public.unusuals;
+create trigger unusuals_touch before insert or update on public.unusuals
+  for each row execute function public.locos_keep_latest();
+alter table public.unusuals enable row level security;
+drop policy if exists "open read"   on public.unusuals;
+drop policy if exists "open insert" on public.unusuals;
+drop policy if exists "open update" on public.unusuals;
+drop policy if exists "signed-in read"   on public.unusuals;
+drop policy if exists "signed-in insert" on public.unusuals;
+drop policy if exists "signed-in update" on public.unusuals;
+create policy "signed-in read"   on public.unusuals for select to authenticated using (true);
+create policy "signed-in insert" on public.unusuals for insert to authenticated with check (true);
+create policy "signed-in update" on public.unusuals for update to authenticated using (true) with check (true);
+revoke all on public.unusuals from anon, authenticated;
+grant select, insert, update on public.unusuals to authenticated;

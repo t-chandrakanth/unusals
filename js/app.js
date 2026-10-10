@@ -1,12 +1,14 @@
 import * as L from './logic.js';
 import { loadState, saveState } from './db.js';
 import { seedState } from './seed.js';
-import { STYLES, reportSheet, historySheet } from './sheet.js';
+import { STYLES, reportSheet, historySheet, unusualSheet } from './sheet.js';
 import { sheetToXlsx } from './xlsx.js';
 import { sheetToCanvas, canvasToBlob } from './canvas.js';
 import { createSync } from './sync.js';
 import { diffOps } from './syncdata.js';
 import { importHistory, alreadyImported } from './historyimport.js';
+import { importUnusuals, unusualsImported } from './unusualimport.js';
+import { UNUSUAL_RECORDS } from './unusual-data.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from './config.js';
 
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -31,6 +33,9 @@ const ui = {
   histChangesOnly: false,
   histMode: 'date', // 'date': all locos on one day; 'loco': one loco over many days
   histDay: today(),
+  uDraft: null, // the unusual report being written; kept here so a redraw does not lose it
+  uSearch: '',
+  uMonth: 'all',
 };
 
 // ---------- small helpers ----------
@@ -96,6 +101,19 @@ async function importOldRecords() {
   } finally {
     importing = false;
   }
+}
+
+// The unusual reports written before the Unusuals tab existed are loaded once,
+// under the same rule: with a shared database, only when this device is in
+// step with it, so reports another device already loaded are not repeated.
+function importOldUnusuals() {
+  if (unusualsImported(state)) {
+    if (!state.unusualsImported) state = { ...state, unusualsImported: true };
+    return;
+  }
+  if (sync && !(state.sync.linked && status.phase === 'synced')) return;
+  commit(importUnusuals(state, UNUSUAL_RECORDS));
+  render();
 }
 
 let toastTimer;
@@ -528,6 +546,172 @@ function viewHistoryLoco() {
       : h('p', { class: 'empty' }, 'No locos yet.'));
 }
 
+// ---------- Unusuals ----------
+
+const UNUSUAL_TITLES = [
+  'LOCO TROUBLE-DPWCS', 'LOCO TROUBLE DUE TO DPWCS COMMUNICATION PROBLEM', 'STALLED DUE TO LOCO PROBLEM',
+  'STALLED DUE TO TRAILING LOCO PROBLEM', 'LOCO FAILED', 'LOCO PROBLEM', 'LOCO TROUBLE',
+];
+
+function monthLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleString('en-GB', { month: 'short', year: 'numeric' });
+}
+
+/**
+ * The form for one unusual report, used both for a fresh report (the draft
+ * lives in ui, so a redraw while typing loses nothing) and for editing.
+ */
+function unusualForm(draft, { submit, onSubmit, onCancel }) {
+  const field = (label, key, opts = {}) => {
+    const el = opts.area
+      ? h('textarea', { rows: opts.rows || 6, value: draft[key], placeholder: opts.placeholder || '' })
+      : h('input', {
+        type: opts.type || 'text', value: draft[key], placeholder: opts.placeholder || '',
+        autocapitalize: opts.type ? null : 'characters', autocomplete: 'off',
+      });
+    el.classList.add('u-input');
+    el.setAttribute('data-ukey', key);
+    if (opts.list) el.setAttribute('list', opts.list);
+    el.addEventListener('input', (e) => { draft[key] = e.target.value; });
+    return h('label', { class: `field ${opts.wide ? 'wide' : ''}` }, h('span', null, label), el);
+  };
+  const titles = [...new Set([...UNUSUAL_TITLES, ...state.unusuals.map((u) => u.title).filter(Boolean)])];
+  const locos = [...new Set(state.locos.map((l) => l.locoNo).filter(Boolean))];
+  return h('form', {
+    class: 'u-form',
+    onsubmit: (e) => {
+      e.preventDefault();
+      if (!draft.day) { toast('Pick the date'); return; }
+      if (!draft.title.trim()) { toast('Enter the type of unusual (the heading)'); return; }
+      onSubmit();
+    },
+  },
+  h('div', { class: 'grid' },
+    field('Date', 'day', { type: 'date' }),
+    field('DET (detention)', 'det', { placeholder: '06:39 HRS' }),
+    field('Type of unusual (heading)', 'title', { wide: true, list: 'u-titles', placeholder: 'LOCO TROUBLE-DPWCS' }),
+    field('Location', 'location', { placeholder: 'PRLI-GTU' }),
+    field('Train no', 'trainNo', { placeholder: 'KSNK/BOXNL' }),
+    field('Loco no', 'locoNo', { wide: true, list: 'u-locos', placeholder: '27592+27767/KZJ/DUE-11/11' }),
+    field('Load (if any)', 'load', { placeholder: '59/59/4882T' }),
+    field('REP (reported to, if any)', 'rep'),
+    field('Sr.DEE incident ID (if any)', 'incident', { placeholder: '16596' }),
+    field('Reason (what happened)', 'reason', { area: true, wide: true, rows: 7, placeholder: 'Times, km, what was done, relief loco, crew...' }),
+    field('Official Sr.DEE report (paste the text, if any)', 'official', { area: true, wide: true, rows: 4 })),
+  h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
+  h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),
+  h('div', { class: 'editor-actions' },
+    h('button', { type: 'submit', class: 'btn primary' }, submit),
+    onCancel && h('button', { type: 'button', class: 'btn', onclick: onCancel }, 'Cancel')));
+}
+
+function openUnusualEditor(u) {
+  const dlg = document.getElementById('editor');
+  const draft = { ...u };
+  dlg.replaceChildren(h('div', { class: 'editor' },
+    h('h2', null, `Edit unusual report, ${L.fmtDay(u.day)}`),
+    unusualForm(draft, {
+      submit: 'Save',
+      onSubmit: () => {
+        dlg.close();
+        dispatch({ type: 'saveUnusual', unusual: draft, now: new Date().toISOString() });
+        toast('Saved');
+      },
+      onCancel: () => dlg.close(),
+    })));
+  dlg.showModal();
+}
+
+function unusualCard(u) {
+  const run = (fn) => async () => {
+    try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); }
+  };
+  const meta = [u.location, u.trainNo && `TR ${u.trainNo}`, u.locoNo].filter(Boolean).join('   |   ');
+  return h('article', { class: 'ucard' },
+    h('div', { class: 'ucard-head' },
+      h('strong', null, u.title || '(no heading)'),
+      u.det && h('span', { class: 'det' }, `DET ${u.det}`)),
+    meta && h('p', { class: 'ucard-meta' }, meta),
+    u.load && h('p', { class: 'ucard-meta' }, `Load: ${u.load}`),
+    u.reason && h('p', { class: 'ucard-reason' }, u.reason),
+    u.rep && h('p', { class: 'ucard-meta' }, `REP: ${u.rep}`),
+    (u.official || u.incident) && h('details', { class: 'ucard-official' },
+      h('summary', null, `Official Sr.DEE report${u.incident ? `, incident ${u.incident}` : ''}`),
+      u.official && h('p', { class: 'ucard-reason' }, u.official)),
+    h('div', { class: 'ucard-actions' },
+      h('button', { class: 'link', onclick: () => openUnusualEditor(u) }, 'Edit'),
+      h('button', { class: 'link', onclick: run(async () => {
+        const blob = await canvasToBlob(sheetToCanvas(unusualSheet([u])));
+        await shareOrDownload(blob, `Unusal-${L.fmtDay(u.day)}-${(u.trainNo || 'report').replace(/[^0-9A-Za-z]+/g, '-')}.png`, `UNUSALS-DATE-${L.fmtDay(u.day)}`);
+      }) }, 'Share image'),
+      h('button', { class: 'link', onclick: run(() => copyText(L.unusualText([u]))) }, 'Copy as text'),
+      h('button', {
+        class: 'link danger',
+        onclick: () => {
+          if (!confirm(`Delete the unusual report of ${L.fmtDay(u.day)} (${u.title || 'no heading'})?`)) return;
+          dispatch({ type: 'removeUnusual', id: u.id });
+          toast('Deleted');
+        },
+      }, 'Delete')));
+}
+
+function viewUnusuals() {
+  if (!ui.uDraft) ui.uDraft = L.blankUnusual(today());
+  const months = [...new Set(state.unusuals.map((u) => u.day.slice(0, 7)))].sort().reverse();
+  if (ui.uMonth !== 'all' && !months.includes(ui.uMonth)) ui.uMonth = 'all';
+
+  const buildList = () => {
+    const q = ui.uSearch.trim().toLowerCase();
+    const visible = state.unusuals.filter((u) =>
+      (ui.uMonth === 'all' || u.day.startsWith(ui.uMonth)) &&
+      (!q || [u.title, u.location, u.trainNo, u.locoNo, u.reason, u.rep, u.load, u.incident, u.official, L.fmtDay(u.day)].some((v) => (v || '').toLowerCase().includes(q))));
+    if (!visible.length) {
+      return [h('p', { class: 'empty' }, state.unusuals.length ? 'No unusual report matches.' : 'No unusual reports yet. Write the first one above.')];
+    }
+    const sheet = unusualSheet(visible, 'Unusals');
+    const base = `Unusals-${ui.uMonth === 'all' ? 'all' : monthLabel(ui.uMonth).replace(' ', '-')}`;
+    return [
+      h('p', { class: 'hint u-screen' }, `${visible.length} report${visible.length === 1 ? '' : 's'}. Share them all as one sheet, oldest first, numbered 1, 2, 3...`),
+      exportBar(sheet, base, `UNUSALS ${ui.uMonth === 'all' ? '' : monthLabel(ui.uMonth)}`.trim(), () => L.unusualText(visible)),
+      h('div', { class: 'u-screen' }, L.unusualsByDay(visible).map(([day, items]) => h('section', null,
+        h('h2', { class: 'section-title' }, L.fmtDay(day), h('span', { class: 'count' }, items.length)),
+        h('div', { class: 'ucards' }, items.map(unusualCard))))),
+      h('div', { class: 'sheet-wrap print-only', id: 'printable' }, sheetTable(sheet)),
+    ];
+  };
+
+  const search = h('input', {
+    type: 'search', class: 'search', placeholder: 'Search train, loco, location or reason', value: ui.uSearch,
+    oninput: (e) => { ui.uSearch = e.target.value; document.getElementById('ulist').replaceChildren(...buildList()); },
+  });
+  const month = h('select', {
+    'aria-label': 'Month',
+    onchange: (e) => { ui.uMonth = e.target.value; document.getElementById('ulist').replaceChildren(...buildList()); },
+  }, h('option', { value: 'all', selected: ui.uMonth === 'all' }, 'All months'),
+  months.map((m) => h('option', { value: m, selected: m === ui.uMonth }, monthLabel(m))));
+
+  return h('div', null,
+    SHARED && status.unusualsMissing && h('p', { class: 'notice' },
+      'Unusual reports are being kept on this device only for now. To share them with everyone, the shared database needs one extra table: run supabase/setup-unusuals.sql once (steps are in the README). Nothing is lost meanwhile.'),
+    h('section', { class: 'panel u-new u-screen' },
+      h('h2', null, 'New unusual report'),
+      unusualForm(ui.uDraft, {
+        submit: 'Save report',
+        onSubmit: () => {
+          const unusual = ui.uDraft;
+          ui.uDraft = null;
+          dispatch({ type: 'saveUnusual', unusual, now: new Date().toISOString() });
+          toast('Unusual report saved');
+        },
+        onCancel: null,
+      }),
+      h('button', { type: 'button', class: 'link', onclick: () => { ui.uDraft = null; render(); } }, 'Clear the form')),
+    h('h2', { class: 'section-title u-screen' }, 'All unusual reports', h('span', { class: 'count' }, state.unusuals.length)),
+    h('div', { class: 'toolbar wrap u-screen' }, search, month),
+    h('div', { id: 'ulist' }, buildList()));
+}
+
 // ---------- More ----------
 
 /** Backup, shown at the foot of History. */
@@ -541,7 +725,7 @@ function backupPanel() {
         const data = JSON.parse(await file.text());
         if (!data || !Array.isArray(data.locos) || !Array.isArray(data.log)) throw new Error('bad file');
         if (!confirm(`Replace everything on this device with the backup (${data.locos.length} locos)?`)) return;
-        state = { ...L.emptyState(), locos: data.locos, log: data.log, reports: data.reports || [], sync: NO_SYNC };
+        state = { ...L.emptyState(), locos: data.locos, log: data.log, reports: data.reports || [], unusuals: data.unusuals || [], unusualsImported: !!data.unusuals, sync: NO_SYNC };
         await saveState(state);
         ui.reportId = null;
         toast('Backup restored');
@@ -554,13 +738,13 @@ function backupPanel() {
   return h('section', { class: 'panel backup' },
     h('h2', null, 'Backup'),
     h('p', null, SHARED
-      ? `Download a copy of everything to keep as a file: ${state.locos.length} locos, ${state.log.length} history entries, ${state.reports.length} reports.`
+      ? `Download a copy of everything to keep as a file: ${state.locos.length} locos, ${state.log.length} history entries, ${state.reports.length} reports, ${state.unusuals.length} unusual reports.`
       : 'Your data is stored on this device only. Download a backup to keep a safe copy, or restore one here.'),
     h('div', { class: 'actions' },
       h('button', {
         class: 'btn',
         onclick: () => shareOrDownload(
-          new Blob([JSON.stringify({ version: 1, locos: state.locos, log: state.log, reports: state.reports })], { type: 'application/json' }),
+          new Blob([JSON.stringify({ version: 1, locos: state.locos, log: state.log, reports: state.reports, unusuals: state.unusuals })], { type: 'application/json' }),
           `loco-tracker-backup-${L.fmtDay(today())}.json`, 'Loco Tracker backup'),
       }, 'Download backup'),
       // Restoring replaces data, so it is only offered when nothing is shared.
@@ -631,8 +815,8 @@ function viewSignIn() {
 
 // ---------- shell ----------
 
-const TABS = [['locos', 'Locos'], ['report', 'Report'], ['history', 'History']];
-const VIEWS = { locos: viewLocos, report: viewReport, history: viewHistory };
+const TABS = [['locos', 'Locos'], ['report', 'Report'], ['unusuals', 'Unusuals'], ['history', 'History']];
+const VIEWS = { locos: viewLocos, report: viewReport, unusuals: viewUnusuals, history: viewHistory };
 
 // ---------- install as an app ----------
 // Chrome and Edge (Windows and Android) can install this page as an app with
@@ -737,6 +921,9 @@ function render() {
     id: typing.dataset.id, field: typing.dataset.field, value: typing.value,
     from: typing.selectionStart, to: typing.selectionEnd,
   };
+  const writing = document.activeElement && document.getElementById('app').contains(document.activeElement) &&
+    document.activeElement.dataset.ukey ? document.activeElement : null;
+  const keepWriting = writing && { key: writing.dataset.ukey, from: writing.selectionStart, to: writing.selectionEnd };
   redrawing = true;
   document.getElementById('app').replaceChildren(
     header,
@@ -746,6 +933,13 @@ function render() {
     }, text))),
     h('main', null, VIEWS[ui.view]()));
   redrawing = false;
+  if (keepWriting) {
+    const box = document.querySelector(`#app .u-input[data-ukey="${keepWriting.key}"]`);
+    if (box) {
+      box.focus();
+      try { box.setSelectionRange(keepWriting.from, keepWriting.to); } catch { /* date boxes have no cursor */ }
+    }
+  }
   if (keep) {
     const box = document.querySelector(`.cell-input[data-id="${keep.id}"][data-field="${keep.field}"]`);
     if (box) {
@@ -757,9 +951,10 @@ function render() {
 }
 
 function onSyncStatus(next) {
-  const screenChanged = (next.phase === 'signed-out') !== (status.phase === 'signed-out') || next.email !== status.email;
+  const screenChanged = (next.phase === 'signed-out') !== (status.phase === 'signed-out') || next.email !== status.email ||
+    (ui.view === 'unusuals' && next.unusualsMissing !== status.unusualsMissing);
   status = next;
-  if (status.phase === 'synced') importOldRecords();
+  if (status.phase === 'synced') { importOldRecords(); importOldUnusuals(); }
   if (screenChanged) { render(); return; }
   // Routine status changes only touch the status line, so a form being
   // filled in or a table being scrolled is not disturbed.
@@ -789,7 +984,7 @@ async function start() {
   }
   render();
   if (sync) sync.start();
-  else importOldRecords();
+  else { importOldRecords(); importOldUnusuals(); }
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }

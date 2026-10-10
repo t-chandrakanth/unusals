@@ -17,6 +17,13 @@ phone's home screen. It works without internet once opened.
   (for WhatsApp), an Excel file, plain text, or print it to PDF. Each time
   today's report is shared, a copy is kept under "Reports sent". Pick an
   earlier date to see the position as it stood on that day.
+- **Unusuals**: every unusual report, day-wise, with a blank form at the top
+  to write a new one (date, heading, location, train, loco, load, reason, DET,
+  REP). Each report can be edited, deleted, shared as an image in the daily
+  sheet layout, or copied as text; the whole list (or one month) can be shared
+  as one numbered sheet, as an Excel file, or printed to PDF. The Sr.DEE
+  "Loco Unusual Report" of an incident (incident ID and text) is kept with the
+  report and opens under it.
 - **History**: day-wise summary of one loco over any date range, with the
   same share options.
 - **Backup**: at the foot of History, download a copy of all data as a file.
@@ -59,6 +66,20 @@ each entry came from:
 Neither source records a time of day, so position reports are filed at
 12:00 and shed statements at 07:00. To rebuild the data file from fresh
 exports, run `tools/build_history.py` (see the notes at the top of it).
+
+## Unusual reports
+
+The reports written before the tab existed (the August and October daily
+sheets and the September statement, 12 in all, with the seven September
+Sr.DEE reports attached) are loaded once from `js/unusual-data.js` and
+`js/unusual-official.js`. They have fixed ids, so loading them again, or from
+two devices, cannot duplicate them.
+
+They are stored in a new database table. **Run `supabase/setup-unusuals.sql`
+once** in Supabase > SQL Editor (new installs get it from `setup.sql`). Until
+then the Unusuals tab works and keeps everything on the device, shows a notice,
+and the rest of the app syncs as before; the reports upload by themselves
+once the table exists. A deleted report is marked removed, not erased.
 
 ## Setting up the shared database (one time)
 

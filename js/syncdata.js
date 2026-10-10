@@ -1,9 +1,9 @@
 // Pure helpers for keeping this device and the shared database in step.
 // No network here: sync.js does the talking, this decides what to say.
 
-import { pick } from './logic.js';
+import { pick, pickUnusual } from './logic.js';
 
-export const TABLES = ['locos', 'log', 'reports'];
+export const TABLES = ['locos', 'log', 'reports', 'unusuals'];
 
 export function locoRow(loco, pos, by, deleted = false) {
   return {
@@ -19,6 +19,14 @@ export function logRow(e) {
 
 export function reportRow(r, deleted = false) {
   return { id: r.id, sent_at: r.at, day: r.day, locos: r.locos, sent_by: r.by || '', deleted };
+}
+
+export function unusualRow(u, deleted = false) {
+  return {
+    id: u.id, day: u.day, deleted,
+    data: { ...pickUnusual(u), updatedAt: u.updatedAt || '' },
+    updated_by: u.updatedBy || '',
+  };
 }
 
 /** What has to be sent to the database after the state went from prev to next. */
@@ -45,6 +53,14 @@ export function diffOps(prev, next, by) {
     }
     for (const r of before.values()) ops.push({ table: 'reports', row: reportRow(r, true) });
   }
+  if (prev.unusuals !== next.unusuals) {
+    const before = new Map(prev.unusuals.map((u) => [u.id, u]));
+    for (const u of next.unusuals) {
+      if (before.get(u.id) !== u) ops.push({ table: 'unusuals', row: unusualRow(u) });
+      before.delete(u.id);
+    }
+    for (const u of before.values()) ops.push({ table: 'unusuals', row: unusualRow(u, true) });
+  }
   return ops;
 }
 
@@ -54,6 +70,7 @@ export function allOps(state, by) {
     ...state.locos.map((l, i) => ({ table: 'locos', row: locoRow(l, i, by) })),
     ...state.log.map((e) => ({ table: 'log', row: logRow(e) })),
     ...state.reports.map((r) => ({ table: 'reports', row: reportRow(r) })),
+    ...state.unusuals.map((u) => ({ table: 'unusuals', row: unusualRow(u) })),
   ];
 }
 
@@ -96,6 +113,14 @@ export function applyRemote(state, table, rows, skip = new Set()) {
     }
     const reports = [...items.values()].sort((a, b) => a.at.localeCompare(b.at));
     return { ...state, reports };
+  }
+  if (table === 'unusuals') {
+    const items = new Map(state.unusuals.map((u) => [u.id, u]));
+    for (const r of rows) {
+      if (r.deleted) items.delete(r.id);
+      else items.set(r.id, { id: r.id, ...r.data, day: r.day, updatedBy: r.updated_by || '' });
+    }
+    return { ...state, unusuals: [...items.values()] };
   }
   return state;
 }
