@@ -55,8 +55,12 @@ export function reportSheet(locos, day) {
 }
 
 export function historySheet(label, summary, fromKey, toKey) {
+  // The "updated by" column only appears when the data is shared between people.
+  const withBy = summary.some((r) => r.by);
   const head = ['DATE', 'TIME', 'TR.NO', 'CURRENT LOCATION', 'DIVISION',
     'H/O TRAIN', 'H/O POINT', 'H/O- TIME', 'WORKING', 'REMARKS'];
+  const cols = [13, 11, 16, 20, 12, 14, 12, 16, 12, 40];
+  if (withBy) { head.push('UPDATED BY'); cols.push(16); }
   const rows = [
     spanRow(c(historyTitle(label, fromKey, toKey), 'title', { colSpan: head.length }), head.length),
     head.map((v) => c(v, 'head')),
@@ -64,17 +68,19 @@ export function historySheet(label, summary, fromKey, toKey) {
   for (const r of summary) {
     const d = r.data;
     const s = r.carried ? 'muted' : 'cell';
-    rows.push([
+    const row = [
       c(fmtDay(r.day), 'serial'),
       c(r.carried ? 'no change' : r.time, s),
       c(d.trainNo, s), c(d.location, s),
       c(d.division === 'OTHER' ? 'OTHER DIV' : 'SC DIV', s),
       c(d.hoTrain, s), c(d.hoPoint, s), c(d.hoTime, s), c(d.working, s),
       c(r.kind === 'removed' ? 'REMOVED FROM LIST' : d.remarks, r.carried ? 'muted' : 'text'),
-    ]);
+    ];
+    if (withBy) row.push(c(r.by, s));
+    rows.push(row);
   }
   if (!summary.length) {
     rows.push(spanRow(c('No records in this period', 'cell', { colSpan: head.length }), head.length));
   }
-  return { name: 'Summary', cols: [13, 11, 16, 20, 12, 14, 12, 16, 12, 40], rows };
+  return { name: 'Summary', cols, rows };
 }
