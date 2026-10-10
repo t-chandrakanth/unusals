@@ -107,7 +107,7 @@ export function unusualSheet(list, name = 'Unusuals') {
       ['DET', u.det, 'band', 'band'],
       u.rep && ['REP', u.rep, 'label', 'cell'],
     ].filter(Boolean);
-    rows.push(spanRow(c(`UNUSALS-DATE-${fmtDay(u.day)}`, 'dateTitle', { colSpan: 3 }), 3));
+    rows.push(spanRow(c(`UNUSALS-DATE-${fmtDay(u.day)}${u.time ? ` ${u.time}` : ''}`, 'dateTitle', { colSpan: 3 }), 3));
     fields.forEach(([label, value, ls, vs], j) => {
       rows.push([j === 0 ? c(i + 1, 'serial', { rowSpan: fields.length }) : null, c(label, ls), c(value, vs)]);
     });

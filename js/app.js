@@ -589,12 +589,13 @@ function unusualForm(draft, { submit, onSubmit, onCancel }) {
   },
   h('div', { class: 'grid' },
     field('Date', 'day', { type: 'date' }),
-    field('DET (detention)', 'det', { placeholder: '06:39 HRS' }),
+    field('Time', 'time', { type: 'time' }),
     field('Type of unusual (heading)', 'title', { wide: true, list: 'u-titles', placeholder: 'LOCO TROUBLE-DPWCS' }),
     field('Location', 'location', { placeholder: 'PRLI-GTU' }),
     field('Train no', 'trainNo', { placeholder: 'KSNK/BOXNL' }),
     field('Loco no', 'locoNo', { wide: true, list: 'u-locos', placeholder: '27592+27767/KZJ/DUE-11/11' }),
     field('Load (if any)', 'load', { placeholder: '59/59/4882T' }),
+    field('DET (detention)', 'det', { placeholder: '06:39 HRS' }),
     field('Reason (what happened)', 'reason', { area: true, wide: true, rows: 7, placeholder: 'Times, km, what was done, relief loco, crew...' })),
   h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
   h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),
@@ -627,7 +628,7 @@ function unusualCard(u) {
   const meta = [u.location, u.trainNo && `TR ${u.trainNo}`, u.locoNo].filter(Boolean).join('   |   ');
   return h('article', { class: 'ucard' },
     h('div', { class: 'ucard-head' },
-      h('strong', null, u.title || '(no heading)'),
+      h('strong', null, `${u.time ? `${u.time}  ` : ''}${u.title || '(no heading)'}`),
       u.det && h('span', { class: 'det' }, `DET ${u.det}`)),
     meta && h('p', { class: 'ucard-meta' }, meta),
     u.load && h('p', { class: 'ucard-meta' }, `Load: ${u.load}`),
@@ -654,7 +655,7 @@ function unusualCard(u) {
 }
 
 function viewUnusuals() {
-  if (!ui.uDraft) ui.uDraft = L.blankUnusual(today());
+  if (!ui.uDraft) ui.uDraft = { ...L.blankUnusual(today()), time: L.fmtTime(new Date()) };
   const months = [...new Set(state.unusuals.map((u) => u.day.slice(0, 7)))].sort().reverse();
   if (ui.uMonth !== 'all' && !months.includes(ui.uMonth)) ui.uMonth = 'all';
 

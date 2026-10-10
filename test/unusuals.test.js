@@ -130,3 +130,13 @@ test('once the table exists the waiting reports upload', async () => {
   assert.equal(state().sync.outbox.length, 0);
   assert.equal(state().unusuals.length, 12);
 });
+
+test('the time of the incident is kept, ordered within the day and shown in the heading', () => {
+  let s = seedState();
+  const mk = (time) => ({ ...L.blankUnusual('2026-10-09'), time, title: 'LOCO FAILED' });
+  s = L.reduce(s, { type: 'saveUnusual', unusual: mk('14:30'), now: now(9) });
+  s = L.reduce(s, { type: 'saveUnusual', unusual: mk('06:15'), now: now(10) });
+  assert.deepEqual(L.unusualsByDay(s.unusuals)[0][1].map((u) => u.time), ['06:15', '14:30']);
+  assert.equal(unusualSheet(s.unusuals).rows[0][0].v, 'UNUSALS-DATE-09-10-2026 06:15');
+  assert.match(L.unusualText(s.unusuals), /UNUSALS-DATE-09-10-2026 06:15/);
+});
