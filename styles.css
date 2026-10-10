@@ -229,3 +229,27 @@ button.dot.due { cursor: pointer; box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.18);
   .list-head, .card { grid-template-columns: 64px 1.1fr 1fr 1.4fr 70px; }
   .card .dot { margin: 0; justify-self: start; }
 }
+
+/* ---- unusual reports ---- */
+
+.u-new { max-width: 760px; margin-bottom: 6px; }
+.u-new .link { margin-top: 6px; }
+.u-form .editor-actions { margin-top: 12px; }
+.field textarea.u-input { resize: vertical; line-height: 1.4; }
+.notice { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--amber); border-radius: var(--radius); background: var(--card); font-size: 14px; }
+.ucards { display: grid; gap: 10px; max-width: 760px; }
+.ucard { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.ucard p { margin: 4px 0 0; }
+.ucard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.ucard-head strong { overflow-wrap: anywhere; }
+.ucard-head .det { flex: none; padding: 2px 9px; border-radius: 99px; background: var(--amber); color: #1b1300; font-size: 12px; font-weight: 700; }
+.ucard-meta { font-size: 14px; color: var(--soft); overflow-wrap: anywhere; }
+.ucard-reason { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ucard-actions { display: flex; flex-wrap: wrap; gap: 2px 16px; margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--line); }
+.print-only { display: none; }
+@media print {
+  .print-only { display: block; }
+  .u-screen { display: none !important; }
+}
+.ucard-official { margin-top: 6px; font-size: 14px; }
+.ucard-official summary { cursor: pointer; font-weight: 600; color: var(--soft); }

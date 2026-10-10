@@ -5,7 +5,7 @@
 // cell  = { v: text, s: style name, colSpan?, rowSpan? }
 // null  = a position covered by a merged cell above or to the left.
 
-import { numbered, reportTitles, historyTitle, fmtDay } from './logic.js';
+import { numbered, reportTitles, historyTitle, fmtDay, unusualsInOrder } from './logic.js';
 
 export const STYLES = {
   title:    { bg: '#FFFF00', color: '#000000', align: 'center' },
@@ -16,6 +16,10 @@ export const STYLES = {
   text:     { bg: '#FFFFFF', color: '#000000', align: 'left' },
   muted:    { bg: '#F3F3F3', color: '#555555', align: 'center' },
   gap:      { bg: null, color: '#000000', align: 'center', noBorder: true },
+  // Unusual reports: red date above, yellow bands for the heading and DET.
+  dateTitle: { bg: '#FFFFFF', color: '#FF0000', align: 'center' },
+  band:      { bg: '#FFFF00', color: '#FF0000', align: 'center' },
+  label:     { bg: '#FFFFFF', color: '#000000', align: 'left' },
 };
 
 const c = (v, s = 'cell', extra = {}) => ({ v: v == null ? '' : String(v), s, ...extra });
@@ -83,4 +87,31 @@ export function historySheet(label, summary, fromKey, toKey) {
     rows.push(spanRow(c('No records in this period', 'cell', { colSpan: head.length }), head.length));
   }
   return { name: 'Summary', cols, rows };
+}
+
+/**
+ * Unusual reports in the daily-sheet layout: one block per report with a red
+ * "UNUSALS-DATE-..." line above it and a running serial number, oldest first.
+ */
+export function unusualSheet(list, name = 'Unusuals') {
+  const rows = [];
+  unusualsInOrder(list).forEach((u, i) => {
+    if (i) rows.push(spanRow(c('', 'gap', { colSpan: 3 }), 3));
+    const fields = [
+      ['TRAIN DETAILS', u.title, 'band', 'band'],
+      ['LOCATION', u.location, 'label', 'cell'],
+      ['TRAIN NO', u.trainNo, 'label', 'cell'],
+      ['LOCO NO', u.locoNo, 'label', 'cell'],
+      u.load && ['LOAD', u.load, 'label', 'cell'],
+      ['REASON', u.reason, 'label', 'text'],
+      ['DET', u.det, 'band', 'band'],
+      u.rep && ['REP', u.rep, 'label', 'cell'],
+    ].filter(Boolean);
+    rows.push(spanRow(c(`UNUSALS-DATE-${fmtDay(u.day)}`, 'dateTitle', { colSpan: 3 }), 3));
+    fields.forEach(([label, value, ls, vs], j) => {
+      rows.push([j === 0 ? c(i + 1, 'serial', { rowSpan: fields.length }) : null, c(label, ls), c(value, vs)]);
+    });
+  });
+  if (!rows.length) rows.push(spanRow(c('No unusual reports', 'cell', { colSpan: 3 }), 3));
+  return { name, cols: [6, 18, 72], rows };
 }

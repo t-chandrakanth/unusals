@@ -29,12 +29,17 @@ export function createSync({ url, key, login, getState, setState, onStatus }) {
   let again = false;
   let timer = null;
   let lastError = '';
+  // The unusual reports live in a table that is added to the database by hand
+  // (supabase/setup-unusuals.sql). Until it exists they stay on this device
+  // and the rest of the app syncs as usual; they upload once it is there.
+  let unusualsMissing = false;
+  const isMissingTable = (e) => e.status === 404;
 
   const syncInfo = () => getState().sync || { outbox: [], cursor: {}, linked: false };
-  const pending = () => syncInfo().outbox.length;
+  const pending = () => syncInfo().outbox.filter((op) => !(unusualsMissing && op.table === 'unusuals')).length;
 
   function report(phase) {
-    onStatus({ phase, pending: pending(), email: session ? session.email : '', error: lastError });
+    onStatus({ phase, pending: pending(), email: session ? session.email : '', error: lastError, unusualsMissing });
   }
 
   function saveSession(s) {
@@ -98,18 +103,28 @@ export function createSync({ url, key, login, getState, setState, onStatus }) {
     if (!outbox.length) return;
     const count = outbox.length;
     const ops = collapse(outbox);
+    let held = false;
     for (const table of TABLES) {
       const rows = ops.filter((op) => op.table === table).map((op) => op.row);
-      for (let i = 0; i < rows.length; i += 500) {
-        // Log entries are only ever added, never rewritten, so the history
-        // cannot be altered once saved.
-        const onConflict = table === 'log' ? 'ignore-duplicates' : 'merge-duplicates';
-        await rest(table, { method: 'POST', body: rows.slice(i, i + 500), prefer: `resolution=${onConflict},return=minimal` });
+      try {
+        for (let i = 0; i < rows.length; i += 500) {
+          // Log entries are only ever added, never rewritten, so the history
+          // cannot be altered once saved.
+          const onConflict = table === 'log' ? 'ignore-duplicates' : 'merge-duplicates';
+          await rest(table, { method: 'POST', body: rows.slice(i, i + 500), prefer: `resolution=${onConflict},return=minimal` });
+        }
+        if (table === 'unusuals' && rows.length) unusualsMissing = false;
+      } catch (e) {
+        if (table !== 'unusuals' || !isMissingTable(e)) throw e;
+        unusualsMissing = true;
+        held = true;
       }
     }
-    // Anything queued while we were uploading stays in the outbox.
+    // Anything queued while we were uploading stays in the outbox, and so do
+    // unusual reports that have nowhere to go yet.
     const s = getState();
-    setState({ ...s, sync: { ...s.sync, outbox: s.sync.outbox.slice(count) } }, false);
+    const kept = held ? s.sync.outbox.slice(0, count).filter((op) => op.table === 'unusuals') : [];
+    setState({ ...s, sync: { ...s.sync, outbox: [...kept, ...s.sync.outbox.slice(count)] } }, false);
   }
 
   async function fetchSince(table, since) {
@@ -129,7 +144,14 @@ export function createSync({ url, key, login, getState, setState, onStatus }) {
       const cursor = s.sync.cursor[table];
       // Step back a few seconds so a row saved just as we last looked is not missed.
       const since = cursor ? new Date(new Date(cursor).getTime() - 5000).toISOString() : EPOCH;
-      fetched[table] = await fetchSince(table, since);
+      try {
+        fetched[table] = await fetchSince(table, since);
+        if (table === 'unusuals') unusualsMissing = false;
+      } catch (e) {
+        if (table !== 'unusuals' || !isMissingTable(e)) throw e;
+        unusualsMissing = true;
+        fetched[table] = [];
+      }
     }
 
     s = getState();

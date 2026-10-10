@@ -131,7 +131,7 @@ function sheetXml(sheet, names) {
       if ((cell.rowSpan || 1) === 1) {
         let width = 0;
         for (let j = 0; j < (cell.colSpan || 1); j++) width += sheet.cols[c + j];
-        lines = Math.max(lines, Math.ceil((cell.v.length * 1.25) / width));
+        lines = Math.max(lines, Math.ceil((cell.v.length * 1.25) / width) + cell.v.split('\n').length - 1);
       }
       if (cell.v === '') return `<c r="${ref}" s="${styleId(cell.s)}"/>`;
       return `<c r="${ref}" s="${styleId(cell.s)}" t="inlineStr"><is><t xml:space="preserve">${esc(cell.v)}</t></is></c>`;

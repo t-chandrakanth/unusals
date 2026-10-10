@@ -5,7 +5,9 @@ export const FIELDS = [
   'hoTrain', 'hoPoint', 'hoTime', 'foisDate', 'working', 'remarks', 'sameSerial',
 ];
 
-export const DIVISIONS = { OTHER: 'Other division', SC: 'SC division' };
+export const UNUSUAL_FIELDS = ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'rep', 'incident', 'official'];
+
+export const DIVISIONS ={ OTHER: 'Other division', SC: 'SC division' };
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -117,8 +119,56 @@ export function isUpdated(loco, since) {
   return (loco.updatedAt || '') > since || (loco.checkedAt || '') > since;
 }
 
+export function blankUnusual(day) {
+  return { id: uid(), day, title: '', location: '', trainNo: '', locoNo: '', load: '', reason: '', det: '', rep: '', incident: '', official: '' };
+}
+
+/** Only the written fields of an unusual report, trimmed. */
+export function pickUnusual(u) {
+  const out = {};
+  for (const f of UNUSUAL_FIELDS) out[f] = String(u[f] ?? '').trim();
+  return out;
+}
+
+export function sameUnusual(a, b) {
+  const pa = pickUnusual(a), pb = pickUnusual(b);
+  return UNUSUAL_FIELDS.every((f) => pa[f] === pb[f]);
+}
+
+/** Newest day first; within a day, the order they were written in. */
+export function unusualsByDay(list) {
+  const days = new Map();
+  for (const u of [...list].sort((a, b) => (a.updatedAt || '').localeCompare(b.updatedAt || ''))) {
+    if (!days.has(u.day)) days.set(u.day, []);
+    days.get(u.day).push(u);
+  }
+  return [...days.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+}
+
+/** Oldest day first, the order of the monthly statement. */
+export function unusualsInOrder(list) {
+  return unusualsByDay(list).reverse().flatMap(([, items]) => items);
+}
+
+export function unusualText(list) {
+  const lines = [];
+  unusualsInOrder(list).forEach((u, i) => {
+    if (i) lines.push('');
+    lines.push(`*${i + 1}. UNUSALS-DATE-${fmtDay(u.day)}*`);
+    lines.push(`*${u.title || '-'}*`);
+    lines.push(`Location: ${u.location || '-'}`);
+    lines.push(`Train no: ${u.trainNo || '-'}`);
+    lines.push(`Loco no: ${u.locoNo || '-'}`);
+    if (u.load) lines.push(`Load: ${u.load}`);
+    lines.push(`Reason: ${u.reason || '-'}`);
+    lines.push(`DET: ${u.det || '-'}`);
+    if (u.rep) lines.push(`REP: ${u.rep}`);
+  });
+  return lines.join('\n');
+}
+
 export function emptyState() {
-  return { version: 1, locos: [], log: [], reports: [] };
+  return { version: 1, locos: [], log: [], reports: [], unusuals: [] };
 }
 
 /** All state changes go through here so every edit is logged with its time. */
@@ -172,6 +222,16 @@ export function reduce(state, action) {
       return { ...state, reports: [...state.reports, action.report] };
     case 'removeReport':
       return { ...state, reports: state.reports.filter((r) => r.id !== action.id) };
+    case 'saveUnusual': {
+      const existing = state.unusuals.find((u) => u.id === action.unusual.id);
+      if (existing && sameUnusual(existing, action.unusual)) return state;
+      const unusual = { ...existing, id: action.unusual.id, ...pickUnusual(action.unusual), updatedAt: action.now, updatedBy: action.by || '' };
+      return { ...state, unusuals: existing
+        ? state.unusuals.map((u) => (u.id === unusual.id ? unusual : u))
+        : [...state.unusuals, unusual] };
+    }
+    case 'removeUnusual':
+      return { ...state, unusuals: state.unusuals.filter((u) => u.id !== action.id) };
     default:
       return state;
   }
