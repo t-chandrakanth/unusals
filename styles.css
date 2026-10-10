@@ -253,3 +253,16 @@ button.dot.due { cursor: pointer; box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.18);
 }
 .ucard-official { margin-top: 6px; font-size: 14px; }
 .ucard-official summary { cursor: pointer; font-weight: 600; color: var(--soft); }
+
+/* ---- phone: tap-to-install strip at the very top ---- */
+
+.install-banner { display: none; }
+@media (max-width: 759px) {
+  .install-banner { display: flex; align-items: stretch; margin: calc(-14px - env(safe-area-inset-top)) -16px 12px; padding-top: env(safe-area-inset-top); background: var(--amber); color: #1b1300; }
+  .install-go { flex: 1; display: grid; gap: 1px; padding: 11px 16px; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+  .install-go strong { font-size: 15px; }
+  .install-go span { font-size: 12px; }
+  .install-close { flex: none; width: 46px; border: 0; border-left: 1px solid rgba(0, 0, 0, 0.15); background: none; color: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
+  .top.has-banner .install { display: none; }
+}
+@media print { .install-banner { display: none !important; } }
