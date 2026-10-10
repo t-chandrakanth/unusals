@@ -185,12 +185,35 @@ function exportBar(sheet, fileBase, title, getText, before) {
 
 function locoCard(row) {
   const l = row.loco;
-  return h('button', { class: 'card', onclick: () => openEditor(l) },
+  // On a wide screen, train number and location can be changed right in the
+  // table. A phone hides these two boxes and opens the full form instead.
+  const cell = (key, label) => h('input', {
+    type: 'text', class: 'col cell-input', value: l[key], placeholder: '-',
+    'aria-label': `${label} of ${l.locoNo}`, 'data-id': l.id, 'data-field': key,
+    autocapitalize: 'characters', autocomplete: 'off',
+    onclick: (e) => e.stopPropagation(),
+    onkeydown: (e) => { if (e.key === 'Escape') { e.target.value = l[key]; e.target.blur(); } },
+    onchange: (e) => {
+      // A box removed by a redraw reports a change too; that is not the
+      // person finishing their edit, so it must not be saved.
+      if (redrawing || !e.target.isConnected) return;
+      const value = e.target.value.trim();
+      if (value === l[key]) return;
+      // Wait a moment so that, when moving to the next box with Tab, the
+      // cursor is already there and stays there after the list redraws.
+      setTimeout(() => {
+        const current = state.locos.find((x) => x.id === l.id);
+        if (!current) return;
+        dispatch({ type: 'save', loco: { ...current, [key]: value }, now: new Date().toISOString() });
+        toast(`${l.locoNo}: ${label.toLowerCase()} saved`);
+      }, 0);
+    },
+  });
+  return h('div', { class: 'card', onclick: () => openEditor(l) },
     h('span', { class: 'serial' }, row.span === 0 ? '' : String(row.serial)),
-    h('strong', { class: 'loco-no' }, l.locoNo || '(no number)'),
-    // Shown as extra columns on a wide screen; a phone shows the number only.
-    h('span', { class: 'col train' }, l.trainNo || '-'),
-    h('span', { class: 'col place' }, l.location || '-'));
+    h('button', { class: 'loco-no', title: 'Open all details' }, l.locoNo || '(no number)'),
+    cell('trainNo', 'Train no'),
+    cell('location', 'Current location'));
 }
 
 function viewLocos() {
@@ -221,7 +244,8 @@ function viewLocos() {
   return h('div', null,
     h('div', { class: 'toolbar' }, search,
       h('button', { class: 'btn primary', onclick: () => openEditor(null) }, '+ Add loco')),
-    h('p', { class: 'hint' }, 'Tap a loco number to see and update its details.'),
+    h('p', { class: 'hint wide-only' }, 'Type in the Train No or Current location box to change it. Click a loco number for all its details.'),
+    h('p', { class: 'hint narrow-only' }, 'Tap a loco number to see and update its details.'),
     h('div', { id: 'lists' }, buildLists()));
 }
 
@@ -617,6 +641,7 @@ async function installApp() {
 }
 
 let shownGate = null;
+let redrawing = false;
 
 function render() {
   // Shown before the app itself: sign-in, or in open mode a one-time name.
@@ -662,6 +687,14 @@ function render() {
     return;
   }
   shownGate = null;
+  // Redrawing must not interrupt someone typing in a table box.
+  const typing = document.activeElement && document.activeElement.classList.contains('cell-input')
+    ? document.activeElement : null;
+  const keep = typing && {
+    id: typing.dataset.id, field: typing.dataset.field, value: typing.value,
+    from: typing.selectionStart, to: typing.selectionEnd,
+  };
+  redrawing = true;
   document.getElementById('app').replaceChildren(
     header,
     h('nav', { class: 'tabs' }, TABS.map(([id, text]) => h('button', {
@@ -669,6 +702,15 @@ function render() {
       onclick: () => { ui.view = id; render(); window.scrollTo(0, 0); },
     }, text))),
     h('main', null, VIEWS[ui.view]()));
+  redrawing = false;
+  if (keep) {
+    const box = document.querySelector(`.cell-input[data-id="${keep.id}"][data-field="${keep.field}"]`);
+    if (box) {
+      box.value = keep.value;
+      box.focus();
+      box.setSelectionRange(keep.from, keep.to);
+    }
+  }
 }
 
 function onSyncStatus(next) {

@@ -195,15 +195,20 @@ main > div > .segs { max-width: 420px; }
 
 /* ---- loco list: a phone shows numbers only, a wide screen shows a table ---- */
 
-.card .col, .list-head { display: none; }
+.card .loco-no { padding: 0; border: 0; background: none; font-weight: 700; text-align: left; cursor: pointer; color: inherit; }
+.card .col, .list-head, .wide-only { display: none; }
 @media (min-width: 760px) {
+  .wide-only { display: block; }
+  .narrow-only { display: none; }
   #lists section { max-width: 900px; gap: 0; }
   #lists .section-title { margin-bottom: 8px; }
-  .list-head, .card { display: grid; grid-template-columns: 64px 1.1fr 1fr 1.4fr; align-items: center; gap: 12px; padding: 9px 14px; }
-  .list-head { border: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; background: var(--line); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--soft); }
-  .card { border-top: 0; border-radius: 0; }
+  .list-head, .card { display: grid; grid-template-columns: 64px 1.1fr 1fr 1.4fr; align-items: center; gap: 12px; padding: 6px 14px; }
+  .list-head { padding: 9px 14px; border: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; background: var(--line); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--soft); }
+  .card { border-top: 0; border-radius: 0; cursor: default; }
   .card:last-child { border-radius: 0 0 var(--radius) var(--radius); }
   .card:hover { background: var(--bg); }
-  .card .col { display: block; min-width: 0; font-size: 15px; overflow-wrap: anywhere; }
+  .card .loco-no:hover { text-decoration: underline; }
+  .card .cell-input { display: block; width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); font-size: 15px; }
+  .card .cell-input:hover { border-color: var(--soft); }
   .serial { width: 28px; }
 }
