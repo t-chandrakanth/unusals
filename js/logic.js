@@ -2,7 +2,7 @@
 
 export const FIELDS = [
   'locoNo', 'dueDate', 'trainNo', 'location', 'division',
-  'hoTrain', 'hoPoint', 'hoTime', 'working', 'remarks', 'sameSerial',
+  'hoTrain', 'hoPoint', 'hoTime', 'foisDate', 'working', 'remarks', 'sameSerial',
 ];
 
 export const DIVISIONS = { OTHER: 'Other division', SC: 'SC division' };
@@ -44,7 +44,7 @@ export function uid() {
 export function blankLoco(division = 'SC') {
   return {
     id: uid(), locoNo: '', dueDate: '', trainNo: '', location: '', division,
-    hoTrain: '', hoPoint: '', hoTime: '', working: '', remarks: '',
+    hoTrain: '', hoPoint: '', hoTime: '', foisDate: '', working: '', remarks: '',
     sameSerial: false, updatedAt: '',
   };
 }
@@ -62,6 +62,15 @@ export function pick(loco) {
 export function sameFields(a, b) {
   const pa = pick(a), pb = pick(b);
   return FIELDS.every((f) => pa[f] === pb[f]);
+}
+
+/**
+ * The FOIS message date written inside a remark (DD-MM-YYYY), as YYYY-MM-DD.
+ * Used for locos saved before the date had its own field.
+ */
+export function foisDateFromRemarks(remarks) {
+  const m = /\bon\s+(\d{2})-(\d{2})-(\d{4})/i.exec(remarks || '');
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 }
 
 export function foisRemark(day) {
