@@ -19,7 +19,9 @@ phone's home screen. It works without internet once opened.
   earlier date to see the position as it stood on that day.
 - **History**: day-wise summary of one loco over any date range, with the
   same share options.
-- **More**: backup and restore, to move data between phone and computer.
+- **Backup**: at the foot of History, download a copy of all data as a file.
+  The top bar shows the sync state (tap it to sync now) and your name (tap to
+  change it).
 
 Every change is saved with its date and time, which is what the history and
 the past-date reports are built from.
@@ -29,8 +31,8 @@ the past-date reports are built from.
 The app has two modes, chosen by `js/config.js`.
 
 **On the device only** (config left empty). Data is stored in the browser on
-the device you use and is not uploaded anywhere. Use **More > Download
-backup** and **Restore backup** to move it between devices.
+the device you use and is not uploaded anywhere. Use **Download backup** and **Restore backup** at the foot of History to
+move it between devices.
 
 **Shared database** (config filled in). Data is kept in a Supabase database
 and shared by everyone who opens the app, so every phone and computer shows

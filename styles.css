@@ -132,7 +132,6 @@ dialog::backdrop { background: rgba(8, 16, 28, 0.55); }
 
 /* ---- more ---- */
 
-.more { display: grid; gap: 12px; }
 .panel { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
 .panel h2 { margin: 0 0 6px; font-size: 16px; }
 .panel p { margin: 0 0 10px; font-size: 14px; color: var(--soft); }
@@ -158,11 +157,15 @@ dialog::backdrop { background: rgba(8, 16, 28, 0.55); }
 
 /* ---- shared database: status line and sign-in ---- */
 
-.top .sync { margin-top: 5px; font-size: 12px; color: #9fd8b4; }
+.top .top-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 14px; margin-top: 3px; }
+.top .sync, .top .who { padding: 4px 0; border: 0; background: none; font-size: 12px; text-align: left; cursor: pointer; white-space: pre-wrap; }
+.top .sync { color: #9fd8b4; }
 .top .sync::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: currentColor; vertical-align: 1px; }
 .top .sync.syncing { color: #c5d2e3; }
 .top .sync.offline { color: #ffd166; }
 .top .sync.error { color: #ff9d94; }
+.top .who { color: #c5d2e3; text-decoration: underline; text-underline-offset: 2px; }
+.backup { margin-top: 28px; }
 
 .signin { max-width: 420px; margin: 24px auto; display: grid; gap: 12px; }
 .signin h2, .signin p { margin: 0; }
@@ -177,3 +180,5 @@ dialog::backdrop { background: rgba(8, 16, 28, 0.55); }
 .day.on { background: var(--navy); border-color: var(--navy); color: #fff; }
 main > div > .segs { max-width: 420px; }
 .btn:disabled { opacity: 0.45; cursor: default; }
+
+@media print { .segs, .days, .backup { display: none !important; } }
