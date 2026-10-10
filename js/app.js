@@ -296,7 +296,12 @@ function openEditor(loco) {
     const other = draft.division === 'OTHER';
     const seg = (value, text) => h('button', {
       type: 'button', class: `seg ${draft.division === value ? 'on' : ''}`,
-      onclick: () => { draft.division = value; build(); },
+      onclick: () => {
+        // Handing a loco over needs its H/O details, so those open up.
+        if (value === 'OTHER' && draft.division !== 'OTHER') showAll = true;
+        draft.division = value;
+        build();
+      },
     }, text);
     const canShare = !isNew || state.locos.some((l) => l.division === draft.division);
     dlg.replaceChildren(h('form', {
@@ -317,7 +322,7 @@ function openEditor(loco) {
       },
     },
     h('h2', null, isNew ? 'Add loco' : `Update ${loco.locoNo}`),
-    showAll && h('div', { class: 'segs' }, seg('SC', 'SC division'), seg('OTHER', 'Other division')),
+    h('div', { class: 'segs' }, seg('SC', 'SC division'), seg('OTHER', 'Other division')),
     h('div', { class: 'grid' },
       field('Loco no', 'locoNo', { placeholder: '27609+28411', wide: !showAll }),
       field('Train no', 'trainNo'),
