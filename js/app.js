@@ -183,7 +183,7 @@ function exportBar(sheet, fileBase, title, getText, before) {
 
 // ---------- Locos ----------
 
-function locoCard(row) {
+function locoCard(row, since) {
   const l = row.loco;
   // On a wide screen, train number and location can be changed right in the
   // table. A phone hides these two boxes and opens the full form instead.
@@ -209,15 +209,32 @@ function locoCard(row) {
       }, 0);
     },
   });
+  // Green: updated since the last report. Red: still to be updated. Pressing
+  // a red dot confirms "no change" without typing anything.
+  const ok = L.isUpdated(l, since);
+  const dot = h('button', {
+    class: `dot ${ok ? 'ok' : 'due'}`,
+    title: ok ? 'Updated' : 'Not updated yet. Press to confirm there is no change.',
+    'aria-label': ok ? `${l.locoNo} is updated` : `${l.locoNo} is not updated yet. Press to confirm there is no change.`,
+    onclick: (e) => {
+      e.stopPropagation();
+      if (ok) return;
+      dispatch({ type: 'check', id: l.id, now: new Date().toISOString() });
+      toast(`${l.locoNo}: confirmed, no change`);
+    },
+  }, ok ? '\u2713' : '!');
   return h('div', { class: 'card', onclick: () => openEditor(l) },
     h('span', { class: 'serial' }, row.span === 0 ? '' : String(row.serial)),
-    h('button', { class: 'loco-no', title: 'Open all details' }, l.locoNo || '(no number)'),
+    h('button', { class: 'loco-no', title: 'Open this loco' }, l.locoNo || '(no number)'),
     cell('trainNo', 'Train no'),
-    cell('location', 'Current location'));
+    cell('location', 'Current location'),
+    dot);
 }
 
 function viewLocos() {
   const buildLists = () => {
+    const since = L.roundStart(state.reports);
+    const sentToday = state.reports.some((r) => r.at === since);
     const q = ui.search.trim().toLowerCase();
     const rows = L.numbered(state.locos).filter((r) => !q ||
       [r.loco.locoNo, r.loco.trainNo, r.loco.location, r.loco.hoPoint, r.loco.remarks]
@@ -227,10 +244,16 @@ function viewLocos() {
       return h('section', null,
         h('h2', { class: `section-title ${division.toLowerCase()}` }, title, h('span', { class: 'count' }, list.length)),
         list.length > 0 && h('div', { class: 'list-head', 'aria-hidden': 'true' },
-          h('span', null, 'Sr. No'), h('span', null, 'Loco No'), h('span', null, 'Train No'), h('span', null, 'Current location')),
-        list.length ? list.map(locoCard) : h('p', { class: 'empty' }, q ? 'No match.' : 'No locos here.'));
+          h('span', null, 'Sr. No'), h('span', null, 'Loco No'), h('span', null, 'Train No'), h('span', null, 'Current location'), h('span', null, 'Updated')),
+        list.length ? list.map((r) => locoCard(r, since)) : h('p', { class: 'empty' }, q ? 'No match.' : 'No locos here.'));
     };
-    return [section('OTHER', 'In other divisions'), section('SC', 'In SC division')];
+    const done = state.locos.filter((l) => L.isUpdated(l, since)).length;
+    const total = state.locos.length;
+    const progress = h('p', { class: `progress ${done === total ? 'all' : ''}` },
+      h('span', { class: 'dot ok', 'aria-hidden': 'true' }, '\u2713'), `${done} updated`,
+      h('span', { class: 'dot due', 'aria-hidden': 'true' }, '!'), `${total - done} to update`,
+      h('span', { class: 'since' }, sentToday ? `since the report sent at ${L.fmtTime(since)}` : 'today'));
+    return [progress, section('OTHER', 'In other divisions'), section('SC', 'In SC division')];
   };
   // Typing in the search box only redraws the lists, so the keyboard stays open.
   const search = h('input', {
@@ -265,6 +288,10 @@ function openEditor(loco) {
       }),
     opts.extra);
 
+  // Opens with the three things updated most often. Everything else is one
+  // press away.
+  let showAll = isNew;
+
   const build = () => {
     const other = draft.division === 'OTHER';
     const seg = (value, text) => h('button', {
@@ -278,27 +305,34 @@ function openEditor(loco) {
         e.preventDefault();
         if (!draft.locoNo.trim()) { toast('Enter the loco number'); return; }
         dlg.close();
-        dispatch({ type: 'save', loco: draft, now: new Date().toISOString() });
+        const now = new Date().toISOString();
+        if (!isNew && L.sameFields(loco, draft)) {
+          // Saving without changing anything confirms the loco is as shown.
+          dispatch({ type: 'check', id: loco.id, now });
+          toast('Confirmed, no change');
+          return;
+        }
+        dispatch({ type: 'save', loco: draft, now });
         toast(isNew ? 'Loco added' : 'Saved');
       },
     },
     h('h2', null, isNew ? 'Add loco' : `Update ${loco.locoNo}`),
-    h('div', { class: 'segs' }, seg('SC', 'SC division'), seg('OTHER', 'Other division')),
+    showAll && h('div', { class: 'segs' }, seg('SC', 'SC division'), seg('OTHER', 'Other division')),
     h('div', { class: 'grid' },
-      field('Loco no', 'locoNo', { placeholder: '27609+28411' }),
-      field('Due date', 'dueDate', { placeholder: '15-Oct or FRESH' }),
+      field('Loco no', 'locoNo', { placeholder: '27609+28411', wide: !showAll }),
       field('Train no', 'trainNo'),
       field('Current location', 'location'),
-      other && field('H/O train to other div', 'hoTrain'),
-      other && field('H/O point', 'hoPoint'),
-      other && field('H/O time', 'hoTime', {
+      showAll && field('Due date', 'dueDate', { placeholder: '15-Oct or FRESH' }),
+      showAll && other && field('H/O train to other div', 'hoTrain'),
+      showAll && other && field('H/O point', 'hoPoint'),
+      showAll && other && field('H/O time', 'hoTime', {
         placeholder: 'DD-MM-YY HH:MM',
         extra: h('button', { type: 'button', class: 'link', onclick: () => { draft.hoTime = L.fmtDateTime(new Date()); build(); } }, 'Use current time'),
       }),
-      !other && field('Working', 'working', { placeholder: 'YES, Shed in, ...' }),
+      showAll && !other && field('Working', 'working', { placeholder: 'YES, Shed in, ...' }),
       // Picking the FOIS message date writes the standard remark with that
       // date. The remark can still be edited by hand afterwards.
-      other && h('label', { class: 'field' },
+      showAll && other && h('label', { class: 'field' },
         h('span', null, 'FOIS message date'),
         h('input', {
           type: 'date',
@@ -313,14 +347,18 @@ function openEditor(loco) {
           type: 'button', class: 'link',
           onclick: () => { draft.foisDate = today(); draft.remarks = L.foisRemark(draft.foisDate); build(); },
         }, 'Use today')),
-      field('Remarks', 'remarks', { area: true, wide: true })),
-    canShare && h('label', { class: 'check' },
+      showAll && field('Remarks', 'remarks', { area: true, wide: true })),
+    showAll && canShare && h('label', { class: 'check' },
       h('input', { type: 'checkbox', checked: !!draft.sameSerial, onchange: (e) => { draft.sameSerial = e.target.checked; } }),
       'Same S.No as the loco above (split consist)'),
     h('div', { class: 'editor-actions' },
       h('button', { type: 'submit', class: 'btn primary' }, 'Save'),
       h('button', { type: 'button', class: 'btn', onclick: () => dlg.close() }, 'Cancel')),
-    !isNew && h('div', { class: 'editor-more' },
+    !isNew && h('button', {
+      type: 'button', class: 'link toggle', 'aria-expanded': String(showAll),
+      onclick: () => { showAll = !showAll; build(); },
+    }, showAll ? 'Hide other details' : 'Show all details'),
+    showAll && !isNew && h('div', { class: 'editor-more' },
       h('button', { type: 'button', class: 'link', onclick: () => { dlg.close(); dispatch({ type: 'move', id: loco.id, dir: -1 }); } }, 'Move up'),
       h('button', { type: 'button', class: 'link', onclick: () => { dlg.close(); dispatch({ type: 'move', id: loco.id, dir: 1 }); } }, 'Move down'),
       h('button', { type: 'button', class: 'link', onclick: () => { dlg.close(); ui.view = 'history'; ui.histMode = 'loco'; ui.histLoco = loco.id; render(); } }, 'History'),

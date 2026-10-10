@@ -102,6 +102,21 @@ export function numbered(locos) {
   return out;
 }
 
+/**
+ * The moment the current round of updating began: when the last report was
+ * sent, or the start of today if nothing has been sent yet today.
+ */
+export function roundStart(reports, now = new Date()) {
+  let since = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  for (const r of reports) if (r.at > since) since = r.at;
+  return since;
+}
+
+/** Has this loco been updated, or confirmed unchanged, in the current round? */
+export function isUpdated(loco, since) {
+  return (loco.updatedAt || '') > since || (loco.checkedAt || '') > since;
+}
+
 export function emptyState() {
   return { version: 1, locos: [], log: [], reports: [] };
 }
@@ -129,6 +144,12 @@ export function reduce(state, action) {
         kind: existing ? 'updated' : 'created', data: pick(loco), by: action.by || '',
       };
       return { ...state, locos, log: [...state.log, entry] };
+    }
+    case 'check': {
+      // "Looked at it, nothing has changed": counts as updated for the round
+      // without adding a history entry.
+      if (!state.locos.some((l) => l.id === action.id)) return state;
+      return { ...state, locos: state.locos.map((l) => (l.id === action.id ? { ...l, checkedAt: action.now } : l)) };
     }
     case 'remove': {
       const loco = state.locos.find((l) => l.id === action.id);
