@@ -832,6 +832,14 @@ window.addEventListener('appinstalled', () => {
   render();
 });
 
+const BANNER_KEY = 'loco-tracker-install-banner-closed';
+function installBannerClosed() {
+  try { return localStorage.getItem(BANNER_KEY) === '1'; } catch { return false; }
+}
+function closeInstallBanner() {
+  try { localStorage.setItem(BANNER_KEY, '1'); } catch { /* private mode */ }
+}
+
 function isInstalled() {
   return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 }
@@ -875,7 +883,18 @@ function render() {
     : (sync && !sync.email ? viewName : null);
   const signedOut = !!gate;
   const other = state.locos.filter((l) => l.division === 'OTHER').length;
-  const header = h('header', { class: 'top' },
+  // On a phone, a full-width strip at the very top offers the install in
+  // one tap. Closing it leaves the small Install app button in its place.
+  const banner = !isInstalled() && !installBannerClosed();
+  const header = h('header', { class: `top ${banner ? 'has-banner' : ''}` },
+    banner && h('div', { class: 'install-banner' },
+      h('button', { class: 'install-go', onclick: installApp },
+        h('strong', null, 'Tap here to install the app'),
+        h('span', null, 'Opens from your home screen like any other app')),
+      h('button', {
+        class: 'install-close', 'aria-label': 'Hide the install message',
+        onclick: () => { closeInstallBanner(); render(); },
+      }, '\u00d7')),
     h('div', { class: 'top-inner' },
       h('div', { class: 'top-row' },
         h('h1', null, 'DPWS Loco Tracker'),
