@@ -1,6 +1,6 @@
 {
-  "name": "DPWS Loco Tracker",
-  "short_name": "Loco Tracker",
+  "name": "DPWCS LOCO",
+  "short_name": "DPWCS LOCO",
   "description": "Track DPWS loco positions, send the daily report, and keep a day-wise history.",
   "start_url": "./",
   "scope": "./",

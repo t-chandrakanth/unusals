@@ -729,7 +729,7 @@ function backupPanel() {
         toast('Backup restored');
         render();
       } catch {
-        toast('That file is not a Loco Tracker backup');
+        toast('That file is not a DPWCS LOCO backup');
       }
     },
   });
@@ -743,7 +743,7 @@ function backupPanel() {
         class: 'btn',
         onclick: () => shareOrDownload(
           new Blob([JSON.stringify({ version: 1, locos: state.locos, log: state.log, reports: state.reports, unusuals: state.unusuals })], { type: 'application/json' }),
-          `loco-tracker-backup-${L.fmtDay(today())}.json`, 'Loco Tracker backup'),
+          `dpwcs-loco-backup-${L.fmtDay(today())}.json`, 'DPWCS LOCO backup'),
       }, 'Download backup'),
       // Restoring replaces data, so it is only offered when nothing is shared.
       !SHARED && h('button', { class: 'btn', onclick: () => fileInput.click() }, 'Restore backup'),
@@ -859,7 +859,7 @@ async function installApp() {
     h('p', null, 'It installs straight from this page. There is nothing to download from a store.'),
     step('Windows computer (Chrome or Edge)',
       'Open this page in Chrome or Edge.',
-      'Click the install icon at the right end of the address bar (a small screen with a down arrow), or open the three-dot menu and choose "Install DPWS Loco Tracker" (in Chrome: Cast, save and share, then Install page as app; in Edge: Apps, then Install this site as an app).',
+      'Click the install icon at the right end of the address bar (a small screen with a down arrow), or open the three-dot menu and choose "Install DPWCS LOCO" (in Chrome: Cast, save and share, then Install page as app; in Edge: Apps, then Install this site as an app).',
       'Click Install. The app opens in its own window and appears in the Start menu. Right-click its taskbar icon and choose "Pin to taskbar" to keep it handy.'),
     step('Android phone (Chrome)',
       'Open this page in Chrome.',
@@ -897,7 +897,7 @@ function render() {
       }, '\u00d7')),
     h('div', { class: 'top-inner' },
       h('div', { class: 'top-row' },
-        h('h1', null, 'DPWS Loco Tracker'),
+        h('h1', null, 'DPWCS LOCO'),
         !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app')),
       h('p', null, signedOut
         ? L.fmtDay(today())
