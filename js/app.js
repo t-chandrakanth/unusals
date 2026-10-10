@@ -26,9 +26,8 @@ const ui = {
   reportDay: today(),
   reportId: null, // a saved report being viewed, or null for the live one
   histLoco: null,
-  histFrom: L.addDays(today(), -6),
+  histFrom: L.addDays(today(), -29),
   histTo: today(),
-  histChangesOnly: false,
   histMode: 'date', // 'date': all locos on one day; 'loco': one loco over many days
   histDay: today(),
 };
@@ -431,15 +430,9 @@ function viewHistoryLoco() {
   const choices = L.locoChoices(state);
   if (!choices.some((ch) => ch.id === ui.histLoco)) ui.histLoco = choices[0] ? choices[0].id : null;
   const choice = choices.find((ch) => ch.id === ui.histLoco);
-  let rows = choice ? L.daySummary(state.log, choice.id, ui.histFrom, ui.histTo) : [];
-  if (ui.histChangesOnly) rows = rows.filter((r) => !r.carried);
+  const rows = choice ? L.daySummary(state.log, choice.id, ui.histFrom, ui.histTo) : [];
   const label = choice ? choice.label : '';
   const sheet = historySheet(label, rows, ui.histFrom, ui.histTo);
-  const range = (n) => h('button', {
-    class: 'btn small',
-    onclick: () => { ui.histTo = today(); ui.histFrom = L.addDays(today(), -(n - 1)); render(); },
-  }, `Last ${n} days`);
-
   return h('div', null,
     h('p', { class: 'hint' }, 'Day-wise summary of one loco, for when an officer asks where it has been.'),
     h('div', { class: 'toolbar wrap' },
@@ -450,10 +443,6 @@ function viewHistoryLoco() {
         h('input', { type: 'date', value: ui.histFrom, onchange: (e) => { ui.histFrom = e.target.value || ui.histFrom; render(); } })),
       h('label', { class: 'inline' }, 'To',
         h('input', { type: 'date', value: ui.histTo, onchange: (e) => { ui.histTo = e.target.value || ui.histTo; render(); } }))),
-    h('div', { class: 'toolbar wrap' }, range(7), range(30), range(90),
-      h('label', { class: 'check' },
-        h('input', { type: 'checkbox', checked: ui.histChangesOnly, onchange: (e) => { ui.histChangesOnly = e.target.checked; render(); } }),
-        'Only days with a change')),
     choice
       ? [exportBar(sheet, `Loco-${label.replace(/[^0-9A-Za-z+]+/g, '-')}-summary`, sheet.rows[0][0].v,
         () => L.historyText(label, rows, ui.histFrom, ui.histTo)),
