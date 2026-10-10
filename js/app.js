@@ -187,7 +187,10 @@ function locoCard(row) {
   const l = row.loco;
   return h('button', { class: 'card', onclick: () => openEditor(l) },
     h('span', { class: 'serial' }, row.span === 0 ? '' : String(row.serial)),
-    h('strong', { class: 'loco-no' }, l.locoNo || '(no number)'));
+    h('strong', { class: 'loco-no' }, l.locoNo || '(no number)'),
+    // Shown as extra columns on a wide screen; a phone shows the number only.
+    h('span', { class: 'col train' }, l.trainNo || '-'),
+    h('span', { class: 'col place' }, l.location || '-'));
 }
 
 function viewLocos() {
@@ -200,6 +203,8 @@ function viewLocos() {
       const list = rows.filter((r) => r.loco.division === division);
       return h('section', null,
         h('h2', { class: `section-title ${division.toLowerCase()}` }, title, h('span', { class: 'count' }, list.length)),
+        list.length > 0 && h('div', { class: 'list-head', 'aria-hidden': 'true' },
+          h('span', null, 'Sr. No'), h('span', null, 'Loco No'), h('span', null, 'Train No'), h('span', null, 'Current location')),
         list.length ? list.map(locoCard) : h('p', { class: 'empty' }, q ? 'No match.' : 'No locos here.'));
     };
     return [section('OTHER', 'In other divisions'), section('SC', 'In SC division')];
@@ -562,6 +567,55 @@ function viewSignIn() {
 const TABS = [['locos', 'Locos'], ['report', 'Report'], ['history', 'History']];
 const VIEWS = { locos: viewLocos, report: viewReport, history: viewHistory };
 
+// ---------- install as an app ----------
+// Chrome and Edge (Windows and Android) can install this page as an app with
+// its own window and icon. They hand us the install prompt when it is
+// available; other browsers get short instructions instead.
+
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+});
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  toast('Installed. Open it from your apps or home screen.');
+  render();
+});
+
+function isInstalled() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+async function installApp() {
+  if (installPrompt) {
+    const prompt = installPrompt;
+    installPrompt = null;
+    prompt.prompt();
+    await prompt.userChoice.catch(() => null);
+    return;
+  }
+  const dlg = document.getElementById('editor');
+  const step = (title, ...lines) => h('section', null, h('h3', null, title), h('ol', null, lines.map((l) => h('li', null, l))));
+  dlg.replaceChildren(h('div', { class: 'editor help' },
+    h('h2', null, 'Install the app'),
+    h('p', null, 'It installs straight from this page. There is nothing to download from a store.'),
+    step('Windows computer (Chrome or Edge)',
+      'Open this page in Chrome or Edge.',
+      'Click the install icon at the right end of the address bar (a small screen with a down arrow), or open the three-dot menu and choose "Install DPWS Loco Tracker" (in Chrome: Cast, save and share, then Install page as app; in Edge: Apps, then Install this site as an app).',
+      'Click Install. The app opens in its own window and appears in the Start menu. Right-click its taskbar icon and choose "Pin to taskbar" to keep it handy.'),
+    step('Android phone (Chrome)',
+      'Open this page in Chrome.',
+      'Tap the three-dot menu at the top right.',
+      'Tap "Add to Home screen", then "Install".'),
+    step('iPhone (Safari)',
+      'Open this page in Safari.',
+      'Tap the Share button.',
+      'Tap "Add to Home Screen", then "Add".'),
+    h('div', { class: 'editor-actions' }, h('button', { class: 'btn primary', onclick: () => dlg.close() }, 'Close'))));
+  dlg.showModal();
+}
+
 let shownGate = null;
 
 function render() {
@@ -573,7 +627,9 @@ function render() {
   const other = state.locos.filter((l) => l.division === 'OTHER').length;
   const header = h('header', { class: 'top' },
     h('div', { class: 'top-inner' },
-      h('h1', null, 'DPWS Loco Tracker'),
+      h('div', { class: 'top-row' },
+        h('h1', null, 'DPWS Loco Tracker'),
+        !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app')),
       h('p', null, signedOut
         ? L.fmtDay(today())
         : `${L.fmtDay(today())}  |  ${state.locos.length} locos  |  ${other} in other divisions`),
