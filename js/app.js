@@ -6,6 +6,7 @@ import { sheetToXlsx } from './xlsx.js';
 import { sheetToCanvas, canvasToBlob } from './canvas.js';
 import { createSync } from './sync.js';
 import { diffOps } from './syncdata.js';
+import { importHistory, alreadyImported } from './historyimport.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from './config.js';
 
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -54,21 +55,45 @@ function persist() {
   saveState(state).then((ok) => { if (!ok) toast('Could not save on this device'); });
 }
 
-function dispatch(action) {
-  const next = L.reduce(state, { ...action, by: who() });
-  if (next !== state) {
-    if (sync) {
-      // Queue the change for the shared database; it uploads straight away
-      // when online and waits safely on this device when not.
-      const ops = diffOps(state, next, who());
-      state = { ...next, sync: { ...next.sync, outbox: [...next.sync.outbox, ...ops] } };
-      sync.kick();
-    } else {
-      state = next;
-    }
-    persist();
+/** Make next the current state, save it, and queue what changed for upload. */
+function commit(next) {
+  if (next === state) return;
+  if (sync) {
+    // Queue the change for the shared database; it uploads straight away
+    // when online and waits safely on this device when not.
+    const ops = diffOps(state, next, who());
+    state = { ...next, sync: { ...next.sync, outbox: [...next.sync.outbox, ...ops] } };
+    sync.kick();
+  } else {
+    state = next;
   }
+  persist();
+}
+
+function dispatch(action) {
+  commit(L.reduce(state, { ...action, by: who() }));
   render();
+}
+
+// The older records (position sheet and shed statements) are loaded once.
+// With a shared database this waits until this device is fully in step with
+// it, so the history attaches to the locos everyone already has.
+let importing = false;
+async function importOldRecords() {
+  if (importing || alreadyImported(state)) return;
+  if (sync && !(state.sync.linked && status.phase === 'synced')) return;
+  importing = true;
+  try {
+    const { SNAPSHOTS } = await import('./history-data.js');
+    if (!alreadyImported(state) && (!sync || status.phase === 'synced')) {
+      commit(importHistory(state, SNAPSHOTS));
+      render();
+    }
+  } catch (e) {
+    console.error(e); // offline or blocked: tried again on the next sync
+  } finally {
+    importing = false;
+  }
 }
 
 let toastTimer;
@@ -529,6 +554,8 @@ function viewSignIn() {
 const TABS = [['locos', 'Locos'], ['report', 'Report'], ['history', 'History'], ['more', 'More']];
 const VIEWS = { locos: viewLocos, report: viewReport, history: viewHistory, more: viewMore };
 
+let shownGate = null;
+
 function render() {
   // Shown before the app itself: sign-in, or in open mode a one-time name.
   const gate = !SHARED ? null : REQUIRE_LOGIN
@@ -544,9 +571,13 @@ function render() {
         : `${L.fmtDay(today())}  |  ${state.locos.length} locos  |  ${other} in other divisions`),
       SHARED && !signedOut && h('p', { class: `sync ${status.phase}`, id: 'sync-status' }, statusText())));
   if (signedOut) {
+    // Data arriving in the background must not wipe a form being typed in.
+    if (shownGate === gate && document.querySelector('.signin')) return;
+    shownGate = gate;
     document.getElementById('app').replaceChildren(header, h('main', null, gate()));
     return;
   }
+  shownGate = null;
   document.getElementById('app').replaceChildren(
     header,
     h('nav', { class: 'tabs' }, TABS.map(([id, text]) => h('button', {
@@ -559,6 +590,7 @@ function render() {
 function onSyncStatus(next) {
   const screenChanged = (next.phase === 'signed-out') !== (status.phase === 'signed-out') || next.email !== status.email;
   status = next;
+  if (status.phase === 'synced') importOldRecords();
   if (screenChanged || ui.view === 'more') { render(); return; }
   // Routine status changes only touch the status line, so a form being
   // filled in or a table being scrolled is not disturbed.
@@ -588,6 +620,7 @@ async function start() {
   }
   render();
   if (sync) sync.start();
+  else importOldRecords();
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
