@@ -8,14 +8,23 @@
 import { TABLES, allOps, collapse, applyRemote } from './syncdata.js';
 
 const SESSION_KEY = 'loco-tracker-session';
+const NAME_KEY = 'loco-tracker-name';
 const EPOCH = '1970-01-01T00:00:00Z';
 const PAGE = 1000;
 const POLL_MS = 30000;
 
-export function createSync({ url, key, getState, setState, onStatus }) {
+export function createSync({ url, key, login, getState, setState, onStatus }) {
   url = url.replace(/\/+$/, '');
   let session = null;
-  try { session = JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { /* none */ }
+  if (login) {
+    try { session = JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { /* none */ }
+  } else {
+    // Open access: no sign-in. The person's name is only a label on their
+    // updates, kept on this device.
+    let name = '';
+    try { name = localStorage.getItem(NAME_KEY) || ''; } catch { /* private mode */ }
+    session = { access: key, email: name, open: true };
+  }
   let running = null;
   let again = false;
   let timer = null;
@@ -58,7 +67,7 @@ export function createSync({ url, key, getState, setState, onStatus }) {
 
   async function token() {
     if (!session) throw Object.assign(new Error('Not signed in'), { status: 401 });
-    if (Date.now() > session.expires - 60000) {
+    if (!session.open && Date.now() > session.expires - 60000) {
       try {
         await auth('refresh_token', { refresh_token: session.refresh });
       } catch (e) {
@@ -92,7 +101,10 @@ export function createSync({ url, key, getState, setState, onStatus }) {
     for (const table of TABLES) {
       const rows = ops.filter((op) => op.table === table).map((op) => op.row);
       for (let i = 0; i < rows.length; i += 500) {
-        await rest(table, { method: 'POST', body: rows.slice(i, i + 500), prefer: 'resolution=merge-duplicates,return=minimal' });
+        // Log entries are only ever added, never rewritten, so the history
+        // cannot be altered once saved.
+        const onConflict = table === 'log' ? 'ignore-duplicates' : 'merge-duplicates';
+        await rest(table, { method: 'POST', body: rows.slice(i, i + 500), prefer: `resolution=${onConflict},return=minimal` });
       }
     }
     // Anything queued while we were uploading stays in the outbox.
@@ -154,7 +166,7 @@ export function createSync({ url, key, getState, setState, onStatus }) {
       lastError = '';
       report(pending() ? 'syncing' : 'synced');
     } catch (e) {
-      if (e.status === 401) { report('signed-out'); return; }
+      if (e.status === 401 && login) { report('signed-out'); return; }
       lastError = e.status ? e.message : '';
       report(e.status ? 'error' : 'offline');
     }
@@ -183,6 +195,12 @@ export function createSync({ url, key, getState, setState, onStatus }) {
     async signIn(email, password) {
       await auth('password', { email, password });
       return syncNow();
+    },
+    setName(name) {
+      name = name.trim();
+      try { localStorage.setItem(NAME_KEY, name); } catch { /* private mode */ }
+      session = { ...session, email: name };
+      report(pending() ? 'syncing' : 'synced');
     },
     signOut() {
       saveSession(null);

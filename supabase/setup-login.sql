@@ -1,9 +1,5 @@
--- Loco Tracker: database setup for Supabase, OPEN version (no sign-in).
--- Use this one when js/config.js has REQUIRE_LOGIN = false.
---
--- Anyone who has the app link can view and edit. To limit the damage a
--- stranger could do, nothing can be deleted outright and the log of changes
--- can only be added to, never rewritten, so the true history is always kept.
+-- Loco Tracker: database setup for Supabase, SIGN-IN version.
+-- Use this one when js/config.js has REQUIRE_LOGIN = true.
 -- Paste this whole file into Supabase > SQL Editor and press Run. It is safe
 -- to run more than once.
 
@@ -72,41 +68,42 @@ create trigger locos_touch   before insert or update on public.locos   for each 
 create trigger log_touch     before insert or update on public.log     for each row execute function public.touch_synced_at();
 create trigger reports_touch before insert or update on public.reports for each row execute function public.touch_synced_at();
 
--- Open access: anyone using the app may read, add and update. Nobody can
--- delete rows: the app marks records as removed instead.
+-- Only signed-in users can read or change anything. Nobody can delete rows
+-- outright: the app marks records as removed instead, so history is kept.
 alter table public.locos   enable row level security;
 alter table public.log     enable row level security;
 alter table public.reports enable row level security;
 
-drop policy if exists "signed-in read"   on public.locos;
-drop policy if exists "signed-in insert" on public.locos;
-drop policy if exists "signed-in update" on public.locos;
 drop policy if exists "open read"   on public.locos;
 drop policy if exists "open insert" on public.locos;
 drop policy if exists "open update" on public.locos;
-create policy "open read"   on public.locos for select to anon, authenticated using (true);
-create policy "open insert" on public.locos for insert to anon, authenticated with check (true);
-create policy "open update" on public.locos for update to anon, authenticated using (true) with check (true);
+drop policy if exists "open read"   on public.log;
+drop policy if exists "open insert" on public.log;
+drop policy if exists "open read"   on public.reports;
+drop policy if exists "open insert" on public.reports;
+drop policy if exists "open update" on public.reports;
+
+drop policy if exists "signed-in read"   on public.locos;
+drop policy if exists "signed-in insert" on public.locos;
+drop policy if exists "signed-in update" on public.locos;
+create policy "signed-in read"   on public.locos for select to authenticated using (true);
+create policy "signed-in insert" on public.locos for insert to authenticated with check (true);
+create policy "signed-in update" on public.locos for update to authenticated using (true) with check (true);
 
 -- The log can be added to but never rewritten.
 drop policy if exists "signed-in read"   on public.log;
 drop policy if exists "signed-in insert" on public.log;
 drop policy if exists "signed-in update" on public.log;
-drop policy if exists "open read"   on public.log;
-drop policy if exists "open insert" on public.log;
-create policy "open read"   on public.log for select to anon, authenticated using (true);
-create policy "open insert" on public.log for insert to anon, authenticated with check (true);
+create policy "signed-in read"   on public.log for select to authenticated using (true);
+create policy "signed-in insert" on public.log for insert to authenticated with check (true);
 
 drop policy if exists "signed-in read"   on public.reports;
 drop policy if exists "signed-in insert" on public.reports;
 drop policy if exists "signed-in update" on public.reports;
-drop policy if exists "open read"   on public.reports;
-drop policy if exists "open insert" on public.reports;
-drop policy if exists "open update" on public.reports;
-create policy "open read"   on public.reports for select to anon, authenticated using (true);
-create policy "open insert" on public.reports for insert to anon, authenticated with check (true);
-create policy "open update" on public.reports for update to anon, authenticated using (true) with check (true);
+create policy "signed-in read"   on public.reports for select to authenticated using (true);
+create policy "signed-in insert" on public.reports for insert to authenticated with check (true);
+create policy "signed-in update" on public.reports for update to authenticated using (true) with check (true);
 
 revoke all on public.locos, public.log, public.reports from anon, authenticated;
-grant select, insert, update on public.locos, public.reports to anon, authenticated;
-grant select, insert         on public.log                   to anon, authenticated;
+grant select, insert, update on public.locos, public.reports to authenticated;
+grant select, insert         on public.log                   to authenticated;

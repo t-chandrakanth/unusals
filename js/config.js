@@ -1,12 +1,17 @@
 // Shared database connection (Supabase).
 //
-// Leave both empty and the app keeps its data on the device only.
-// Fill both in and the app asks everyone to sign in and keeps the data in
-// the database, shared by all users.
+// Leave URL and KEY empty and the app keeps its data on the device only.
+// Fill both in and the app keeps the data in the database, shared by
+// everyone who opens it.
 //
-// The key below is the project's public "anon" key. It is meant to be
-// visible in the app: on its own it gives no access to the data. Access comes
-// from signing in, enforced by the rules in supabase/setup.sql.
+// The key is the project's public "anon" key, which is meant to be visible in
+// the app. Never put the service_role key or the database password here.
 
 export const SUPABASE_URL = '';
 export const SUPABASE_KEY = '';
+
+// false: anyone who opens the app link can view and edit. No sign-in.
+//        Use together with supabase/setup.sql.
+// true:  each person signs in with an email and password that you create in
+//        Supabase. Use together with supabase/setup-login.sql.
+export const REQUIRE_LOGIN = false;

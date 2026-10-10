@@ -6,7 +6,7 @@ import { sheetToXlsx } from './xlsx.js';
 import { sheetToCanvas, canvasToBlob } from './canvas.js';
 import { createSync } from './sync.js';
 import { diffOps } from './syncdata.js';
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
+import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from './config.js';
 
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const today = () => L.dayKey(new Date());
@@ -16,7 +16,7 @@ const today = () => L.dayKey(new Date());
 const SHARED = !!(SUPABASE_URL && SUPABASE_KEY);
 const NO_SYNC = { outbox: [], cursor: {}, linked: false };
 let sync = null;
-let status = { phase: SHARED ? 'signed-out' : 'local', pending: 0, email: '', error: '' };
+let status = { phase: SHARED ? 'syncing' : 'local', pending: 0, email: '', error: '' };
 
 let state = L.emptyState();
 const ui = {
@@ -395,17 +395,25 @@ function viewMore() {
     return h('div', { class: 'more' },
       h('section', { class: 'panel' },
         h('h2', null, 'Shared database'),
-        h('p', null, `Signed in as ${status.email}. ${statusText()}.`),
-        h('p', null, `Everyone who signs in sees and updates the same data. ${counts}`),
+        h('p', null, `${REQUIRE_LOGIN ? 'Signed in as' : 'Your name:'} ${status.email}. ${statusText()}.`),
+        h('p', null, `Everyone who ${REQUIRE_LOGIN ? 'signs in' : 'opens this app'} sees and updates the same data. ${counts}`),
         h('div', { class: 'actions' },
           h('button', { class: 'btn primary', onclick: () => sync.syncNow().then(() => toast(statusText())) }, 'Sync now'),
-          h('button', {
-            class: 'btn',
-            onclick: () => {
-              if (status.pending && !confirm(`${status.pending} changes have not been uploaded yet. Sign out anyway? They will upload after the next sign-in on this device.`)) return;
-              sync.signOut();
-            },
-          }, 'Sign out'))),
+          REQUIRE_LOGIN
+            ? h('button', {
+              class: 'btn',
+              onclick: () => {
+                if (status.pending && !confirm(`${status.pending} changes have not been uploaded yet. Sign out anyway? They will upload after the next sign-in on this device.`)) return;
+                sync.signOut();
+              },
+            }, 'Sign out')
+            : h('button', {
+              class: 'btn',
+              onclick: () => {
+                const name = prompt('Your name, shown next to the updates you make:', status.email);
+                if (name && name.trim()) sync.setName(name);
+              },
+            }, 'Change name'))),
       h('section', { class: 'panel' },
         h('h2', null, 'Backup'),
         h('p', null, 'The database is the main copy. You can still download a copy of everything to keep as a file.'),
@@ -455,6 +463,21 @@ function statusText() {
   }
 }
 
+function viewName() {
+  const name = h('input', { type: 'text', required: true, maxLength: 30, autocomplete: 'name', placeholder: 'For example: Mahesh' });
+  return h('form', {
+    class: 'panel signin',
+    onsubmit: (e) => {
+      e.preventDefault();
+      if (name.value.trim()) sync.setName(name.value);
+    },
+  },
+  h('h2', null, 'Your name'),
+  h('p', null, 'Asked once on this device. It is shown next to the updates you make, so everyone can see who changed what.'),
+  h('label', { class: 'field' }, h('span', null, 'Name'), name),
+  h('button', { type: 'submit', class: 'btn primary' }, 'Continue'));
+}
+
 function viewSignIn() {
   let busy = false;
   const email = h('input', { type: 'email', autocomplete: 'username', required: true, placeholder: 'you@example.com' });
@@ -493,7 +516,11 @@ const TABS = [['locos', 'Locos'], ['report', 'Report'], ['history', 'History'], 
 const VIEWS = { locos: viewLocos, report: viewReport, history: viewHistory, more: viewMore };
 
 function render() {
-  const signedOut = SHARED && status.phase === 'signed-out';
+  // Shown before the app itself: sign-in, or in open mode a one-time name.
+  const gate = !SHARED ? null : REQUIRE_LOGIN
+    ? (status.phase === 'signed-out' ? viewSignIn : null)
+    : (sync && !sync.email ? viewName : null);
+  const signedOut = !!gate;
   const other = state.locos.filter((l) => l.division === 'OTHER').length;
   const header = h('header', { class: 'top' },
     h('div', { class: 'top-inner' },
@@ -503,7 +530,7 @@ function render() {
         : `${L.fmtDay(today())}  |  ${state.locos.length} locos  |  ${other} in other divisions`),
       SHARED && !signedOut && h('p', { class: `sync ${status.phase}`, id: 'sync-status' }, statusText())));
   if (signedOut) {
-    document.getElementById('app').replaceChildren(header, h('main', null, viewSignIn()));
+    document.getElementById('app').replaceChildren(header, h('main', null, gate()));
     return;
   }
   document.getElementById('app').replaceChildren(
@@ -516,7 +543,7 @@ function render() {
 }
 
 function onSyncStatus(next) {
-  const screenChanged = (next.phase === 'signed-out') !== (status.phase === 'signed-out');
+  const screenChanged = (next.phase === 'signed-out') !== (status.phase === 'signed-out') || next.email !== status.email;
   status = next;
   if (screenChanged || ui.view === 'more') { render(); return; }
   // Routine status changes only touch the status line, so a form being
@@ -538,6 +565,7 @@ async function start() {
     sync = createSync({
       url: SUPABASE_URL,
       key: SUPABASE_KEY,
+      login: REQUIRE_LOGIN,
       getState: () => state,
       setState: (next, redraw) => { state = next; persist(); if (redraw) render(); },
       onStatus: onSyncStatus,

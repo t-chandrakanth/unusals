@@ -33,30 +33,36 @@ the device you use and is not uploaded anywhere. Use **More > Download
 backup** and **Restore backup** to move it between devices.
 
 **Shared database** (config filled in). Data is kept in a Supabase database
-and shared by everyone who signs in, so the phone and the computer, and all
-users, see the same thing. Each change records who made it. The app still
-works without internet: changes are kept on the device and uploaded when the
-connection returns. If two people change the same loco, the later change
-wins and both are kept in the history.
+and shared by everyone who opens the app, so every phone and computer shows
+the same thing. Each person types their name once, and each change records
+who made it. The app still works without internet: changes are kept on the
+device and uploaded when the connection returns. If two people change the
+same loco, the later change wins and both are kept in the history.
 
-The app starts with the position sheet dated 08-10-2026. The first person to
-sign in to an empty database uploads the data from their device; everyone
-after that receives the shared data.
+The app starts with the position sheet dated 08-10-2026. The first device to
+connect to an empty database uploads its data; everyone after that receives
+the shared data.
 
 ## Setting up the shared database (one time)
 
 1. Create a free project at https://supabase.com.
 2. In **SQL Editor**, paste the contents of `supabase/setup.sql` and run it.
-3. In **Authentication > Sign In / Providers**, turn off **Allow new users to
-   sign up**, so only people you add can get in.
-4. In **Authentication > Users**, use **Add user** for each person (email and
-   password, with "Auto Confirm User" ticked).
-5. From **Project Settings > API**, copy the **Project URL** and the
+3. From **Project Settings > API**, copy the **Project URL** and the
    **anon public** key into `js/config.js`.
 
-The anon key is designed to be public. It gives no access by itself: the
-rules in `setup.sql` only allow signed-in users to read or change data.
 Never put the `service_role` key or the database password in this repo.
+
+### Who can edit
+
+By default (`REQUIRE_LOGIN = false`) there is no sign-in: **anyone who has
+the app link can view and edit**. That is simple for a team, but it also
+means a stranger who finds the link could change the data. Two things limit
+the damage: nothing can be deleted outright, and the log of changes can only
+be added to, never rewritten, so the true history is always there.
+
+To restrict access to named people instead, set `REQUIRE_LOGIN = true`, run
+`supabase/setup-login.sql`, turn off **Allow new users to sign up** under
+Authentication, and add each person under **Authentication > Users**.
 
 ## Publishing it (one time)
 
@@ -83,6 +89,7 @@ npm start    # serves the app at http://localhost:8080
 - `js/xlsx.js`, `js/canvas.js`: Excel and image export
 - `js/sync.js`, `js/syncdata.js`: shared database sync and offline queue
 - `js/config.js`: database connection (empty means device-only)
-- `supabase/setup.sql`: database tables and access rules
+- `supabase/setup.sql`: database tables and open-access rules
+- `supabase/setup-login.sql`: the same, restricted to signed-in users
 - `js/app.js`: the screens
 - `js/seed.js`: starting data
