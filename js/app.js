@@ -6,6 +6,7 @@ import { sheetToXlsx } from './xlsx.js';
 import { sheetToCanvas, canvasToBlob } from './canvas.js';
 import { createSync } from './sync.js';
 import { diffOps } from './syncdata.js';
+import { importHistory, alreadyImported } from './historyimport.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from './config.js';
 
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -28,6 +29,8 @@ const ui = {
   histFrom: L.addDays(today(), -6),
   histTo: today(),
   histChangesOnly: false,
+  histMode: 'date', // 'date': all locos on one day; 'loco': one loco over many days
+  histDay: today(),
 };
 
 // ---------- small helpers ----------
@@ -54,21 +57,45 @@ function persist() {
   saveState(state).then((ok) => { if (!ok) toast('Could not save on this device'); });
 }
 
-function dispatch(action) {
-  const next = L.reduce(state, { ...action, by: who() });
-  if (next !== state) {
-    if (sync) {
-      // Queue the change for the shared database; it uploads straight away
-      // when online and waits safely on this device when not.
-      const ops = diffOps(state, next, who());
-      state = { ...next, sync: { ...next.sync, outbox: [...next.sync.outbox, ...ops] } };
-      sync.kick();
-    } else {
-      state = next;
-    }
-    persist();
+/** Make next the current state, save it, and queue what changed for upload. */
+function commit(next) {
+  if (next === state) return;
+  if (sync) {
+    // Queue the change for the shared database; it uploads straight away
+    // when online and waits safely on this device when not.
+    const ops = diffOps(state, next, who());
+    state = { ...next, sync: { ...next.sync, outbox: [...next.sync.outbox, ...ops] } };
+    sync.kick();
+  } else {
+    state = next;
   }
+  persist();
+}
+
+function dispatch(action) {
+  commit(L.reduce(state, { ...action, by: who() }));
   render();
+}
+
+// The older records (position sheet and shed statements) are loaded once.
+// With a shared database this waits until this device is fully in step with
+// it, so the history attaches to the locos everyone already has.
+let importing = false;
+async function importOldRecords() {
+  if (importing || alreadyImported(state)) return;
+  if (sync && !(state.sync.linked && status.phase === 'synced')) return;
+  importing = true;
+  try {
+    const { SNAPSHOTS } = await import('./history-data.js');
+    if (!alreadyImported(state) && (!sync || status.phase === 'synced')) {
+      commit(importHistory(state, SNAPSHOTS));
+      render();
+    }
+  } catch (e) {
+    console.error(e); // offline or blocked: tried again on the next sync
+  } finally {
+    importing = false;
+  }
 }
 
 let toastTimer;
@@ -267,7 +294,7 @@ function openEditor(loco) {
     !isNew && h('div', { class: 'editor-more' },
       h('button', { type: 'button', class: 'link', onclick: () => { dlg.close(); dispatch({ type: 'move', id: loco.id, dir: -1 }); } }, 'Move up'),
       h('button', { type: 'button', class: 'link', onclick: () => { dlg.close(); dispatch({ type: 'move', id: loco.id, dir: 1 }); } }, 'Move down'),
-      h('button', { type: 'button', class: 'link', onclick: () => { dlg.close(); ui.view = 'history'; ui.histLoco = loco.id; render(); } }, 'History'),
+      h('button', { type: 'button', class: 'link', onclick: () => { dlg.close(); ui.view = 'history'; ui.histMode = 'loco'; ui.histLoco = loco.id; render(); } }, 'History'),
       h('button', {
         type: 'button', class: 'link danger',
         onclick: () => {
@@ -341,7 +368,61 @@ function viewReport() {
 
 // ---------- History ----------
 
+/** Days that have any record, newest first. */
+function recordDays() {
+  const days = new Set(state.log.map((e) => L.dayKey(e.at)));
+  for (const r of state.reports) days.add(r.day);
+  return [...days].filter((d) => d <= today()).sort().reverse();
+}
+
 function viewHistory() {
+  const tab = (mode, text) => h('button', {
+    type: 'button', class: `seg ${ui.histMode === mode ? 'on' : ''}`,
+    onclick: () => { ui.histMode = mode; render(); },
+  }, text);
+  return h('div', null,
+    h('div', { class: 'segs' }, tab('date', 'Day-wise, all locos'), tab('loco', 'One loco')),
+    ui.histMode === 'date' ? viewHistoryDay() : viewHistoryLoco(),
+    backupPanel());
+}
+
+function viewHistoryDay() {
+  const days = recordDays();
+  const day = ui.histDay;
+  const locos = day === today() ? state.locos : L.locosOnDay(state, day);
+  const sheet = reportSheet(locos, day);
+  const sent = state.reports.filter((r) => r.day === day);
+  const pick = (d) => { ui.histDay = d; render(); };
+  return h('div', null,
+    h('p', { class: 'hint' }, 'Pick a date to see the position of every loco on that day.'),
+    h('div', { class: 'toolbar wrap' },
+      h('label', { class: 'inline' }, 'Date',
+        h('input', { type: 'date', value: day, max: today(), onchange: (e) => pick(e.target.value || today()) })),
+      h('button', { class: 'btn small', onclick: () => pick(L.addDays(day, -1)) }, 'Previous day'),
+      h('button', { class: 'btn small', disabled: day >= today(), onclick: () => pick(L.addDays(day, 1)) }, 'Next day')),
+    h('div', { class: 'days', 'aria-label': 'Dates with records' }, days.map((d) => h('button', {
+      class: `day ${d === day ? 'on' : ''}`, onclick: () => pick(d),
+    }, L.fmtDay(d).slice(0, 5)))),
+    locos.length
+      ? [
+        h('p', { class: 'hint' }, days.includes(day)
+          ? `Position of all locos at the end of ${L.fmtDay(day)}.`
+          : `No report was recorded on ${L.fmtDay(day)}. Showing the last known position before it.`),
+        exportBar(sheet, `DPWS-locos-${L.fmtDay(day)}`, sheet.rows[0][0].v, () => L.reportText(locos, day)),
+        h('div', { class: 'sheet-wrap', id: 'printable' }, sheetTable(sheet)),
+      ]
+      : h('p', { class: 'empty' }, `There are no records on or before ${L.fmtDay(day)}.`),
+    sent.length > 0 && [
+      h('h2', { class: 'section-title' }, `Reports sent on ${L.fmtDay(day)}`, h('span', { class: 'count' }, sent.length)),
+      h('ul', { class: 'rows' }, sent.map((r) => h('li', null,
+        h('button', {
+          class: 'row-main',
+          onclick: () => { ui.view = 'report'; ui.reportId = r.id; render(); window.scrollTo(0, 0); },
+        }, `${L.fmtTime(r.at)}${r.by ? `  ${r.by}` : ''}  (open as sent)`)))),
+    ]);
+}
+
+function viewHistoryLoco() {
   const choices = L.locoChoices(state);
   if (!choices.some((ch) => ch.id === ui.histLoco)) ui.histLoco = choices[0] ? choices[0].id : null;
   const choice = choices.find((ch) => ch.id === ui.histLoco);
@@ -377,7 +458,8 @@ function viewHistory() {
 
 // ---------- More ----------
 
-function viewMore() {
+/** Backup, shown at the foot of History. */
+function backupPanel() {
   const fileInput = h('input', {
     type: 'file', accept: 'application/json,.json', style: 'display:none',
     onchange: async (e) => {
@@ -397,70 +479,21 @@ function viewMore() {
       }
     },
   });
-  const backupButton = h('button', {
-    class: 'btn primary',
-    onclick: () => shareOrDownload(
-      new Blob([JSON.stringify({ version: 1, locos: state.locos, log: state.log, reports: state.reports })], { type: 'application/json' }),
-      `loco-tracker-backup-${L.fmtDay(today())}.json`, 'Loco Tracker backup'),
-  }, 'Download backup');
-  const counts = `${state.locos.length} locos, ${state.log.length} saved updates, ${state.reports.length} saved reports.`;
-
-  if (SHARED) {
-    return h('div', { class: 'more' },
-      h('section', { class: 'panel' },
-        h('h2', null, 'Shared database'),
-        h('p', null, `${REQUIRE_LOGIN ? 'Signed in as' : 'Your name:'} ${status.email}. ${statusText()}.`),
-        h('p', null, `Everyone who ${REQUIRE_LOGIN ? 'signs in' : 'opens this app'} sees and updates the same data. ${counts}`),
-        h('div', { class: 'actions' },
-          h('button', { class: 'btn primary', onclick: () => sync.syncNow().then(() => toast(statusText())) }, 'Sync now'),
-          REQUIRE_LOGIN
-            ? h('button', {
-              class: 'btn',
-              onclick: () => {
-                if (status.pending && !confirm(`${status.pending} changes have not been uploaded yet. Sign out anyway? They will upload after the next sign-in on this device.`)) return;
-                sync.signOut();
-              },
-            }, 'Sign out')
-            : h('button', {
-              class: 'btn',
-              onclick: () => {
-                const name = prompt('Your name, shown next to the updates you make:', status.email);
-                if (name && name.trim()) sync.setName(name);
-              },
-            }, 'Change name'))),
-      h('section', { class: 'panel' },
-        h('h2', null, 'Backup'),
-        h('p', null, 'The database is the main copy. You can still download a copy of everything to keep as a file.'),
-        h('div', { class: 'actions' }, backupButton)),
-      h('section', { class: 'panel' },
-        h('h2', null, 'Install on your phone'),
-        h('p', null, 'Open this page in Chrome, tap the three-dot menu, then "Add to Home screen". It then opens like an app. Without internet you can still view and update; changes upload when the connection is back.')));
-  }
-
-  return h('div', { class: 'more' },
-    h('section', { class: 'panel' },
-      h('h2', null, 'Backup and move between devices'),
-      h('p', null, 'Your data is stored on this device only. To carry it from the phone to a computer (or keep a safe copy), download a backup here and restore it on the other device.'),
-      h('div', { class: 'actions' }, backupButton,
-        h('button', { class: 'btn', onclick: () => fileInput.click() }, 'Restore backup'),
-        fileInput)),
-    h('section', { class: 'panel' },
-      h('h2', null, 'Install on your phone'),
-      h('p', null, 'Open this page in Chrome, tap the three-dot menu, then "Add to Home screen". It then opens like an app and works without internet.')),
-    h('section', { class: 'panel' },
-      h('h2', null, 'Start over'),
-      h('p', null, `${counts.slice(0, -1)} on this device.`),
+  return h('section', { class: 'panel backup' },
+    h('h2', null, 'Backup'),
+    h('p', null, SHARED
+      ? `Download a copy of everything to keep as a file: ${state.locos.length} locos, ${state.log.length} history entries, ${state.reports.length} reports.`
+      : 'Your data is stored on this device only. Download a backup to keep a safe copy, or restore one here.'),
+    h('div', { class: 'actions' },
       h('button', {
-        class: 'btn danger',
-        onclick: async () => {
-          if (!confirm('Erase everything on this device and load the 08-10-2026 sheet again?')) return;
-          state = { ...seedState(), sync: NO_SYNC };
-          await saveState(state);
-          ui.reportId = null;
-          toast('Reset to the 08-10-2026 sheet');
-          render();
-        },
-      }, 'Reset to the 08-10-2026 sheet')));
+        class: 'btn',
+        onclick: () => shareOrDownload(
+          new Blob([JSON.stringify({ version: 1, locos: state.locos, log: state.log, reports: state.reports })], { type: 'application/json' }),
+          `loco-tracker-backup-${L.fmtDay(today())}.json`, 'Loco Tracker backup'),
+      }, 'Download backup'),
+      // Restoring replaces data, so it is only offered when nothing is shared.
+      !SHARED && h('button', { class: 'btn', onclick: () => fileInput.click() }, 'Restore backup'),
+      fileInput));
 }
 
 // ---------- sign in ----------
@@ -526,8 +559,10 @@ function viewSignIn() {
 
 // ---------- shell ----------
 
-const TABS = [['locos', 'Locos'], ['report', 'Report'], ['history', 'History'], ['more', 'More']];
-const VIEWS = { locos: viewLocos, report: viewReport, history: viewHistory, more: viewMore };
+const TABS = [['locos', 'Locos'], ['report', 'Report'], ['history', 'History']];
+const VIEWS = { locos: viewLocos, report: viewReport, history: viewHistory };
+
+let shownGate = null;
 
 function render() {
   // Shown before the app itself: sign-in, or in open mode a one-time name.
@@ -542,11 +577,35 @@ function render() {
       h('p', null, signedOut
         ? L.fmtDay(today())
         : `${L.fmtDay(today())}  |  ${state.locos.length} locos  |  ${other} in other divisions`),
-      SHARED && !signedOut && h('p', { class: `sync ${status.phase}`, id: 'sync-status' }, statusText())));
+      SHARED && !signedOut && h('p', { class: 'top-meta' },
+        // Tap the status to check with the database straight away.
+        h('button', {
+          class: `sync ${status.phase}`, id: 'sync-status', title: 'Tap to sync now',
+          onclick: () => sync.syncNow(),
+        }, statusText()),
+        REQUIRE_LOGIN
+          ? h('button', {
+            class: 'who',
+            onclick: () => {
+              if (status.pending && !confirm(`${status.pending} changes have not been uploaded yet. Sign out anyway? They will upload after the next sign-in on this device.`)) return;
+              sync.signOut();
+            },
+          }, `${status.email}  (sign out)`)
+          : h('button', {
+            class: 'who', title: 'Tap to change your name',
+            onclick: () => {
+              const name = prompt('Your name, shown next to the updates you make:', status.email);
+              if (name && name.trim()) sync.setName(name);
+            },
+          }, `${status.email}  (change name)`))));
   if (signedOut) {
+    // Data arriving in the background must not wipe a form being typed in.
+    if (shownGate === gate && document.querySelector('.signin')) return;
+    shownGate = gate;
     document.getElementById('app').replaceChildren(header, h('main', null, gate()));
     return;
   }
+  shownGate = null;
   document.getElementById('app').replaceChildren(
     header,
     h('nav', { class: 'tabs' }, TABS.map(([id, text]) => h('button', {
@@ -559,7 +618,8 @@ function render() {
 function onSyncStatus(next) {
   const screenChanged = (next.phase === 'signed-out') !== (status.phase === 'signed-out') || next.email !== status.email;
   status = next;
-  if (screenChanged || ui.view === 'more') { render(); return; }
+  if (status.phase === 'synced') importOldRecords();
+  if (screenChanged) { render(); return; }
   // Routine status changes only touch the status line, so a form being
   // filled in or a table being scrolled is not disturbed.
   const line = document.getElementById('sync-status');
@@ -588,6 +648,7 @@ async function start() {
   }
   render();
   if (sync) sync.start();
+  else importOldRecords();
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }

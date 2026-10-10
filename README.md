@@ -19,7 +19,9 @@ phone's home screen. It works without internet once opened.
   earlier date to see the position as it stood on that day.
 - **History**: day-wise summary of one loco over any date range, with the
   same share options.
-- **More**: backup and restore, to move data between phone and computer.
+- **Backup**: at the foot of History, download a copy of all data as a file.
+  The top bar shows the sync state (tap it to sync now) and your name (tap to
+  change it).
 
 Every change is saved with its date and time, which is what the history and
 the past-date reports are built from.
@@ -29,8 +31,8 @@ the past-date reports are built from.
 The app has two modes, chosen by `js/config.js`.
 
 **On the device only** (config left empty). Data is stored in the browser on
-the device you use and is not uploaded anywhere. Use **More > Download
-backup** and **Restore backup** to move it between devices.
+the device you use and is not uploaded anywhere. Use **Download backup** and **Restore backup** at the foot of History to
+move it between devices.
 
 **Shared database** (config filled in). Data is kept in a Supabase database
 and shared by everyone who opens the app, so every phone and computer shows
@@ -42,6 +44,21 @@ same loco, the later change wins and both are kept in the history.
 The app starts with the position sheet dated 08-10-2026. The first device to
 connect to an empty database uploads its data; everyone after that receives
 the shared data.
+
+## Older records
+
+The history from before the app existed is loaded once, automatically, from
+`js/history-data.js`. It combines two sources, and History shows which one
+each entry came from:
+
+- **sheet**: the position reports in the " DPWCS LOCO" tab (17-08-2026 to
+  10-10-2026). These are also kept whole under **Reports sent**.
+- **shed**: the loco shed's daily statements (13-07-2026 to 10-10-2026).
+  These fill the days between position reports.
+
+Neither source records a time of day, so position reports are filed at
+12:00 and shed statements at 07:00. To rebuild the data file from fresh
+exports, run `tools/build_history.py` (see the notes at the top of it).
 
 ## Setting up the shared database (one time)
 
@@ -89,6 +106,7 @@ npm start    # serves the app at http://localhost:8080
 - `js/xlsx.js`, `js/canvas.js`: Excel and image export
 - `js/sync.js`, `js/syncdata.js`: shared database sync and offline queue
 - `js/config.js`: database connection (empty means device-only)
+- `js/historyimport.js`, `js/history-data.js`: one-time import of older records
 - `supabase/setup.sql`: database tables and open-access rules
 - `supabase/setup-login.sql`: the same, restricted to signed-in users
 - `js/app.js`: the screens

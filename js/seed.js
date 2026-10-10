@@ -9,7 +9,7 @@ const OTHER = [
   ['28347+27744', '29-Sep', 'TMU', 'BRPS/MLDT/ER', 'SMGP', 'MTMI', '06-09-26 9:00', fois('2026-09-06')],
   ['28352+28443', '28-Nov', 'MSGM/NMG', 'BSS/UMD/NR', 'CCIK/BCFCL', 'WADI', '30-08-26 21:15', fois('2026-09-01')],
   ['27381+27324', 'FRESH', 'AMED/BOXNHL', 'WR/NGP/CR', 'MILK', 'WADI', '23-09-26 5:50', fois('2026-09-23')],
-  ['27592+27764', 'FRESH', 'MNF', 'NYN/PRYJ/NR', 'KSNK', 'LUR', '06-10-26 15:45', fois('2026-10-06')],
+  ['27592+27767', 'FRESH', 'MNF', 'NYN/PRYJ/NR', 'KSNK', 'LUR', '06-10-26 15:45', fois('2026-10-06')],
   ['27337', '10-Oct', 'JSPK', 'GAYA/DDU/EC', 'P-52', 'NED', '27-08-26 15:47', fois('2026-10-05')],
   ['27360', '', 'T L/E', 'KQA/GTL/SCOR', '762', 'MTMI', '06-10-26 0:15', fois('2026-10-06'), true],
   ['27383+28343', '27-Oct', 'JSWT', 'NZB/HYB/SC', 'JSWT', 'NZB', '08-10-26 4:50', fois('2026-10-08')],
