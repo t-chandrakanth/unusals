@@ -1,5 +1,5 @@
 // Starting data: the DPWS loco position sheet dated 08-10-2026.
-import { uid, pick, emptyState, foisRemark } from './logic.js';
+import { uid, pick, emptyState, foisRemark, foisDateFromRemarks } from './logic.js';
 
 const fois = (day) => foisRemark(day);
 
@@ -39,7 +39,7 @@ export function seedState() {
     state.log.push({ id: uid(), locoId: loco.id, at, kind: 'created', data: pick(loco) });
   };
   for (const [locoNo, dueDate, trainNo, location, hoTrain, hoPoint, hoTime, remarks, sameSerial] of OTHER) {
-    add({ locoNo, dueDate, trainNo, location, division: 'OTHER', hoTrain, hoPoint, hoTime, working: '', remarks, sameSerial: !!sameSerial });
+    add({ locoNo, dueDate, trainNo, location, division: 'OTHER', hoTrain, hoPoint, hoTime, foisDate: foisDateFromRemarks(remarks), working: '', remarks, sameSerial: !!sameSerial });
   }
   for (const [locoNo, dueDate, trainNo, location, working, remarks] of SC) {
     add({ locoNo, dueDate, trainNo, location, division: 'SC', hoTrain: '', hoPoint: '', hoTime: '', working, remarks, sameSerial: false });

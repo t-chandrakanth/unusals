@@ -117,3 +117,17 @@ test('xlsx output is a well-formed zip (checked further with openpyxl)', () => {
       sheetToXlsx(historySheet(s.locos[0].locoNo, rows, '2026-10-06', '2026-10-09')));
   }
 });
+
+test('FOIS message date drives the remark and can be read back from old remarks', () => {
+  assert.equal(L.foisRemark('2026-10-09'),
+    'FOIS message given to the division on 09-10-2026. Following it up with the Division regularly. FOIS MESSAGE GIVEN TODAY IT SELF.');
+  assert.equal(L.foisDateFromRemarks(L.foisRemark('2026-10-09')), '2026-10-09');
+  assert.equal(L.foisDateFromRemarks('MCI SECTOR'), '');
+  const s = seedState();
+  assert.equal(s.locos[0].foisDate, '2026-08-30');
+  assert.equal(s.locos[10].foisDate, '');
+  // An older loco without the field is unchanged by merely opening and saving it.
+  const { foisDate, ...old } = s.locos[0];
+  const before = { ...s, locos: [old, ...s.locos.slice(1)] };
+  assert.equal(L.reduce(before, { type: 'save', loco: { ...old }, now: 'x' }), before);
+});

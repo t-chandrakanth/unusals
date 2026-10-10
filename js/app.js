@@ -240,10 +240,24 @@ function openEditor(loco) {
         extra: h('button', { type: 'button', class: 'link', onclick: () => { draft.hoTime = L.fmtDateTime(new Date()); build(); } }, 'Use current time'),
       }),
       !other && field('Working', 'working', { placeholder: 'YES, Shed in, ...' }),
-      field('Remarks', 'remarks', {
-        area: true, wide: true,
-        extra: other && h('button', { type: 'button', class: 'link', onclick: () => { draft.remarks = L.foisRemark(today()); build(); } }, 'Fill FOIS message remark for today'),
-      })),
+      // Picking the FOIS message date writes the standard remark with that
+      // date. The remark can still be edited by hand afterwards.
+      other && h('label', { class: 'field' },
+        h('span', null, 'FOIS message date'),
+        h('input', {
+          type: 'date',
+          value: draft.foisDate || L.foisDateFromRemarks(draft.remarks),
+          onchange: (e) => {
+            draft.foisDate = e.target.value;
+            if (draft.foisDate) draft.remarks = L.foisRemark(draft.foisDate);
+            build();
+          },
+        }),
+        h('button', {
+          type: 'button', class: 'link',
+          onclick: () => { draft.foisDate = today(); draft.remarks = L.foisRemark(draft.foisDate); build(); },
+        }, 'Use today')),
+      field('Remarks', 'remarks', { area: true, wide: true })),
     canShare && h('label', { class: 'check' },
       h('input', { type: 'checkbox', checked: !!draft.sameSerial, onchange: (e) => { draft.sameSerial = e.target.checked; } }),
       'Same S.No as the loco above (split consist)'),
