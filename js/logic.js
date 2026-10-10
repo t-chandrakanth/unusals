@@ -104,7 +104,7 @@ export function reduce(state, action) {
       const now = action.now;
       const existing = state.locos.find((l) => l.id === action.loco.id);
       if (existing && sameFields(existing, action.loco)) return state;
-      const loco = { ...existing, ...action.loco, ...pick(action.loco), updatedAt: now };
+      const loco = { ...existing, ...action.loco, ...pick(action.loco), updatedAt: now, updatedBy: action.by || '' };
       let locos;
       if (!existing) {
         locos = [...state.locos, loco];
@@ -117,14 +117,14 @@ export function reduce(state, action) {
       }
       const entry = {
         id: uid(), locoId: loco.id, at: now,
-        kind: existing ? 'updated' : 'created', data: pick(loco),
+        kind: existing ? 'updated' : 'created', data: pick(loco), by: action.by || '',
       };
       return { ...state, locos, log: [...state.log, entry] };
     }
     case 'remove': {
       const loco = state.locos.find((l) => l.id === action.id);
       if (!loco) return state;
-      const entry = { id: uid(), locoId: loco.id, at: action.now, kind: 'removed', data: pick(loco) };
+      const entry = { id: uid(), locoId: loco.id, at: action.now, kind: 'removed', data: pick(loco), by: action.by || '' };
       return { ...state, locos: state.locos.filter((l) => l.id !== loco.id), log: [...state.log, entry] };
     }
     case 'move': {
@@ -165,10 +165,10 @@ export function daySummary(log, locoId, fromKey, toKey) {
     while (i < entries.length && dayKey(entries[i].at) === day) {
       last = entries[i++];
       any = true;
-      rows.push({ day, time: fmtTime(last.at), kind: last.kind, data: last.data, carried: false });
+      rows.push({ day, time: fmtTime(last.at), kind: last.kind, data: last.data, by: last.by || '', carried: false });
     }
     if (!any && last && last.kind !== 'removed') {
-      rows.push({ day, time: '', kind: last.kind, data: last.data, carried: true });
+      rows.push({ day, time: '', kind: last.kind, data: last.data, by: '', carried: true });
     }
   }
   return rows;
@@ -250,7 +250,8 @@ export function historyText(label, rows, fromKey, toKey) {
       : `SC div${d.working ? ` | Working: ${d.working}` : ''}`;
     const when = r.carried ? `${fmtDay(r.day)} (no change)` : `${fmtDay(r.day)} ${r.time}`;
     const tail = r.kind === 'removed' ? ' | REMOVED FROM LIST' : (d.remarks ? ` | ${d.remarks}` : '');
-    lines.push(`${when}: TR ${d.trainNo || '-'} | ${d.location || '-'} | ${where}${tail}`);
+    const who = r.by ? ` | by ${r.by}` : '';
+    lines.push(`${when}: TR ${d.trainNo || '-'} | ${d.location || '-'} | ${where}${tail}${who}`);
   }
   return lines.join('\n');
 }

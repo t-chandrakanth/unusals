@@ -4,9 +4,19 @@ import { seedState } from './seed.js';
 import { STYLES, reportSheet, historySheet } from './sheet.js';
 import { sheetToXlsx } from './xlsx.js';
 import { sheetToCanvas, canvasToBlob } from './canvas.js';
+import { createSync } from './sync.js';
+import { diffOps } from './syncdata.js';
+import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from './config.js';
 
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const today = () => L.dayKey(new Date());
+
+// With a database configured the data is shared and everyone signs in.
+// Without one the app keeps its data on this device only.
+const SHARED = !!(SUPABASE_URL && SUPABASE_KEY);
+const NO_SYNC = { outbox: [], cursor: {}, linked: false };
+let sync = null;
+let status = { phase: SHARED ? 'syncing' : 'local', pending: 0, email: '', error: '' };
 
 let state = L.emptyState();
 const ui = {
@@ -38,11 +48,25 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 
+const who = () => (sync && sync.email ? sync.email.split('@')[0] : '');
+
+function persist() {
+  saveState(state).then((ok) => { if (!ok) toast('Could not save on this device'); });
+}
+
 function dispatch(action) {
-  const next = L.reduce(state, action);
+  const next = L.reduce(state, { ...action, by: who() });
   if (next !== state) {
-    state = next;
-    saveState(state).then((ok) => { if (!ok) toast('Could not save on this device'); });
+    if (sync) {
+      // Queue the change for the shared database; it uploads straight away
+      // when online and waits safely on this device when not.
+      const ops = diffOps(state, next, who());
+      state = { ...next, sync: { ...next.sync, outbox: [...next.sync.outbox, ...ops] } };
+      sync.kick();
+    } else {
+      state = next;
+    }
+    persist();
   }
   render();
 }
@@ -261,10 +285,8 @@ function viewReport() {
     const same = lastOne && lastOne.day === day && lastOne.locos.length === locos.length &&
       lastOne.locos.every((l, i) => l.id === locos[i].id && L.sameFields(l, locos[i]));
     if (same) return;
-    const report = { id: L.uid(), at: new Date().toISOString(), day, locos: locos.map((l) => ({ ...l })) };
-    state = L.reduce(state, { type: 'addReport', report });
-    saveState(state);
-    setTimeout(render, 0);
+    const report = { id: L.uid(), at: new Date().toISOString(), day, by: who(), locos: locos.map((l) => ({ ...l })) };
+    setTimeout(() => dispatch({ type: 'addReport', report }), 0);
   };
 
   let note;
@@ -291,7 +313,7 @@ function viewReport() {
     recent.length
       ? h('ul', { class: 'rows' }, recent.map((r) => h('li', { class: r.id === ui.reportId ? 'on' : '' },
         h('button', { class: 'row-main', onclick: () => { ui.reportId = r.id; render(); window.scrollTo(0, 0); } },
-          `${L.fmtDay(r.day)}  ${L.fmtTime(r.at)}`),
+          `${L.fmtDay(r.day)}  ${L.fmtTime(r.at)}${r.by ? `  ${r.by}` : ''}`),
         h('button', {
           class: 'link danger',
           onclick: () => {
@@ -351,7 +373,7 @@ function viewMore() {
         const data = JSON.parse(await file.text());
         if (!data || !Array.isArray(data.locos) || !Array.isArray(data.log)) throw new Error('bad file');
         if (!confirm(`Replace everything on this device with the backup (${data.locos.length} locos)?`)) return;
-        state = { ...L.emptyState(), ...data, reports: data.reports || [] };
+        state = { ...L.emptyState(), locos: data.locos, log: data.log, reports: data.reports || [], sync: NO_SYNC };
         await saveState(state);
         ui.reportId = null;
         toast('Backup restored');
@@ -361,17 +383,51 @@ function viewMore() {
       }
     },
   });
+  const backupButton = h('button', {
+    class: 'btn primary',
+    onclick: () => shareOrDownload(
+      new Blob([JSON.stringify({ version: 1, locos: state.locos, log: state.log, reports: state.reports })], { type: 'application/json' }),
+      `loco-tracker-backup-${L.fmtDay(today())}.json`, 'Loco Tracker backup'),
+  }, 'Download backup');
+  const counts = `${state.locos.length} locos, ${state.log.length} saved updates, ${state.reports.length} saved reports.`;
+
+  if (SHARED) {
+    return h('div', { class: 'more' },
+      h('section', { class: 'panel' },
+        h('h2', null, 'Shared database'),
+        h('p', null, `${REQUIRE_LOGIN ? 'Signed in as' : 'Your name:'} ${status.email}. ${statusText()}.`),
+        h('p', null, `Everyone who ${REQUIRE_LOGIN ? 'signs in' : 'opens this app'} sees and updates the same data. ${counts}`),
+        h('div', { class: 'actions' },
+          h('button', { class: 'btn primary', onclick: () => sync.syncNow().then(() => toast(statusText())) }, 'Sync now'),
+          REQUIRE_LOGIN
+            ? h('button', {
+              class: 'btn',
+              onclick: () => {
+                if (status.pending && !confirm(`${status.pending} changes have not been uploaded yet. Sign out anyway? They will upload after the next sign-in on this device.`)) return;
+                sync.signOut();
+              },
+            }, 'Sign out')
+            : h('button', {
+              class: 'btn',
+              onclick: () => {
+                const name = prompt('Your name, shown next to the updates you make:', status.email);
+                if (name && name.trim()) sync.setName(name);
+              },
+            }, 'Change name'))),
+      h('section', { class: 'panel' },
+        h('h2', null, 'Backup'),
+        h('p', null, 'The database is the main copy. You can still download a copy of everything to keep as a file.'),
+        h('div', { class: 'actions' }, backupButton)),
+      h('section', { class: 'panel' },
+        h('h2', null, 'Install on your phone'),
+        h('p', null, 'Open this page in Chrome, tap the three-dot menu, then "Add to Home screen". It then opens like an app. Without internet you can still view and update; changes upload when the connection is back.')));
+  }
+
   return h('div', { class: 'more' },
     h('section', { class: 'panel' },
       h('h2', null, 'Backup and move between devices'),
       h('p', null, 'Your data is stored on this device only. To carry it from the phone to a computer (or keep a safe copy), download a backup here and restore it on the other device.'),
-      h('div', { class: 'actions' },
-        h('button', {
-          class: 'btn primary',
-          onclick: () => shareOrDownload(
-            new Blob([JSON.stringify(state)], { type: 'application/json' }),
-            `loco-tracker-backup-${L.fmtDay(today())}.json`, 'Loco Tracker backup'),
-        }, 'Download backup'),
+      h('div', { class: 'actions' }, backupButton,
         h('button', { class: 'btn', onclick: () => fileInput.click() }, 'Restore backup'),
         fileInput)),
     h('section', { class: 'panel' },
@@ -379,12 +435,12 @@ function viewMore() {
       h('p', null, 'Open this page in Chrome, tap the three-dot menu, then "Add to Home screen". It then opens like an app and works without internet.')),
     h('section', { class: 'panel' },
       h('h2', null, 'Start over'),
-      h('p', null, `${state.locos.length} locos, ${state.log.length} saved updates, ${state.reports.length} saved reports on this device.`),
+      h('p', null, `${counts.slice(0, -1)} on this device.`),
       h('button', {
         class: 'btn danger',
         onclick: async () => {
           if (!confirm('Erase everything on this device and load the 08-10-2026 sheet again?')) return;
-          state = seedState();
+          state = { ...seedState(), sync: NO_SYNC };
           await saveState(state);
           ui.reportId = null;
           toast('Reset to the 08-10-2026 sheet');
@@ -393,23 +449,107 @@ function viewMore() {
       }, 'Reset to the 08-10-2026 sheet')));
 }
 
+// ---------- sign in ----------
+
+function statusText() {
+  const n = status.pending;
+  const waiting = `${n} change${n === 1 ? '' : 's'} waiting to upload`;
+  switch (status.phase) {
+    case 'synced': return 'All changes saved to the database';
+    case 'syncing': return n ? `Saving ${n} change${n === 1 ? '' : 's'}` : 'Checking for updates';
+    case 'offline': return n ? `No internet, ${waiting}` : 'No internet, showing the last saved data';
+    case 'error': return `Database problem${status.error ? `: ${status.error}` : ''}${n ? `, ${waiting}` : ''}`;
+    default: return '';
+  }
+}
+
+function viewName() {
+  const name = h('input', { type: 'text', required: true, maxLength: 30, autocomplete: 'name', placeholder: 'For example: Mahesh' });
+  return h('form', {
+    class: 'panel signin',
+    onsubmit: (e) => {
+      e.preventDefault();
+      if (name.value.trim()) sync.setName(name.value);
+    },
+  },
+  h('h2', null, 'Your name'),
+  h('p', null, 'Asked once on this device. It is shown next to the updates you make, so everyone can see who changed what.'),
+  h('label', { class: 'field' }, h('span', null, 'Name'), name),
+  h('button', { type: 'submit', class: 'btn primary' }, 'Continue'));
+}
+
+function viewSignIn() {
+  let busy = false;
+  const email = h('input', { type: 'email', autocomplete: 'username', required: true, placeholder: 'you@example.com' });
+  const password = h('input', { type: 'password', autocomplete: 'current-password', required: true });
+  const message = h('p', { class: 'form-error', role: 'alert' });
+  const button = h('button', { type: 'submit', class: 'btn primary' }, 'Sign in');
+  return h('form', {
+    class: 'panel signin',
+    onsubmit: async (e) => {
+      e.preventDefault();
+      if (busy) return;
+      busy = true;
+      button.textContent = 'Signing in...';
+      message.textContent = '';
+      try {
+        await sync.signIn(email.value.trim(), password.value);
+      } catch (err) {
+        message.textContent = err.status
+          ? 'Email or password is not correct.'
+          : 'Could not reach the database. Check the internet connection and try again.';
+        busy = false;
+        button.textContent = 'Sign in';
+      }
+    },
+  },
+  h('h2', null, 'Sign in'),
+  h('p', null, 'Use the email and password given to you for the loco tracker.'),
+  h('label', { class: 'field' }, h('span', null, 'Email'), email),
+  h('label', { class: 'field' }, h('span', null, 'Password'), password),
+  message, button);
+}
+
 // ---------- shell ----------
 
 const TABS = [['locos', 'Locos'], ['report', 'Report'], ['history', 'History'], ['more', 'More']];
 const VIEWS = { locos: viewLocos, report: viewReport, history: viewHistory, more: viewMore };
 
 function render() {
+  // Shown before the app itself: sign-in, or in open mode a one-time name.
+  const gate = !SHARED ? null : REQUIRE_LOGIN
+    ? (status.phase === 'signed-out' ? viewSignIn : null)
+    : (sync && !sync.email ? viewName : null);
+  const signedOut = !!gate;
   const other = state.locos.filter((l) => l.division === 'OTHER').length;
+  const header = h('header', { class: 'top' },
+    h('div', { class: 'top-inner' },
+      h('h1', null, 'DPWS Loco Tracker'),
+      h('p', null, signedOut
+        ? L.fmtDay(today())
+        : `${L.fmtDay(today())}  |  ${state.locos.length} locos  |  ${other} in other divisions`),
+      SHARED && !signedOut && h('p', { class: `sync ${status.phase}`, id: 'sync-status' }, statusText())));
+  if (signedOut) {
+    document.getElementById('app').replaceChildren(header, h('main', null, gate()));
+    return;
+  }
   document.getElementById('app').replaceChildren(
-    h('header', { class: 'top' },
-      h('div', { class: 'top-inner' },
-        h('h1', null, 'DPWS Loco Tracker'),
-        h('p', null, `${L.fmtDay(today())}  |  ${state.locos.length} locos  |  ${other} in other divisions`))),
+    header,
     h('nav', { class: 'tabs' }, TABS.map(([id, text]) => h('button', {
       class: ui.view === id ? 'on' : '',
       onclick: () => { ui.view = id; render(); window.scrollTo(0, 0); },
     }, text))),
     h('main', null, VIEWS[ui.view]()));
+}
+
+function onSyncStatus(next) {
+  const screenChanged = (next.phase === 'signed-out') !== (status.phase === 'signed-out') || next.email !== status.email;
+  status = next;
+  if (screenChanged || ui.view === 'more') { render(); return; }
+  // Routine status changes only touch the status line, so a form being
+  // filled in or a table being scrolled is not disturbed.
+  const line = document.getElementById('sync-status');
+  if (line) { line.textContent = statusText(); line.className = `sync ${status.phase}`; }
 }
 
 async function start() {
@@ -418,9 +558,22 @@ async function start() {
     state = { ...L.emptyState(), ...stored };
   } else {
     state = seedState();
-    await saveState(state);
+  }
+  state.sync = { ...NO_SYNC, ...state.sync };
+  await saveState(state);
+  if (SHARED) {
+    sync = createSync({
+      url: SUPABASE_URL,
+      key: SUPABASE_KEY,
+      login: REQUIRE_LOGIN,
+      getState: () => state,
+      setState: (next, redraw) => { state = next; persist(); if (redraw) render(); },
+      onStatus: onSyncStatus,
+    });
+    status = { ...status, phase: sync.signedIn ? 'syncing' : 'signed-out', email: sync.email };
   }
   render();
+  if (sync) sync.start();
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
