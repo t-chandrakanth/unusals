@@ -212,3 +212,20 @@ main > div > .segs { max-width: 420px; }
   .card .cell-input:hover { border-color: var(--soft); }
   .serial { width: 28px; }
 }
+
+/* ---- update dots: green done, red still to do ---- */
+
+.dot { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; color: #fff; font-size: 13px; font-weight: 800; line-height: 1; }
+.dot.ok { background: #1c8a4c; }
+.dot.due { background: #c62828; }
+button.dot.due { cursor: pointer; box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.18); }
+.card .dot { margin-left: auto; }
+.progress { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 0; font-size: 14px; font-weight: 600; }
+.progress .dot { width: 18px; height: 18px; font-size: 11px; }
+.progress .dot.due { margin-left: 10px; }
+.progress .since { font-weight: 400; color: var(--soft); }
+.editor .toggle { display: block; margin-top: 10px; }
+@media (min-width: 760px) {
+  .list-head, .card { grid-template-columns: 64px 1.1fr 1fr 1.4fr 70px; }
+  .card .dot { margin: 0; justify-self: start; }
+}

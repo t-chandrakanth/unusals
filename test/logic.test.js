@@ -131,3 +131,29 @@ test('FOIS message date drives the remark and can be read back from old remarks'
   const before = { ...s, locos: [old, ...s.locos.slice(1)] };
   assert.equal(L.reduce(before, { type: 'save', loco: { ...old }, now: 'x' }), before);
 });
+
+test('update dots: a loco is green once updated or confirmed in the current round', () => {
+  const noon = new Date(2026, 9, 10, 12, 0);
+  const startOfDay = new Date(2026, 9, 10).toISOString();
+  assert.equal(L.roundStart([], noon), startOfDay);
+  const yesterday = { at: new Date(2026, 9, 9, 20, 0).toISOString() };
+  const morning = { at: new Date(2026, 9, 10, 8, 0).toISOString() };
+  assert.equal(L.roundStart([yesterday], noon), startOfDay);
+  assert.equal(L.roundStart([yesterday, morning], noon), morning.at);
+
+  let s = seedState();
+  const loco = s.locos[0];
+  assert.equal(L.isUpdated(loco, morning.at), false);
+  // Confirming "no change" turns it green without a history entry.
+  const logBefore = s.log.length;
+  s = L.reduce(s, { type: 'check', id: loco.id, now: at(10, 9) });
+  assert.equal(L.isUpdated(s.locos[0], morning.at), true);
+  assert.equal(s.log.length, logBefore);
+  // Sending the next report starts a new round: red again.
+  const afternoon = at(10, 14);
+  assert.equal(L.isUpdated(s.locos[0], afternoon), false);
+  // A real change turns it green and is logged.
+  s = L.reduce(s, { type: 'save', loco: { ...s.locos[0], location: 'KZJ' }, now: at(10, 15) });
+  assert.equal(L.isUpdated(s.locos[0], afternoon), true);
+  assert.equal(s.log.length, logBefore + 1);
+});

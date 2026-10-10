@@ -8,7 +8,7 @@ export const TABLES = ['locos', 'log', 'reports'];
 export function locoRow(loco, pos, by, deleted = false) {
   return {
     id: loco.id, pos, deleted,
-    data: { ...pick(loco), updatedAt: loco.updatedAt || '' },
+    data: { ...pick(loco), updatedAt: loco.updatedAt || '', checkedAt: loco.checkedAt || '' },
     updated_by: by || '',
   };
 }
