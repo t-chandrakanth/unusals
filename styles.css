@@ -423,3 +423,9 @@ a.install { text-decoration: none; }
 /* the TI GOODS badge in the DPWCS LOCO header, bigger */
 .top .ti-badge { width: clamp(76px, 24vw, 112px); height: clamp(76px, 24vw, 112px); border-radius: 18px; box-shadow: 0 5px 16px rgba(0, 0, 0, 0.45); }
 .top-row { align-items: center; }
+
+/* DPWCS Unusuals: the form to write a report is hard to miss */
+.u-new { border: 2px solid #ff7a45; box-shadow: 0 10px 28px rgba(255, 122, 69, 0.28); }
+.u-new > h2 { background: linear-gradient(100deg, #d9342b 0%, #ff7a45 100%); font-size: 19px; letter-spacing: 0.3px; padding-top: 16px; padding-bottom: 16px; }
+.u-new .plus { width: 30px; height: 30px; background: #fff; color: #d9342b; font-size: 22px; }
+.u-new .u-form .editor-actions .btn.primary { padding: 16px; font-size: 18px; font-weight: 800; border-radius: 14px; background: linear-gradient(135deg, #d9342b, #ff7a45); border-color: transparent; color: #fff; box-shadow: 0 8px 20px rgba(217, 52, 43, 0.35); }

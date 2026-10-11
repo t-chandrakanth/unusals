@@ -227,3 +227,21 @@ dialog { border-radius: 20px; }
 .top .edge-round { border-radius: 50%; background: #fff; box-shadow: 0 6px 18px rgba(150, 20, 30, 0.35); }
 .top .edge-badge { border-radius: 22px; box-shadow: 0 6px 18px rgba(11, 26, 48, 0.4); }
 .top .edge { width: clamp(78px, 24vw, 140px); height: clamp(78px, 24vw, 140px); }
+
+/* the button to write a new report: big, solid, easy to see */
+.btn.new { flex: 1 1 280px; display: inline-flex; align-items: center; justify-content: center; gap: 12px; padding: 16px 24px; border: 0; border-radius: 18px; font-size: 18px; font-weight: 800; letter-spacing: 0.3px; color: #fff; background: linear-gradient(135deg, #e5384f, #ff6a4d); box-shadow: 0 10px 26px rgba(229, 56, 79, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.35); animation: nudge 2.6s ease-in-out infinite; }
+.btn.new.cw { background: linear-gradient(135deg, #de7600, #ffb020); box-shadow: 0 10px 26px rgba(222, 118, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.btn.new.other { background: linear-gradient(135deg, #07897b, #19c8b0); box-shadow: 0 10px 26px rgba(7, 137, 123, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.btn.new::before { content: "+"; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.28); font-size: 24px; font-weight: 700; line-height: 1; }
+.btn.new:active { transform: scale(0.98); animation: none; }
+@keyframes nudge { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025); } }
+@media (prefers-reduced-motion: reduce) { .btn.new { animation: none; } }
+@media (prefers-color-scheme: dark) { .btn.new, .btn.new.cw, .btn.new.other { color: #fff; } }
+
+/* the same colours on the overview's quick buttons */
+.hero-actions .btn.hero-new { border: 0; padding: 11px 18px; border-radius: 14px; font-size: 14px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #e5384f, #ff6a4d) !important; box-shadow: 0 6px 16px rgba(229, 56, 79, 0.35); }
+.hero-actions .btn.hero-new.cw { background: linear-gradient(135deg, #de7600, #ffb020) !important; box-shadow: 0 6px 16px rgba(222, 118, 0, 0.35); }
+.hero-actions .btn.hero-new.other { background: linear-gradient(135deg, #07897b, #19c8b0) !important; box-shadow: 0 6px 16px rgba(7, 137, 123, 0.35); }
+
+/* the Save button in the form */
+.u-form .editor-actions .btn.primary { padding: 15px; font-size: 17px; font-weight: 800; border-radius: 14px; }

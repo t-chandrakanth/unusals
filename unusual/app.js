@@ -461,7 +461,7 @@ function viewOverview() {
       h('div', { class: 'hero-top' },
         h('div', null, h('div', { class: 'big' }, String(list.length)), h('small', null, 'unusual reports on record')),
         h('div', { class: 'when' }, h('b', null, String(list.filter((u) => u.day.startsWith(month)).length)), ' this month', h('br'), h('b', null, String(list.filter((u) => u.day >= week).length)), ' in the last 7 days')),
-      h('div', { class: 'hero-actions' }, [...Object.entries(TYPES).map(([k, ty]) => h('button', { class: 'btn', onclick: () => openForm(k) }, `+ ${ty.name.replace(/s$/, '')}`)), h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files')])),
+      h('div', { class: 'hero-actions' }, [...Object.entries(TYPES).map(([k, ty]) => h('button', { class: `btn hero-new ${k}`, onclick: () => openForm(k) }, `+ ${ty.name.replace(/s$/, '')}`)), h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files')])),
     h('div', { class: 'kpis' }, kpi('loco', 'Loco failures', count('loco')), kpi('cw', 'C&W failures', count('cw')), kpi('other', 'Others', count('other')), kpi('all', 'All reports', list.length)),
     h('section', { class: 'card-box' },
       h('h2', null, 'Last 14 days', h('span', { class: 'legend' }, h('span', null, h('i', { style: 'background:var(--k-fail)' }), 'Loco'), h('span', null, h('i', { style: 'background:var(--k-other)' }), 'C&W'), h('span', null, h('i', { style: 'background:var(--k-dpwcs)' }), 'Other'))),
@@ -526,7 +526,7 @@ function viewList() {
     h('option', { value: 'all', selected: ui.month === 'all' }, 'All months'),
     months.map((m) => h('option', { value: m, selected: m === ui.month }, monthLabel(m))));
   const newButtons = TYPES[type]
-    ? [h('button', { class: `btn new ${type}`, onclick: () => openForm(type) }, `+ New ${TYPES[type].name.toLowerCase().replace(/s$/, '')} report`)]
+    ? [h('button', { class: `btn new ${type}`, onclick: () => openForm(type) }, `New ${({ loco: 'loco failure', cw: 'C&W failure', other: 'other' })[type]} report`)]
     : Object.entries(TYPES).map(([k, t]) => h('button', { class: `btn new ${k}`, onclick: () => openForm(k) }, `+ ${t.name}`));
   newButtons.push(h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files'));
   return h('div', null,
