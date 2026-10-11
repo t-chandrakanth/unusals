@@ -8,7 +8,8 @@ import { createSync } from './sync.js';
 import { diffOps } from './syncdata.js';
 import { importHistory, alreadyImported } from './historyimport.js';
 import { importUnusuals, unusualsImported, upgradeUnusuals } from './unusualimport.js';
-import { parseOfficial, fillFromOfficial } from './official.js';
+import { parseOfficial, fillFromOfficial, parseBlocks } from './official.js';
+import { fileToText, FileError } from './filetext.js';
 import { UNUSUAL_RECORDS } from './unusual-data.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from './config.js';
 
@@ -592,46 +593,108 @@ function readOfficial(u) {
   }
 }
 
+/** Adds every new report found in a file that holds many (a month's sheet). */
+function addManyUnusuals(blocks) {
+  const key = (u) => `${u.day}|${u.trainNo}|${u.locoNo}`.toUpperCase();
+  const have = new Set(state.unusuals.map(key));
+  const usable = blocks.filter((b) => b.day && b.title);
+  const fresh = usable.filter((b) => !have.has(key(b)));
+  if (!usable.length) { toast('Found the reports but not their dates. Add the dates and try again.'); return; }
+  if (!fresh.length) { toast(`All ${usable.length} reports in that file are already in the list.`); return; }
+  const dup = usable.length - fresh.length;
+  if (!confirm(`Found ${usable.length} unusual reports in that file${dup ? `, ${dup} already in the list` : ''}.\n\nAdd the ${fresh.length} new one${fresh.length === 1 ? '' : 's'}?`)) return;
+  const now = new Date().toISOString();
+  for (const b of fresh) dispatch({ type: 'saveUnusual', unusual: { ...L.blankUnusual(b.day), ...b }, now });
+  toast(`Added ${fresh.length} unusual report${fresh.length === 1 ? '' : 's'}`);
+}
+
 /**
- * The paste box at the top of the form. Copy the Sr.DEE report from its PDF,
- * paste it here and press the button: the report is kept with the record and
- * the empty boxes of the form are filled from it.
+ * Reads text that came from a pasted page or an attached PDF or Excel file:
+ * a Sr.DEE report fills this form; a sheet with one report fills it too;
+ * a sheet with many reports adds them all.
+ */
+function takeUnusualText(draft, text, redraw) {
+  const sree = /Failure Report|Incident ID/i.test(text) ? parseOfficial(text) : null;
+  if (sree) {
+    const fill = fillFromOfficial(sree);
+    for (const [key, value] of Object.entries(fill)) {
+      if (value && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = value;
+    }
+    draft.official = JSON.stringify(sree);
+    draft.incident = sree.id;
+    draft._paste = '';
+    toast(`Read the Sr.DEE report, incident ${sree.id}. Check the boxes below, then save.`);
+    redraw();
+    return;
+  }
+  const blocks = parseBlocks(text);
+  if (blocks.length === 1) {
+    const [b] = blocks;
+    for (const key of ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'rep']) {
+      if (b[key] && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = b[key];
+    }
+    draft._paste = '';
+    toast('Read the report. Check the boxes below, then save.');
+    redraw();
+    return;
+  }
+  if (blocks.length > 1) { draft._paste = ''; addManyUnusuals(blocks); redraw(); return; }
+  toast('Could not find a Sr.DEE report or unusual reports in that. Try the whole page, or paste the text.');
+}
+
+/**
+ * The attach / paste box at the top of the form. Attach (or drop) the Sr.DEE
+ * PDF, or an Excel or PDF unusual sheet; or paste copied text. The data is
+ * read from it and the empty boxes of the form are filled.
  */
 function officialPaste(draft, redraw) {
   const o = readOfficial(draft);
   const box = h('textarea', {
     rows: 3, value: draft._paste || '',
-    placeholder: 'Open the Sr.DEE "Loco Unusual Report" PDF, press Ctrl+A then Ctrl+C, and paste it here (Ctrl+V)',
+    placeholder: 'Or paste the copied text here (open the PDF, Ctrl+A, Ctrl+C, then Ctrl+V)',
   });
   box.classList.add('u-input');
   box.setAttribute('data-ukey', '_paste');
   box.addEventListener('input', (e) => { draft._paste = e.target.value; });
-  const read = () => {
-    const parsed = parseOfficial(draft._paste);
-    if (!parsed) { toast('That does not look like a Sr.DEE report. Copy the whole page of the PDF.'); return; }
-    const fill = fillFromOfficial(parsed);
-    for (const [key, value] of Object.entries(fill)) {
-      if (value && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = value;
+
+  const readFile = async (file) => {
+    if (!file) return;
+    toast(`Reading ${file.name}...`);
+    try {
+      takeUnusualText(draft, await fileToText(file), redraw);
+    } catch (e) {
+      console.error(e);
+      toast(e instanceof FileError ? e.message : 'Could not read that file. Try pasting its text instead.');
     }
-    draft.official = JSON.stringify(parsed);
-    draft.incident = parsed.id;
-    draft._paste = '';
-    toast(`Read incident ${parsed.id}. Check the boxes below, then save.`);
-    redraw();
   };
-  return h('div', { class: 'opaste' },
+  const chooser = h('input', {
+    type: 'file', accept: '.pdf,.xlsx,.csv,.txt,application/pdf', style: 'display:none',
+    onchange: (e) => { const f = e.target.files[0]; e.target.value = ''; readFile(f); },
+  });
+  const panel = h('div', { class: 'opaste' },
     h('div', { class: 'opaste-head' },
-      h('strong', null, 'Official Sr.DEE report'),
+      h('strong', null, 'Attach the official Sr.DEE report'),
       o || draft.official
         ? h('span', { class: 'okchip' }, `✓ Attached${draft.incident ? `, incident ${draft.incident}` : ''}`)
         : h('span', { class: 'ohint' }, 'optional')),
-    box,
+    h('button', { type: 'button', class: 'drop', onclick: () => chooser.click() },
+      h('b', null, 'Attach PDF or Excel'),
+      h('span', null, 'tap here, or drop the file on this box. The data is read and the form is filled.')),
+    chooser, box,
     h('div', { class: 'opaste-actions' },
-      h('button', { type: 'button', class: 'btn primary small', onclick: read }, 'Read it and fill the form'),
+      h('button', { type: 'button', class: 'btn small', onclick: () => takeUnusualText(draft, draft._paste || '', redraw) }, 'Read the pasted text'),
       draft.official && h('button', {
         type: 'button', class: 'link danger',
         onclick: () => { draft.official = ''; draft.incident = ''; redraw(); },
       }, 'Remove the attached report')));
+  panel.addEventListener('dragover', (e) => { e.preventDefault(); panel.classList.add('over'); });
+  panel.addEventListener('dragleave', () => panel.classList.remove('over'));
+  panel.addEventListener('drop', (e) => {
+    e.preventDefault();
+    panel.classList.remove('over');
+    readFile(e.dataTransfer.files[0]);
+  });
+  return panel;
 }
 
 /**

@@ -113,3 +113,87 @@ export function fillFromOfficial(o) {
     incident: o.id,
   };
 }
+
+// ---------- unusual sheets (the daily-sheet layout) ----------
+
+const DATE_MARK = /(?:UNUS[A-Z]*-)?DATE\s*-\s*(\d{1,2})-(\d{1,2})-(\d{4})/gi;
+const one = (v) => String(v || '').replace(/[\t\s]+/g, ' ').replace(/^[\s:]+|[\s:]+$/g, '');
+
+function cutBlock(part) {
+  const find = (re, from) => {
+    const m = new RegExp(re, 'i').exec(part.slice(from));
+    return m ? { start: from + m.index, end: from + m.index + m[0].length } : null;
+  };
+  const loc = find('\\bLOCATION\\b', 0);
+  const tr = loc && find('\\bTRAIN\\s*NO\\b', loc.end);
+  const lo = tr && find('\\bLOCO\\s*(?:NO|NUMBER)\\b', tr.end);
+  const reason = lo && find('\\bREASON\\b', lo.end);
+  if (!reason) return null;
+  // Between LOCO NO and REASON: the loco number (first line), maybe a LOAD
+  // row, and, in a PDF where the REASON label sits in the middle of a wrapped
+  // paragraph, the first lines of the reason.
+  const lines = part.slice(lo.end, reason.start).split('\n');
+  const first = lines.findIndex((l) => l.trim());
+  let locoText = first >= 0 ? lines[first] : '';
+  let before = first >= 0 ? lines.slice(first + 1) : [];
+  let load = '';
+  const inline = /(?:^|\s)LOAD\b[\s:]*(.*)$/i.exec(locoText);
+  if (inline) { load = inline[1]; locoText = locoText.slice(0, inline.index); }
+  const loadAt = before.findIndex((l) => /^\s*LOAD\b/i.test(l));
+  if (!load && loadAt >= 0) {
+    load = before[loadAt].replace(/^\s*LOAD\b[\s:]*/i, '');
+    before = before.filter((_, k) => k !== loadAt);
+  }
+  const rest = part.slice(reason.end);
+  const dets = [...rest.matchAll(/(?:^|\s)DET\b/gi)];
+  const det = dets[dets.length - 1];
+  const reasonText = [...before, det ? rest.slice(0, det.index) : rest].join('\n');
+  const tail = det ? rest.slice(det.index + det[0].length) : '';
+  const rep = /\bREP\b/i.exec(tail);
+  return {
+    title: one(part.slice(0, loc.start)),
+    location: one(part.slice(loc.end, tr.start)),
+    trainNo: one(part.slice(tr.end, lo.start)),
+    locoNo: one(locoText),
+    load: one(load),
+    reason: reasonText.split('\n').map((l) => l.replace(/[\t ]+/g, ' ').trim()).filter(Boolean).join('\n'),
+    det: one(rep ? tail.slice(0, rep.index) : tail),
+    rep: rep ? one(tail.slice(rep.index + rep[0].length)) : '',
+  };
+}
+
+/**
+ * Unusual reports written as blocks (TRAIN DETAILS / LOCATION / TRAIN NO /
+ * LOCO NO / REASON / DET, with a "UNUSALS-DATE-dd-mm-yyyy" line), as in the
+ * daily sheets and the monthly statement, from a PDF, Excel or pasted text.
+ * One block gives one report; a whole month gives all of them.
+ */
+export function parseBlocks(text) {
+  const days = [];
+  const src = String(text || '').split('\r\n').join('\n').replace(DATE_MARK, (_, d, m, y) => {
+    days.push(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+    return ' ';
+  });
+  // A PDF can break the label over two lines with the serial and the heading
+  // in between: "TRAIN / 2 STALLED DUE TO LOCO PROBLEM / DETAILS".
+  const joined = src.replace(/\bTRAIN\b[ \t]*\n[ \t]*(?:\d{1,3}[ \t]+)?([^\n]*)\n[ \t]*DETAILS\b/gi, 'TRAIN DETAILS $1\n');
+  const parts = joined.split(/\bTRAIN\s+DETAILS\b/i).slice(1);
+  const out = [];
+  parts.forEach((part, i) => {
+    const b = cutBlock(part);
+    if (!b) return;
+    // The serial number of the next block ends this block's last box.
+    if (i < parts.length - 1) {
+      const key = b.rep ? 'rep' : 'det';
+      const next = String(i + 2); // the serial the next block should carry
+      if (b[key] === next) b[key] = '';
+      else if (b[key].endsWith(` ${next}`)) b[key] = b[key].slice(0, -next.length - 1);
+      else {
+        const trimmed = b[key].replace(/\s+\d{1,3}$/, '');
+        if (/\D/.test(trimmed)) b[key] = trimmed;
+      }
+    }
+    out.push({ day: days.length === parts.length ? days[i] : (days[i] || ''), ...b });
+  });
+  return out;
+}
