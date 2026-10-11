@@ -10,7 +10,7 @@ import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
 import { unusualSheet } from '../js/sheet.js';
 import { sheetToCanvas, canvasToBlob } from '../js/canvas.js';
 import { sheetToXlsx } from '../js/xlsx.js';
-import { parseBlocks, parseOfficial, fillFromOfficial } from '../js/official.js';
+import { parseBlocks, parseOfficial, fillFromOfficial, parseDetention } from '../js/official.js';
 import { fileToText, FileError } from '../js/filetext.js';
 import { UNUSUAL_RECORDS } from '../js/unusual-data.js';
 import { importUnusuals } from '../js/unusualimport.js';
@@ -28,7 +28,7 @@ const TYPES = {
 };
 const FORM = {
   loco: ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason'],
-  cw: ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'wagonNo', 'bpcNo', 'det', 'reason'],
+  cw: ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason'],
   other: ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason'],
 };
 const LABEL = {
@@ -191,6 +191,17 @@ function addMany(blocks) {
 
 /** Fills the open form from a Sr.DEE report or one sheet; a sheet of many is added whole. */
 function takeText(draft, text, rebuild, close) {
+  // A C&W "Detention particulars of goods train" report becomes a C&W failure report.
+  const cw = parseDetention(text);
+  if (cw) {
+    draft.type = 'cw';
+    for (const key of ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'bpcNo', 'wagonNo', 'reason', 'det']) {
+      if (cw[key] && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = cw[key];
+    }
+    toast('Read the C&W detention report. Check the boxes, then save.');
+    rebuild();
+    return;
+  }
   const sree = /Failure Report|Incident ID/i.test(text) ? parseOfficial(text) : null;
   if (sree) {
     for (const [key, value] of Object.entries(fillFromOfficial(sree))) {
@@ -220,12 +231,20 @@ function takeText(draft, text, rebuild, close) {
 function openForm(type, existing) {
   const dlg = document.getElementById('editor');
   const draft = existing ? { ...existing } : { ...L.blankUnusual(today()), type, time: L.fmtTime(new Date()) };
-  const kind = kindOf(draft);
-  const titles = [...new Set([...TYPES[kind].titles, ...state.unusuals.filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
   const locos = [...new Set(state.locos.map((l) => l.locoNo).filter(Boolean))];
   const close = () => dlg.close();
 
+  // Pasting a whole report anywhere in the form is picked up and fills the boxes.
+  dlg.onpaste = (e) => {
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (!/DETENTION\s+PARTICULARS|BRIEF\s+HISTORY|Failure Report|Incident ID|TRAIN\s+DETAILS/i.test(text)) return;
+    e.preventDefault();
+    takeText(draft, text, build, close);
+  };
+
   const build = () => {
+    const kind = kindOf(draft);
+    const titles = [...new Set([...TYPES[kind].titles, ...state.unusuals.filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
     const field = (key) => {
       const el = key === 'reason'
         ? h('textarea', { rows: 6, value: draft[key], placeholder: HINT[key] })
@@ -252,14 +271,17 @@ function openForm(type, existing) {
     });
     const attach = h('button', { type: 'button', class: 'attach', onclick: () => chooser.click() },
       h('b', null, 'Attach PDF or Excel'),
-      h('span', null, 'a Sr.DEE report or a report sheet: the data is read and the boxes are filled. A whole month adds every report.'));
+      h('span', null, 'a C&W detention report, a Sr.DEE report or a report sheet: the data is read and the boxes are filled. A whole month adds every report.'));
+    const paste = h('textarea', { rows: 2, placeholder: 'Or paste the report here (it is read as soon as you paste)', style: 'margin-bottom:6px' });
+    const pasteRow = h('div', { class: 'opaste-actions', style: 'margin:0 0 14px' },
+      h('button', { type: 'button', class: 'btn small', onclick: () => takeText(draft, paste.value, build, close) }, 'Read the pasted text'));
     attach.addEventListener('dragover', (e) => { e.preventDefault(); attach.classList.add('over'); });
     attach.addEventListener('dragleave', () => attach.classList.remove('over'));
     attach.addEventListener('drop', (e) => { e.preventDefault(); attach.classList.remove('over'); readFile(e.dataTransfer.files[0]); });
 
     dlg.replaceChildren(h('div', { class: 'editor' },
       h('div', { class: `dlg-head ${kind}` }, existing ? `Edit ${TYPES[kind].name.toLowerCase()} report, ${L.fmtDay(existing.day)}` : `New report: ${TYPES[kind].name}`),
-      attach, chooser,
+      attach, chooser, paste, pasteRow,
       draft.official && h('p', { class: 'okline' }, `✓ Official Sr.DEE report attached${draft.incident ? `, incident ${draft.incident}` : ''}`),
       h('form', {
         class: 'u-form',

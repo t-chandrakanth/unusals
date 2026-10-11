@@ -216,3 +216,79 @@ export function parseBlocks(text) {
   });
   return out;
 }
+
+// ---------- C&W detention particulars ----------
+
+const DETENTION_LABELS = [
+  ['date', 'Date'], ['trainNo', 'Train No'], ['locoNo', 'Loco No'], ['bpcNo', 'BPC No'], ['load', 'Load'],
+  ['station', 'Station'], ['section', 'Section'], ['commodity', 'Commodity'], ['ex', 'Ex\\.?'],
+  ['driver', 'Driver'], ['guard', 'Guard'],
+];
+
+/** "07.10.26" or "7-10-2026" -> "2026-10-07" */
+function shortDay(v) {
+  const m = /(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/.exec(v || '');
+  if (!m) return '';
+  const y = m[3].length === 2 ? `20${m[3]}` : m[3];
+  return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+}
+
+/** True for the text of a "Detention particulars of goods train" (C&W) report. */
+export function looksLikeDetention(text) {
+  return /DETENTION\s+PARTICULARS/i.test(text) || (/BRIEF\s+HISTORY/i.test(text) && /WAGON\s+DETAILS/i.test(text));
+}
+
+/**
+ * A C&W "DETENTION PARTICULARS OF GOODS TRAIN: <train> AT <station> DUE TO
+ * <cause>" report (hot axle, brake binding...), pasted or from a PDF, as the
+ * boxes of a C&W failure report. Section, commodity, ex, driver and guard
+ * have no box of their own, so they go at the end of the reason.
+ */
+export function parseDetention(text) {
+  const src = String(text || '').split('\r\n').join('\n');
+  if (!looksLikeDetention(src)) return null;
+  const hist = src.search(/BRIEF\s+HISTORY/i);
+  const wag = src.search(/WAGON\s+DETAILS/i);
+  const head = (hist >= 0 ? src.slice(0, hist) : (wag >= 0 ? src.slice(0, wag) : src)).replace(/\s+/g, ' ');
+
+  const title = /(?:GOODS\s+)?TRAIN\s*:?\s*([^\s:]+)\s+AT\s+(.+?)\s+DUE\s+TO\s+(.+?)\*?\s*(?:Date\b|$)/i.exec(head);
+  const found = [];
+  for (const [key, label] of DETENTION_LABELS) {
+    // a label counts only with its colon: "Date :" , "Ex. :"
+    const all = [...head.matchAll(new RegExp(`(?:^|\\s)${label}\\s*:`, 'gi'))];
+    const m = all[0];
+    if (m) found.push({ key, start: m.index, end: m.index + m[0].length });
+  }
+  found.sort((a, b) => a.start - b.start);
+  const f = {};
+  found.forEach((x, i) => { f[x.key] = clean(head.slice(x.end, i + 1 < found.length ? found[i + 1].start : undefined)); });
+
+  const history = hist >= 0
+    ? src.slice(hist, wag > hist ? wag : undefined).replace(/^BRIEF\s+HISTORY:?/i, '')
+    : '';
+  const lines = history.split('\n').map((l) => l.replace(/[\t ]+/g, ' ').trim()).filter(Boolean)
+    // "15.30hrs: Train arrived" -> "15:30 Train arrived"
+    .map((l) => l.replace(/^(\d{1,2})[.:](\d{2})\s*hrs?\s*:?\s*/i, '$1:$2 '));
+  const wagonText = wag >= 0
+    ? src.slice(wag).replace(/^WAGON\s+DETAILS:?/i, '').split('\n').map((l) => l.replace(/[\t ]+/g, ' ').trim()).filter(Boolean).join(' ')
+    : '';
+
+  const extra = [
+    f.section && `Section: ${f.section}`, f.commodity && `Commodity: ${f.commodity}`, f.ex && `Ex: ${f.ex}`,
+    f.driver && `Driver: ${f.driver}`, f.guard && `Guard: ${f.guard}`,
+  ].filter(Boolean).join(' | ');
+  const trainNo = f.trainNo || (title ? title[1] : '');
+  return {
+    type: 'cw',
+    day: shortDay(f.date),
+    title: title ? clean(title[3]).toUpperCase() : '',
+    location: f.station || (title ? clean(title[2]) : ''),
+    trainNo,
+    locoNo: f.locoNo || '',
+    load: f.load || '',
+    bpcNo: f.bpcNo || '',
+    wagonNo: clean(wagonText),
+    reason: lines.join('\n') + (extra ? `\n\n${extra}` : ''),
+    det: '',
+  };
+}

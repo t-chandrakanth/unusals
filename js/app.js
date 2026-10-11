@@ -8,7 +8,7 @@ import { createSync } from './sync.js';
 import { diffOps } from './syncdata.js';
 import { importHistory, alreadyImported } from './historyimport.js';
 import { importUnusuals, unusualsImported, upgradeUnusuals } from './unusualimport.js';
-import { parseOfficial, fillFromOfficial, parseBlocks } from './official.js';
+import { parseOfficial, fillFromOfficial, parseBlocks, parseDetention } from './official.js';
 import { fileToText, FileError } from './filetext.js';
 import { UNUSUAL_RECORDS } from './unusual-data.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from './config.js';
@@ -691,6 +691,20 @@ function addManyUnusuals(blocks) {
  * a sheet with many reports adds them all.
  */
 function takeUnusualText(draft, text, redraw) {
+  const cw = parseDetention(text);
+  if (cw) {
+    draft.type = 'cw';
+    draft.wagonNo = cw.wagonNo;
+    draft.bpcNo = cw.bpcNo;
+    const reason = [cw.reason, cw.wagonNo && `Wagon no: ${cw.wagonNo}`, cw.bpcNo && `BPC no: ${cw.bpcNo}`].filter(Boolean).join('\n');
+    for (const [key, value] of Object.entries({ day: cw.day, title: cw.title, location: cw.location, trainNo: cw.trainNo, locoNo: cw.locoNo, load: cw.load, reason })) {
+      if (value && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = value;
+    }
+    draft._paste = '';
+    toast('Read the C&W detention report. Check the boxes below, then save.');
+    redraw();
+    return;
+  }
   const sree = /Failure Report|Incident ID/i.test(text) ? parseOfficial(text) : null;
   if (sree) {
     const fill = fillFromOfficial(sree);
@@ -806,6 +820,13 @@ function unusualForm(draft, { submit, onSubmit, onCancel, redraw }) {
   const locos = [...new Set(state.locos.map((l) => l.locoNo).filter(Boolean))];
   formEl = h('form', {
     class: 'u-form',
+    // Pasting a whole report anywhere in the form is picked up and fills the boxes.
+    onpaste: (e) => {
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      if (!/DETENTION\s+PARTICULARS|BRIEF\s+HISTORY|Failure Report|Incident ID/i.test(text)) return;
+      e.preventDefault();
+      takeUnusualText(draft, text, redraw);
+    },
     onsubmit: (e) => {
       e.preventDefault();
       if (!draft.day) { toast('Pick the date'); return; }
