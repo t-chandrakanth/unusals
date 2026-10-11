@@ -789,12 +789,22 @@ function unusualForm(draft, { submit, onSubmit, onCancel, redraw }) {
     el.classList.add('u-input');
     el.setAttribute('data-ukey', key);
     if (opts.list) el.setAttribute('list', opts.list);
-    el.addEventListener('input', (e) => { draft[key] = e.target.value; });
+    el.addEventListener('input', (e) => { draft[key] = e.target.value; if (opts.after) opts.after(); });
     return h('label', { class: `field ${opts.wide ? 'wide' : ''}` }, h('span', null, label), el);
+  };
+  // From and To are only for working out the detention: it is filled in as
+  // they are typed, and only the detention is shown or shared.
+  let formEl = null;
+  const worked = () => {
+    const d = L.detentionBetween(draft.detFrom, draft.detTo);
+    if (!d) return;
+    draft.det = d;
+    const box = formEl && formEl.querySelector('.u-input[data-ukey="det"]');
+    if (box) box.value = d;
   };
   const titles = [...new Set([...UNUSUAL_TITLES, ...state.unusuals.map((u) => u.title).filter(Boolean)])];
   const locos = [...new Set(state.locos.map((l) => l.locoNo).filter(Boolean))];
-  return h('form', {
+  formEl = h('form', {
     class: 'u-form',
     onsubmit: (e) => {
       e.preventDefault();
@@ -811,14 +821,17 @@ function unusualForm(draft, { submit, onSubmit, onCancel, redraw }) {
     field('Location', 'location', { placeholder: 'PRLI-GTU' }),
     field('Train no', 'trainNo', { placeholder: 'KSNK/BOXNL' }),
     field('Loco no', 'locoNo', { wide: true, list: 'u-locos', placeholder: '27592+27767/KZJ/DUE-11/11' }),
-    field('Load (if any)', 'load', { placeholder: '59/59/4882T' }),
-    field('DET (detention)', 'det', { placeholder: '06:39 HRS' }),
+    field('Load (if any)', 'load', { wide: true, placeholder: '59/59/4882T' }),
+    field('Detention from (not shown)', 'detFrom', { type: 'time', after: worked }),
+    field('Detention to (not shown)', 'detTo', { type: 'time', after: worked }),
+    field('DET (detention, worked out from From and To)', 'det', { wide: true, placeholder: '06:39 HRS' }),
     field('Reason (what happened)', 'reason', { area: true, wide: true, rows: 7, placeholder: 'Times, km, what was done, relief loco, crew...' })),
   h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
   h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),
   h('div', { class: 'editor-actions' },
     h('button', { type: 'submit', class: 'btn primary' }, submit),
     onCancel && h('button', { type: 'button', class: 'btn', onclick: onCancel }, 'Cancel')));
+  return formEl;
 }
 
 function openUnusualEditor(u) {

@@ -136,3 +136,24 @@ test('the time of the incident is kept, ordered within the day and shown in the 
   assert.equal(unusualSheet(s.unusuals).rows[0][0].v, 'UNUSALS-DATE-09-10-2026 06:15');
   assert.match(L.unusualText(s.unusuals), /UNUSALS-DATE-09-10-2026 06:15/);
 });
+
+test('detention is worked out from From and To, past midnight too', () => {
+  assert.equal(L.detentionBetween('02:40', '05:14'), '02:34 HRS');
+  assert.equal(L.detentionBetween('23:30', '01:15'), '01:45 HRS');
+  assert.equal(L.detentionBetween('08:00', '08:00'), '00:00 HRS');
+  assert.equal(L.detentionBetween('08:00', ''), '');
+  assert.equal(L.detentionBetween('', ''), '');
+});
+
+test('From and To are kept with the report but never shared: only DET shows', () => {
+  const u = { ...L.blankUnusual('2026-10-12'), title: 'LOCO FAILED', detFrom: '02:40', detTo: '05:14', det: '02:34 HRS' };
+  const s = L.reduce(seedState(), { type: 'saveUnusual', unusual: u, now: now(), by: 'x' });
+  assert.equal(s.unusuals[0].detFrom, '02:40');
+  assert.equal(s.unusuals[0].detTo, '05:14');
+  const text = L.unusualText(s.unusuals);
+  assert.match(text, /DET: 02:34 HRS/);
+  assert.doesNotMatch(text, /02:40|05:14/);
+  const cells = unusualSheet(s.unusuals).rows.flat().filter(Boolean).map((c) => c.v).join('|');
+  assert.match(cells, /02:34 HRS/);
+  assert.doesNotMatch(cells, /02:40|05:14/);
+});

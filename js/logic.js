@@ -5,7 +5,7 @@ export const FIELDS = [
   'hoTrain', 'hoPoint', 'hoTime', 'foisDate', 'working', 'remarks', 'sameSerial',
 ];
 
-export const UNUSUAL_FIELDS = ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'rep', 'incident', 'official', 'type', 'wagonNo', 'bpcNo'];
+export const UNUSUAL_FIELDS = ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'detFrom', 'detTo', 'rep', 'incident', 'official', 'type', 'wagonNo', 'bpcNo'];
 
 export const DIVISIONS ={ OTHER: 'Other division', SC: 'SC division' };
 
@@ -120,7 +120,24 @@ export function isUpdated(loco, since) {
 }
 
 export function blankUnusual(day) {
-  return { id: uid(), day, time: '', title: '', location: '', trainNo: '', locoNo: '', load: '', reason: '', det: '', rep: '', incident: '', official: '', type: '', wagonNo: '', bpcNo: '' };
+  return { id: uid(), day, time: '', title: '', location: '', trainNo: '', locoNo: '', load: '', reason: '', det: '', detFrom: '', detTo: '', rep: '', incident: '', official: '', type: '', wagonNo: '', bpcNo: '' };
+}
+
+/**
+ * Detention between two clock times (HH:MM), written the way DET is: "06:39 HRS".
+ * A To that is earlier than From means it ran past midnight. '' if either is missing.
+ */
+export function detentionBetween(from, to) {
+  const minutes = (t) => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '').trim());
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  const a = minutes(from);
+  const b = minutes(to);
+  if (a === null || b === null) return '';
+  let d = b - a;
+  if (d < 0) d += 24 * 60;
+  return `${pad(Math.floor(d / 60))}:${pad(d % 60)} HRS`;
 }
 
 /** Only the written fields of an unusual report, trimmed. */
