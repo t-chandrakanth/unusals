@@ -5,8 +5,8 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f1fb",
-  "theme_color": "#4b22c9",
+  "background_color": "#f5f9fc",
+  "theme_color": "#e4f3ff",
   "id": "./unusals",
   "icons": [
     {
