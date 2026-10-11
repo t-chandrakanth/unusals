@@ -9,6 +9,7 @@ import { diffOps } from '../js/syncdata.js';
 import { importHistory, alreadyImported } from '../js/historyimport.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
 import { readReports, tidyBatch, reportKey } from '../js/reports.js';
+import { dailySummary } from '../js/summary.js';
 import { fileToText, FileError } from '../js/filetext.js';
 import { importDpwcs, dpwcsSeeded } from '../js/unusualimport.js';
 import { UNUSUAL_RECORDS } from '../js/unusual-data.js';
@@ -38,6 +39,7 @@ const ui = {
   uDraft: null, // the loco failure being written; kept here so a redraw does not lose it
   uSearch: '',
   uMonth: 'all',
+  sumDay: '',
 };
 
 // ---------- small helpers ----------
@@ -103,6 +105,16 @@ async function importOldRecords() {
   } finally {
     importing = false;
   }
+}
+
+// The daily message for a day, and WhatsApp with it ready to send to a group.
+const daySummaryText = (day) => dailySummary(mine(), day, { title: 'DPWCS LOCO FAILURES', kindOf: () => 'loco', groups: [['loco', 'LOCO FAILURES']] });
+function sendWhatsApp(text) {
+  const max = 5500; // a longer message does not fit in a WhatsApp link
+  const cut = text.length > max;
+  const body = cut ? `${text.slice(0, max).replace(/\n[^\n]*$/, '')}\n...` : text;
+  window.open(`https://wa.me/?text=${encodeURIComponent(body)}`, '_blank', 'noopener');
+  if (cut) toast('A long list is cut for WhatsApp. Use Share image or Excel file to send all of it.');
 }
 
 // The DPWCS loco failures have their own list: only reports tagged 'dpwcs' are shown
@@ -976,6 +988,13 @@ function viewUnusuals() {
       h('button', { type: 'button', class: 'link', onclick: () => { ui.uDraft = null; render(); } }, 'Clear the form')),
     h('h2', { class: 'section-title u-screen' }, 'DPWCS loco failures', h('span', { class: 'count' }, mine().length)),
     h('div', { class: 'toolbar wrap u-screen' }, search, month),
+    (() => {
+      const day = h('input', { type: 'date', value: ui.sumDay || today(), 'aria-label': 'Day', onchange: (e) => { ui.sumDay = e.target.value || today(); } });
+      return h('div', { class: 'toolbar wrap u-screen sum-row' },
+        h('button', { class: 'btn whatsapp big', onclick: () => sendWhatsApp(daySummaryText(day.value || today())) }, "Today's reports on WhatsApp"),
+        h('label', { class: 'inline' }, 'for day', day),
+        h('button', { class: 'btn small', onclick: () => copyText(daySummaryText(day.value || today())) }, 'Copy text'));
+    })(),
     h('div', { id: 'ulist' }, buildList()));
 }
 

@@ -15,6 +15,7 @@ import { fileToText, FileError } from '../js/filetext.js';
 import { UNUSUAL_RECORDS } from '../js/unusual-data.js';
 import { importUnusuals } from '../js/unusualimport.js';
 import { EXTRA_RECORDS } from './records.js';
+import { dailySummary } from '../js/summary.js';
 import { locoNumbers, topCounts, repeatLocos, lastDays, longestDetentions, addDays, fmtMinutes } from './stats.js';
 
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -80,7 +81,7 @@ const NO_SYNC = { outbox: [], cursor: {}, linked: false };
 let state = L.emptyState();
 let sync = null;
 let status = { phase: SHARED ? 'syncing' : 'local', pending: 0, email: '', error: '', unusualsMissing: false };
-const ui = { view: 'overview', search: '', month: 'all', range: 'all', from: '', to: '' };
+const ui = { view: 'overview', search: '', month: 'all', range: 'all', from: '', to: '', sumDay: '' };
 let repeatMap = new Map(); // loco number -> reports in the last 90 days, when more than one
 
 const who = () => (sync && sync.email ? sync.email.split('@')[0] : '');
@@ -427,6 +428,9 @@ function exportBar(sheet, base, title, getText) {
     h('button', { class: 'btn whatsapp', onclick: () => sendWhatsApp(getText()) }, 'Send on WhatsApp'));
 }
 
+/** The daily message for a day: counts, then a short line for each report. */
+const daySummaryText = (day) => dailySummary(rows(), day, { title: 'SCR UNUSALS', kindOf });
+
 /** Opens WhatsApp with the reports as a message to send to anyone or any group. */
 function sendWhatsApp(text) {
   const max = 5500; // a longer message does not fit in a WhatsApp link
@@ -463,6 +467,17 @@ function viewOverview() {
         h('div', { class: 'when' }, h('b', null, String(list.filter((u) => u.day.startsWith(month)).length)), ' this month', h('br'), h('b', null, String(list.filter((u) => u.day >= week).length)), ' in the last 7 days')),
       h('div', { class: 'hero-actions' }, [...Object.entries(TYPES).map(([k, ty]) => h('button', { class: `btn hero-new ${k}`, onclick: () => openForm(k) }, `+ ${ty.name.replace(/s$/, '')}`)), h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files')])),
     h('div', { class: 'kpis' }, kpi('loco', 'Loco failures', count('loco')), kpi('cw', 'C&W failures', count('cw')), kpi('other', 'Others', count('other')), kpi('all', 'All reports', list.length)),
+    h('section', { class: 'card-box' },
+      h('h2', null, 'Daily WhatsApp summary'),
+      h('p', { class: 'nothing', style: 'margin-bottom:10px' }, 'The counts and a short line for each report of one day, ready to paste into the group.'),
+      (() => {
+        const day = h('input', { type: 'date', value: ui.sumDay || today(), 'aria-label': 'Day', onchange: (e) => { ui.sumDay = e.target.value || today(); } });
+        const chosen = () => day.value || today();
+        return h('div', { class: 'sum-row' },
+          h('label', { class: 'dfield' }, 'Day', day),
+          h('button', { class: 'btn whatsapp big', onclick: () => sendWhatsApp(daySummaryText(chosen())) }, "Send on WhatsApp"),
+          h('button', { class: 'btn', onclick: () => copyText(daySummaryText(chosen())) }, 'Copy text'));
+      })()),
     h('section', { class: 'card-box' },
       h('h2', null, 'Last 14 days', h('span', { class: 'legend' }, h('span', null, h('i', { style: 'background:var(--k-fail)' }), 'Loco'), h('span', null, h('i', { style: 'background:var(--k-other)' }), 'C&W'), h('span', null, h('i', { style: 'background:var(--k-dpwcs)' }), 'Other'))),
       h('div', { class: 'chart' }, days.map((d) => {
@@ -529,6 +544,7 @@ function viewList() {
     ? [h('button', { class: `btn new ${type}`, onclick: () => openForm(type) }, `New ${({ loco: 'loco failure', cw: 'C&W failure', other: 'other' })[type]} report`)]
     : Object.entries(TYPES).map(([k, t]) => h('button', { class: `btn new ${k}`, onclick: () => openForm(k) }, `+ ${t.name}`));
   newButtons.push(h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files'));
+  newButtons.push(h('button', { class: 'btn whatsapp', onclick: () => sendWhatsApp(daySummaryText(today())) }, "Today's reports on WhatsApp"));
   return h('div', null,
     SHARED && status.unusualsMissing && h('p', { class: 'notice' },
       'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase (steps are in the README). Nothing is lost meanwhile.'),

@@ -245,3 +245,8 @@ dialog { border-radius: 20px; }
 
 /* the Save button in the form */
 .u-form .editor-actions .btn.primary { padding: 15px; font-size: 17px; font-weight: 800; border-radius: 14px; }
+
+/* the daily summary */
+.sum-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.btn.whatsapp.big { padding: 13px 20px; font-size: 16px; font-weight: 800; background: #25d366; border-color: #25d366; color: #05381d; }
+@media (prefers-color-scheme: dark) { .btn.whatsapp.big { color: #05381d; } }
