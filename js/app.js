@@ -7,7 +7,8 @@ import { sheetToCanvas, canvasToBlob } from './canvas.js';
 import { createSync } from './sync.js';
 import { diffOps } from './syncdata.js';
 import { importHistory, alreadyImported } from './historyimport.js';
-import { importUnusuals, unusualsImported } from './unusualimport.js';
+import { importUnusuals, unusualsImported, upgradeUnusuals } from './unusualimport.js';
+import { parseOfficial, fillFromOfficial } from './official.js';
 import { UNUSUAL_RECORDS } from './unusual-data.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from './config.js';
 
@@ -109,6 +110,8 @@ async function importOldRecords() {
 function importOldUnusuals() {
   if (unusualsImported(state)) {
     if (!state.unusualsImported) state = { ...state, unusualsImported: true };
+    const upgraded = upgradeUnusuals(state, UNUSUAL_RECORDS);
+    if (upgraded !== state) { commit(upgraded); render(); }
     return;
   }
   if (sync && !(state.sync.linked && status.phase === 'synced')) return;
@@ -552,17 +555,76 @@ const UNUSUAL_TITLES = [
   'LOCO TROUBLE-DPWCS', 'LOCO TROUBLE DUE TO DPWCS COMMUNICATION PROBLEM', 'STALLED DUE TO LOCO PROBLEM',
   'STALLED DUE TO TRAILING LOCO PROBLEM', 'LOCO FAILED', 'LOCO PROBLEM', 'LOCO TROUBLE',
 ];
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
 function monthLabel(key) {
   const [y, m] = key.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleString('en-GB', { month: 'short', year: 'numeric' });
 }
 
+/** The colour of a report: DPWCS troubles blue, failures and stalls red, the rest amber. */
+function unusualKind(u) {
+  if (/DPWCS|DPWS/i.test(u.title)) return 'dpwcs';
+  if (/FAIL|STALL/i.test(u.title)) return 'fail';
+  return 'other';
+}
+
+function readOfficial(u) {
+  try {
+    const o = JSON.parse(u.official);
+    return o && typeof o === 'object' ? o : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The paste box at the top of the form. Copy the Sr.DEE report from its PDF,
+ * paste it here and press the button: the report is kept with the record and
+ * the empty boxes of the form are filled from it.
+ */
+function officialPaste(draft, redraw) {
+  const o = readOfficial(draft);
+  const box = h('textarea', {
+    rows: 3, value: draft._paste || '',
+    placeholder: 'Open the Sr.DEE "Loco Unusual Report" PDF, press Ctrl+A then Ctrl+C, and paste it here (Ctrl+V)',
+  });
+  box.classList.add('u-input');
+  box.setAttribute('data-ukey', '_paste');
+  box.addEventListener('input', (e) => { draft._paste = e.target.value; });
+  const read = () => {
+    const parsed = parseOfficial(draft._paste);
+    if (!parsed) { toast('That does not look like a Sr.DEE report. Copy the whole page of the PDF.'); return; }
+    const fill = fillFromOfficial(parsed);
+    for (const [key, value] of Object.entries(fill)) {
+      if (value && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = value;
+    }
+    draft.official = JSON.stringify(parsed);
+    draft.incident = parsed.id;
+    draft._paste = '';
+    toast(`Read incident ${parsed.id}. Check the boxes below, then save.`);
+    redraw();
+  };
+  return h('div', { class: 'opaste' },
+    h('div', { class: 'opaste-head' },
+      h('strong', null, 'Official Sr.DEE report'),
+      o || draft.official
+        ? h('span', { class: 'okchip' }, `✓ Attached${draft.incident ? `, incident ${draft.incident}` : ''}`)
+        : h('span', { class: 'ohint' }, 'optional')),
+    box,
+    h('div', { class: 'opaste-actions' },
+      h('button', { type: 'button', class: 'btn primary small', onclick: read }, 'Read it and fill the form'),
+      draft.official && h('button', {
+        type: 'button', class: 'link danger',
+        onclick: () => { draft.official = ''; draft.incident = ''; redraw(); },
+      }, 'Remove the attached report')));
+}
+
 /**
  * The form for one unusual report, used both for a fresh report (the draft
  * lives in ui, so a redraw while typing loses nothing) and for editing.
  */
-function unusualForm(draft, { submit, onSubmit, onCancel }) {
+function unusualForm(draft, { submit, onSubmit, onCancel, redraw }) {
   const field = (label, key, opts = {}) => {
     const el = opts.area
       ? h('textarea', { rows: opts.rows || 6, value: draft[key], placeholder: opts.placeholder || '' })
@@ -587,6 +649,7 @@ function unusualForm(draft, { submit, onSubmit, onCancel }) {
       onSubmit();
     },
   },
+  officialPaste(draft, redraw),
   h('div', { class: 'grid' },
     field('Date', 'day', { type: 'date' }),
     field('Time', 'time', { type: 'time' }),
@@ -607,10 +670,11 @@ function unusualForm(draft, { submit, onSubmit, onCancel }) {
 function openUnusualEditor(u) {
   const dlg = document.getElementById('editor');
   const draft = { ...u };
-  dlg.replaceChildren(h('div', { class: 'editor' },
+  const build = () => dlg.replaceChildren(h('div', { class: 'editor' },
     h('h2', null, `Edit unusual report, ${L.fmtDay(u.day)}`),
     unusualForm(draft, {
       submit: 'Save',
+      redraw: build,
       onSubmit: () => {
         dlg.close();
         dispatch({ type: 'saveUnusual', unusual: draft, now: new Date().toISOString() });
@@ -618,27 +682,50 @@ function openUnusualEditor(u) {
       },
       onCancel: () => dlg.close(),
     })));
+  build();
   dlg.showModal();
+}
+
+/** The official Sr.DEE report, as tiles and a time line. */
+function officialDetails(u) {
+  const o = readOfficial(u);
+  const summary = h('summary', null,
+    h('span', { class: 'o-badge' }, 'Sr.DEE'),
+    `Official report${u.incident ? `, incident ${u.incident}` : ''}`);
+  if (!o) return h('details', { class: 'o-panel' }, summary, h('p', { class: 'o-raw' }, u.official));
+  const tile = (label, value) => value && h('div', { class: 'o-tile' }, h('small', null, label), h('span', null, value));
+  const locos = [o.loco, o.multi && `+ ${o.multi}`].filter(Boolean).join(' ');
+  return h('details', { class: 'o-panel' }, summary,
+    h('div', { class: 'o-grid' },
+      tile('Incident type', o.type), tile('Cause', o.cause), tile('Nature of failure', o.nature),
+      tile('Detention', o.detention), tile('Repercussions', o.repercussions),
+      tile('Loco', locos), tile('Train and load', [o.train, o.load].filter(Boolean).join('   ')),
+      tile('Failed section', o.section), tile('Major section', o.major),
+      tile('Schedule', [o.schedDone && `done ${o.schedDone}`, o.schedDue && `due ${o.schedDue}`].filter(Boolean).join(', ')),
+      tile('Loco pilot', o.lp), tile('Assistant', o.alp), tile('CLI', o.cli)),
+    o.timeline && o.timeline.length > 0 && h('ol', { class: 'o-time' }, o.timeline.map((x) => h('li', null,
+      x.t ? h('b', null, x.t) : h('b', { class: 'none' }, '•'), h('span', null, x.text)))),
+    o.previous && h('p', { class: 'o-prev' }, h('b', null, 'Earlier incidents: '), o.previous));
 }
 
 function unusualCard(u) {
   const run = (fn) => async () => {
     try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); }
   };
-  const meta = [u.location, u.trainNo && `TR ${u.trainNo}`, u.locoNo].filter(Boolean).join('   |   ');
-  return h('article', { class: 'ucard' },
-    h('div', { class: 'ucard-head' },
-      h('strong', null, `${u.time ? `${u.time}  ` : ''}${u.title || '(no heading)'}`),
-      u.det && h('span', { class: 'det' }, `DET ${u.det}`)),
-    meta && h('p', { class: 'ucard-meta' }, meta),
-    u.load && h('p', { class: 'ucard-meta' }, `Load: ${u.load}`),
+  const [y, m, d] = u.day.split('-');
+  const chip = (label, value) => value && h('span', { class: 'chip' }, h('small', null, label), value);
+  return h('article', { class: `ucard k-${unusualKind(u)}` },
+    h('div', { class: 'ucard-top' },
+      h('div', { class: 'udate' }, h('b', null, d), h('span', null, `${MONTHS[Number(m) - 1]} ${y}`), u.time && h('em', null, u.time)),
+      h('div', { class: 'utitle' },
+        h('strong', null, u.title || '(no heading)'),
+        h('div', { class: 'chips' }, chip('LOCATION', u.location), chip('TRAIN', u.trainNo), chip('LOCO', u.locoNo), chip('LOAD', u.load))),
+      u.det && h('span', { class: 'det' }, h('small', null, 'DET'), u.det)),
     u.reason && h('p', { class: 'ucard-reason' }, u.reason),
-    u.rep && h('p', { class: 'ucard-meta' }, `REP: ${u.rep}`),
-    (u.official || u.incident) && h('details', { class: 'ucard-official' },
-      h('summary', null, `Official Sr.DEE report${u.incident ? `, incident ${u.incident}` : ''}`),
-      u.official && h('p', { class: 'ucard-reason' }, u.official)),
+    u.rep && h('p', { class: 'ucard-rep' }, h('b', null, 'REP '), u.rep),
+    (u.official || u.incident) && officialDetails(u),
     h('div', { class: 'ucard-actions' },
-      h('button', { class: 'link', onclick: () => openUnusualEditor(u) }, 'Edit'),
+      h('button', { class: 'link', onclick: () => openUnusualEditor(u) }, u.official ? 'Edit' : 'Edit / paste official'),
       h('button', { class: 'link', onclick: run(async () => {
         const blob = await canvasToBlob(sheetToCanvas(unusualSheet([u])));
         await shareOrDownload(blob, `Unusal-${L.fmtDay(u.day)}-${(u.trainNo || 'report').replace(/[^0-9A-Za-z]+/g, '-')}.png`, `UNUSALS-DATE-${L.fmtDay(u.day)}`);
@@ -693,7 +780,7 @@ function viewUnusuals() {
     SHARED && status.unusualsMissing && h('p', { class: 'notice' },
       'Unusual reports are being kept on this device only for now. To share them with everyone, the shared database needs one extra table: run supabase/setup-unusuals.sql once (steps are in the README). Nothing is lost meanwhile.'),
     h('section', { class: 'panel u-new u-screen' },
-      h('h2', null, 'New unusual report'),
+      h('h2', null, h('span', { class: 'plus' }, '+'), 'Write a new unusual report'),
       unusualForm(ui.uDraft, {
         submit: 'Save report',
         onSubmit: () => {
@@ -703,6 +790,7 @@ function viewUnusuals() {
           toast('Unusual report saved');
         },
         onCancel: null,
+        redraw: render,
       }),
       h('button', { type: 'button', class: 'link', onclick: () => { ui.uDraft = null; render(); } }, 'Clear the form')),
     h('h2', { class: 'section-title u-screen' }, 'All unusual reports', h('span', { class: 'count' }, state.unusuals.length)),

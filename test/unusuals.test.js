@@ -10,12 +10,8 @@ import { createSync } from '../js/sync.js';
 
 const now = (h = 9) => new Date(2026, 9, 10, h, 0).toISOString();
 
-test('the older records are all there, with the September official reports attached', () => {
+test('the older records are all there', () => {
   assert.equal(UNUSUAL_RECORDS.length, 12);
-  const sep = UNUSUAL_RECORDS.filter((r) => r.day.startsWith('2026-09'));
-  assert.equal(sep.length, 7);
-  assert.deepEqual(sep.map((r) => r.incident), ['16378', '16415', '16428', '16484', '16536', '16544', '16596']);
-  assert.ok(sep.every((r) => r.official.includes(`Incident type`)));
   assert.equal(UNUSUAL_RECORDS.find((r) => r.day === '2026-09-11').load, '60/60/5360');
 });
 

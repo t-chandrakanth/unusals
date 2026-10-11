@@ -26,3 +26,25 @@ export function importUnusuals(state, records) {
   });
   return { ...state, unusuals: [...state.unusuals, ...added], unusualsImported: true };
 }
+
+/**
+ * Devices that loaded the records before the official reports were stored in
+ * a structured form get the new form, so every device shows them the same.
+ */
+export function upgradeUnusuals(state, records) {
+  const perDay = new Map();
+  const fresh = new Map();
+  for (const r of records) {
+    const n = (perDay.get(r.day) || 0) + 1;
+    perDay.set(r.day, n);
+    if (r.official) fresh.set(`${UNUSUAL_IMPORT_TAG}-${r.day}-${n}`, r);
+  }
+  let changed = false;
+  const unusuals = state.unusuals.map((u) => {
+    const r = fresh.get(u.id);
+    if (!r || (u.official || '').startsWith('{') || u.official === r.official) return u;
+    changed = true;
+    return { ...u, official: r.official, incident: r.incident, load: u.load || r.load, updatedAt: new Date().toISOString() };
+  });
+  return changed ? { ...state, unusuals } : state;
+}
