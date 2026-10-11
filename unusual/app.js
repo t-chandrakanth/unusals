@@ -43,6 +43,8 @@ const HINT = {
 };
 const WIDE = new Set(['title', 'locoNo', 'wagonNo', 'bpcNo', 'reason']);
 const FILE_TYPES = 'image/*,.docx,.pdf,.xlsx,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+// The DPWCS LOCO app keeps a list of its own (app = 'dpwcs'); it is not part of this register.
+const rows = () => state.unusuals.filter((u) => u.app !== 'dpwcs');
 const kindOf = (u) => (TYPES[u.type] ? u.type : 'loco');
 
 // ---------- storage on this device ----------
@@ -176,7 +178,7 @@ function readOfficial(u) { try { const o = JSON.parse(u.official); return o && t
 
 /** Adds the new reports of a batch (many files, or a sheet of many) in one go, after asking. */
 function addBatch(reports, { files = 1, unreadable = [] } = {}) {
-  const have = new Set(state.unusuals.map(reportKey));
+  const have = new Set(rows().map(reportKey));
   const usable = reports.filter((r) => r.day && r.title);
   const { fresh, folded, held } = tidyBatch(usable, have);
   if (!usable.length) {
@@ -277,7 +279,7 @@ function openForm(type, existing) {
     if (!box) return;
     const since = addDays(today(), -90);
     const nums = locoNumbers(draft.locoNo);
-    const seen = nums.map((n) => ({ n, items: state.unusuals.filter((u) => u.id !== draft.id && u.day >= since && locoNumbers(u.locoNo).includes(n)) }))
+    const seen = nums.map((n) => ({ n, items: rows().filter((u) => u.id !== draft.id && u.day >= since && locoNumbers(u.locoNo).includes(n)) }))
       .filter((x) => x.items.length);
     box.style.display = seen.length ? 'block' : 'none';
     box.textContent = seen.map((x) => `Loco ${x.n} already has ${x.items.length} report${x.items.length === 1 ? '' : 's'} in the last 90 days (latest ${L.fmtDay(x.items.map((u) => u.day).sort().pop())})`).join('. ');
@@ -285,7 +287,7 @@ function openForm(type, existing) {
 
   const build = () => {
     const kind = kindOf(draft);
-    const titles = [...new Set([...TYPES[kind].titles, ...state.unusuals.filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
+    const titles = [...new Set([...TYPES[kind].titles, ...rows().filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
     const field = (key) => {
       const el = key === 'reason'
         ? h('textarea', { rows: 6, value: draft[key], placeholder: HINT[key] })
@@ -430,7 +432,7 @@ function sendWhatsApp(text) {
 }
 
 function viewOverview() {
-  const list = state.unusuals;
+  const list = rows();
   const t = today();
   const month = t.slice(0, 7);
   const week = addDays(t, -6);
@@ -483,7 +485,7 @@ function viewOverview() {
 
 function viewList() {
   const type = ui.view;
-  const pool = type === 'all' ? state.unusuals : state.unusuals.filter((u) => kindOf(u) === type);
+  const pool = type === 'all' ? rows() : rows().filter((u) => kindOf(u) === type);
   const months = [...new Set(pool.map((u) => u.day.slice(0, 7)))].sort().reverse();
   if (ui.month !== 'all' && !months.includes(ui.month)) ui.month = 'all';
 
@@ -593,10 +595,10 @@ function statusText() {
 }
 
 function render() {
-  const count = (t) => state.unusuals.filter((u) => kindOf(u) === t).length;
-  const tabs = [['overview', 'Overview', null], ['loco', 'Loco failures', count('loco')], ['cw', 'C&W failures', count('cw')], ['other', 'Others', count('other')], ['all', 'All', state.unusuals.length]];
+  const count = (t) => rows().filter((u) => kindOf(u) === t).length;
+  const tabs = [['overview', 'Overview', null], ['loco', 'Loco failures', count('loco')], ['cw', 'C&W failures', count('cw')], ['other', 'Others', count('other')], ['all', 'All', rows().length]];
   const dots = { loco: 'var(--k-fail)', cw: 'var(--k-other)', other: 'var(--k-dpwcs)', all: 'var(--navy)', overview: 'var(--navy)' };
-  repeatMap = new Map(repeatLocos(state.unusuals, addDays(today(), -90)).map((r) => [r.loco, r.count]));
+  repeatMap = new Map(repeatLocos(rows(), addDays(today(), -90)).map((r) => [r.loco, r.count]));
   document.getElementById('app').replaceChildren(
     h('header', { class: `top ${!isInstalled() && !bannerClosed() ? 'has-banner' : ''}` },
       !isInstalled() && !bannerClosed() && h('div', { class: 'install-banner' },
@@ -608,7 +610,7 @@ function render() {
       h('div', { class: 'top-row' },
         h('h1', null, h('img', { class: 'logo', src: 'icons/icon-192.png', alt: '', width: 34, height: 34 }), 'SCR UNUSALS'),
         !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app')),
-      h('p', null, `${L.fmtDay(today())}  |  ${state.unusuals.length} reports`),
+      h('p', null, `${L.fmtDay(today())}  |  ${rows().length} reports`),
       h('p', { class: 'top-meta' }, h('button', {
         class: `sync ${status.phase}`, id: 'sync-status', title: SHARED ? 'Tap to sync now' : '',
         onclick: () => { if (sync) sync.syncNow(); },

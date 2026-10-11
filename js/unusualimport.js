@@ -48,3 +48,25 @@ export function upgradeUnusuals(state, records) {
   });
   return changed ? { ...state, unusuals } : state;
 }
+
+// ---------- the DPWCS loco failures: a list of their own ----------
+
+export const DPWCS_TAG = 'dpw';
+
+export const dpwcsSeeded = (state) => state.unusuals.some((u) => u.id.startsWith(`${DPWCS_TAG}-`));
+
+/** The first DPWCS loco failures, as copies tagged app = 'dpwcs', with fixed ids so they are never doubled. */
+export function importDpwcs(state, records) {
+  if (dpwcsSeeded(state)) return state;
+  const perDay = new Map();
+  const added = records.map((r) => {
+    const n = (perDay.get(r.day) || 0) + 1;
+    perDay.set(r.day, n);
+    const [y, m, d] = r.day.split('-').map(Number);
+    return {
+      id: `${DPWCS_TAG}-${r.day}-${n}`, ...pickUnusual(r), type: 'loco', app: 'dpwcs',
+      updatedAt: new Date(y, m - 1, d, 12).toISOString(), updatedBy: 'record',
+    };
+  });
+  return { ...state, unusuals: [...state.unusuals, ...added] };
+}
