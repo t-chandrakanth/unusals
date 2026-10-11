@@ -1140,7 +1140,9 @@ function render() {
     h('div', { class: 'top-inner' },
       h('div', { class: 'top-row' },
         h('h1', null, h('img', { class: 'logo', src: 'icons/logo.png', alt: 'Indian Railways', width: 34, height: 34 }), 'DPWCS LOCO'),
-        !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app')),
+        h('span', { class: 'top-links' },
+          h('a', { class: 'install', href: 'unusual/' }, 'Unusals app'),
+          !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app'))),
       h('p', null, signedOut
         ? L.fmtDay(today())
         : `${L.fmtDay(today())}  |  ${state.locos.length} locos  |  ${other} in other divisions`),

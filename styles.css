@@ -400,3 +400,6 @@ button.dot.due { cursor: pointer; box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.18);
 .suggest button:first-child { border-top: 0; }
 .suggest button:hover { background: var(--bg); }
 @media print { .suggest { display: none; } }
+
+.top-links { display: flex; align-items: center; gap: 8px; }
+a.install { text-decoration: none; }
