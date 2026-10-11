@@ -28,9 +28,9 @@ const TYPES = {
   other: { name: 'Others', accent: 'k-dpwcs', titles: [] },
 };
 const FORM = {
-  loco: ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason'],
-  cw: ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason'],
-  other: ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason'],
+  loco: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason'],
+  cw: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason'],
+  other: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason'],
 };
 const LABEL = {
   day: 'Date', time: 'Time', title: 'Train details (heading)', location: 'Location', trainNo: 'Train no',
@@ -103,7 +103,7 @@ function save(unusual) {
     const name = prompt('Your name, shown next to the reports you write:');
     if (name && name.trim()) sync.setName(name);
   }
-  commit(L.reduce(state, { type: 'saveUnusual', unusual, now: new Date().toISOString(), by: who() }));
+  commit(L.reduce(state, { type: 'saveUnusual', unusual: { ...unusual, time: '' }, now: new Date().toISOString(), by: who() }));
 }
 
 // The older reports, loaded once. With a shared database this waits until the
@@ -237,8 +237,8 @@ async function readFiles(list, { draft, rebuild, close } = {}) {
 }
 
 function fillForm(draft, r, rebuild) {
-  for (const key of ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'reason', 'det', 'detFrom', 'detTo', 'rep']) {
-    if (r[key] && (key === 'day' || key === 'time' || !String(draft[key] || '').trim())) draft[key] = r[key];
+  for (const key of ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'reason', 'det', 'detFrom', 'detTo', 'rep']) {
+    if (r[key] && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = r[key];
   }
   if (r.type && !draft.type) draft.type = r.type;
   if (r.official) { draft.official = r.official; draft.incident = r.incident || ''; }
@@ -266,7 +266,7 @@ function bulkAttach() {
 
 function openForm(type, existing) {
   const dlg = document.getElementById('editor');
-  const draft = existing ? { ...existing } : { ...L.blankUnusual(today()), type, time: L.fmtTime(new Date()) };
+  const draft = existing ? { ...existing } : { ...L.blankUnusual(today()), type };
   const locos = [...new Set(state.locos.map((l) => l.locoNo).filter(Boolean))];
   const close = () => dlg.close();
 
@@ -388,7 +388,7 @@ function card(u, showTag) {
   const run = (fn) => async () => { try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); } };
   return h('article', { class: `ucard ${TYPES[kind].accent}` },
     h('div', { class: 'ucard-top' },
-      h('div', { class: 'udate' }, h('b', null, d), h('span', null, `${MONTHS[Number(m) - 1]} ${u.day.slice(0, 4)}`), u.time && h('em', null, `${u.time} HRS`)),
+      h('div', { class: 'udate' }, h('b', null, d), h('span', null, `${MONTHS[Number(m) - 1]} ${u.day.slice(0, 4)}`)),
       h('div', { class: 'utitle' },
         showTag && h('span', { class: 'tag' }, TYPES[kind].name),
         h('strong', null, u.title || '(no heading)'),

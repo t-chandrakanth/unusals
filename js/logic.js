@@ -155,7 +155,7 @@ export function sameUnusual(a, b) {
 /** Newest day first; within a day, the order they were written in. */
 export function unusualsByDay(list) {
   const days = new Map();
-  const byTime = (a, b) => (a.time || '').localeCompare(b.time || '') || (a.updatedAt || '').localeCompare(b.updatedAt || '');
+  const byTime = (a, b) => (a.updatedAt || '').localeCompare(b.updatedAt || '');
   for (const u of [...list].sort(byTime)) {
     if (!days.has(u.day)) days.set(u.day, []);
     days.get(u.day).push(u);
@@ -172,7 +172,7 @@ export function unusualText(list) {
   const lines = [];
   unusualsInOrder(list).forEach((u, i) => {
     if (i) lines.push('');
-    lines.push(`*${i + 1}. UNUSALS-DATE-${fmtDay(u.day)}${u.time ? ` ${u.time}` : ''}*`);
+    lines.push(`*${i + 1}. UNUSALS-DATE-${fmtDay(u.day)}*`);
     lines.push(`*${u.title || '-'}*`);
     lines.push(`Location: ${u.location || '-'}`);
     lines.push(`Train no: ${u.trainNo || '-'}`);

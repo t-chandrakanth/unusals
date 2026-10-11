@@ -688,7 +688,7 @@ function addManyUnusuals(reports, { files = 1, unreadable = [] } = {}) {
   ].filter((x) => x !== '').join('\n');
   if (!confirm(msg)) return;
   const now = new Date().toISOString();
-  for (const r of fresh) dispatch({ type: 'saveUnusual', unusual: { ...L.blankUnusual(r.day), ...r, type: 'loco', app: 'dpwcs' }, now });
+  for (const r of fresh) dispatch({ type: 'saveUnusual', unusual: { ...L.blankUnusual(r.day), ...r, type: 'loco', app: 'dpwcs', time: '' }, now });
   toast(`Added ${fresh.length} report${fresh.length === 1 ? '' : 's'}`);
 }
 
@@ -696,8 +696,8 @@ function addManyUnusuals(reports, { files = 1, unreadable = [] } = {}) {
 function fillUnusual(draft, r) {
   const extra = [r.wagonNo && `Wagon no: ${r.wagonNo}`, r.bpcNo && `BPC no: ${r.bpcNo}`].filter(Boolean).join('\n');
   const reason = [r.reason, extra].filter(Boolean).join('\n');
-  for (const [key, value] of Object.entries({ day: r.day, time: r.time, title: r.title, location: r.location, trainNo: r.trainNo, locoNo: r.locoNo, load: r.load, det: r.det, reason })) {
-    if (value && (key === 'day' || key === 'time' || !String(draft[key] || '').trim())) draft[key] = value;
+  for (const [key, value] of Object.entries({ day: r.day, title: r.title, location: r.location, trainNo: r.trainNo, locoNo: r.locoNo, load: r.load, det: r.det, reason })) {
+    if (value && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = value;
   }
   if (r.official) { draft.official = r.official; draft.incident = r.incident || ''; }
   draft._paste = '';
@@ -831,7 +831,6 @@ function unusualForm(draft, { submit, onSubmit, onCancel, redraw }) {
   officialPaste(draft, redraw),
   h('div', { class: 'grid' },
     field('Date', 'day', { type: 'date' }),
-    field('Time', 'time', { type: 'time' }),
     field('Type of unusual (heading)', 'title', { wide: true, list: 'u-titles', placeholder: 'LOCO TROUBLE-DPWCS' }),
     field('Location', 'location', { placeholder: 'PRLI-GTU' }),
     field('Train no', 'trainNo', { placeholder: 'KSNK/BOXNL' }),
@@ -859,7 +858,7 @@ function openUnusualEditor(u) {
       redraw: build,
       onSubmit: () => {
         dlg.close();
-        dispatch({ type: 'saveUnusual', unusual: { ...draft, app: 'dpwcs' }, now: new Date().toISOString() });
+        dispatch({ type: 'saveUnusual', unusual: { ...draft, app: 'dpwcs', time: '' }, now: new Date().toISOString() });
         toast('Saved');
       },
       onCancel: () => dlg.close(),
@@ -898,7 +897,7 @@ function unusualCard(u) {
   const chip = (label, value) => value && h('span', { class: 'chip' }, h('small', null, label), value);
   return h('article', { class: `ucard k-${unusualKind(u)}` },
     h('div', { class: 'ucard-top' },
-      h('div', { class: 'udate' }, h('b', null, d), h('span', null, `${MONTHS[Number(m) - 1]} ${y}`), u.time && h('em', null, u.time)),
+      h('div', { class: 'udate' }, h('b', null, d), h('span', null, `${MONTHS[Number(m) - 1]} ${y}`)),
       h('div', { class: 'utitle' },
         h('strong', null, u.title || '(no heading)'),
         h('div', { class: 'chips' }, chip('LOCATION', u.location), chip('TRAIN', u.trainNo), chip('LOCO', u.locoNo), chip('LOAD', u.load))),
@@ -924,7 +923,7 @@ function unusualCard(u) {
 }
 
 function viewUnusuals() {
-  if (!ui.uDraft) ui.uDraft = { ...L.blankUnusual(today()), time: L.fmtTime(new Date()) };
+  if (!ui.uDraft) ui.uDraft = L.blankUnusual(today());
   const months = [...new Set(mine().map((u) => u.day.slice(0, 7)))].sort().reverse();
   if (ui.uMonth !== 'all' && !months.includes(ui.uMonth)) ui.uMonth = 'all';
 
@@ -968,7 +967,7 @@ function viewUnusuals() {
         onSubmit: () => {
           const unusual = ui.uDraft;
           ui.uDraft = null;
-          dispatch({ type: 'saveUnusual', unusual: { ...unusual, app: 'dpwcs' }, now: new Date().toISOString() });
+          dispatch({ type: 'saveUnusual', unusual: { ...unusual, app: 'dpwcs', time: '' }, now: new Date().toISOString() });
           toast('Unusual report saved');
         },
         onCancel: null,
@@ -1168,7 +1167,9 @@ function render() {
     h('div', { class: 'top-inner' },
       h('div', { class: 'top-row' },
         h('h1', null, h('img', { class: 'logo', src: '../icons/logo.png', alt: 'Indian Railways', width: 34, height: 34 }), 'DPWCS LOCO'),
-        !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app')),
+        h('span', { class: 'top-links' },
+          h('img', { class: 'ti-badge', src: '../icons/tigoods.png', alt: 'TI GOODS', width: 48, height: 48 }),
+          !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app'))),
       h('p', null, signedOut
         ? L.fmtDay(today())
         : `${L.fmtDay(today())}  |  ${state.locos.length} locos  |  ${other} in other divisions`),

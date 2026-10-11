@@ -416,3 +416,7 @@ a.install { text-decoration: none; }
   .top.has-banner .install { display: none; }
 }
 @media print { .install-banner { display: none !important; } }
+
+/* the TI GOODS badge in the DPWCS LOCO header */
+.top-row { flex-wrap: wrap; }
+.ti-badge { flex: none; width: 48px; height: 48px; border-radius: 12px; object-fit: cover; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
