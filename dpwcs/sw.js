@@ -1,6 +1,6 @@
 // Offline support for DPWCS LOCO: the network when there is one (so updates
 // arrive straight away), the last saved copy when there is not.
-const CACHE = 'dpwcs-loco-v4';
+const CACHE = 'dpwcs-loco-v6';
 const FILES = [
   './', 'index.html', 'app.js', 'manifest.webmanifest', '../styles.css',
   '../js/logic.js', '../js/seed.js', '../js/sheet.js', '../js/xlsx.js', '../js/canvas.js', '../js/db.js', '../js/sync.js',
@@ -9,7 +9,7 @@ const FILES = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -22,7 +22,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' })
       .then((res) => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
         return res;

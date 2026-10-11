@@ -1,5 +1,5 @@
 // Offline support for SCR UNUSALS: the network when there is one, the last saved copy when there is not.
-const CACHE = 'scr-unusals-v14';
+const CACHE = 'scr-unusals-v15';
 const FILES = [
   './', 'index.html', 'app.css', 'app.js', 'records.js', 'stats.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/tigoods.png', '../icons/logo.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
@@ -8,7 +8,7 @@ const FILES = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -21,7 +21,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' })
       .then((res) => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
         return res;
