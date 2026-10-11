@@ -15,6 +15,7 @@ import { fileToText, FileError } from '../js/filetext.js';
 import { UNUSUAL_RECORDS } from '../js/unusual-data.js';
 import { importUnusuals } from '../js/unusualimport.js';
 import { EXTRA_RECORDS } from './records.js';
+import { locoNumbers, topCounts, repeatLocos, lastDays, longestDetentions, addDays, fmtMinutes } from './stats.js';
 
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const today = () => L.dayKey(new Date());
@@ -76,7 +77,8 @@ const NO_SYNC = { outbox: [], cursor: {}, linked: false };
 let state = L.emptyState();
 let sync = null;
 let status = { phase: SHARED ? 'syncing' : 'local', pending: 0, email: '', error: '', unusualsMissing: false };
-const ui = { view: 'loco', search: '', month: 'all' };
+const ui = { view: 'overview', search: '', month: 'all', range: 'all' };
+let repeatMap = new Map(); // loco number -> reports in the last 90 days, when more than one
 
 const who = () => (sync && sync.email ? sync.email.split('@')[0] : '');
 const persist = () => { saveState(state).then((ok) => { if (!ok) toast('Could not save on this device'); }); };
@@ -242,6 +244,18 @@ function openForm(type, existing) {
     takeText(draft, text, build, close);
   };
 
+  // A loco that already has reports in the last 90 days is flagged as you type it.
+  const showRepeat = () => {
+    const box = dlg.querySelector('#repeat-hint');
+    if (!box) return;
+    const since = addDays(today(), -90);
+    const nums = locoNumbers(draft.locoNo);
+    const seen = nums.map((n) => ({ n, items: state.unusuals.filter((u) => u.id !== draft.id && u.day >= since && locoNumbers(u.locoNo).includes(n)) }))
+      .filter((x) => x.items.length);
+    box.style.display = seen.length ? 'block' : 'none';
+    box.textContent = seen.map((x) => `Loco ${x.n} already has ${x.items.length} report${x.items.length === 1 ? '' : 's'} in the last 90 days (latest ${L.fmtDay(x.items.map((u) => u.day).sort().pop())})`).join('. ');
+  };
+
   const build = () => {
     const kind = kindOf(draft);
     const titles = [...new Set([...TYPES[kind].titles, ...state.unusuals.filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
@@ -252,7 +266,7 @@ function openForm(type, existing) {
           type: key === 'day' ? 'date' : key === 'time' ? 'time' : 'text', value: draft[key], placeholder: HINT[key] || '',
           autocapitalize: key === 'day' || key === 'time' ? null : 'characters', autocomplete: 'off',
         });
-      el.addEventListener('input', (e) => { draft[key] = e.target.value; });
+      el.addEventListener('input', (e) => { draft[key] = e.target.value; if (key === 'locoNo') showRepeat(); });
       if (key === 'title') el.setAttribute('list', 'u-titles');
       if (key === 'locoNo') el.setAttribute('list', 'u-locos');
       return h('label', { class: `field ${WIDE.has(key) ? 'wide' : ''}` }, h('span', null, LABEL[key]), el);
@@ -296,6 +310,7 @@ function openForm(type, existing) {
         },
       },
       h('div', { class: 'grid' }, FORM[kind].map(field)),
+      h('div', { id: 'repeat-hint', class: 'repeat-hint', style: 'display:none' }),
       h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
       h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),
       h('div', { class: 'editor-actions' },
@@ -303,6 +318,7 @@ function openForm(type, existing) {
         h('button', { type: 'button', class: 'btn', onclick: close }, 'Cancel')))));
   };
   build();
+  showRepeat();
   dlg.showModal();
 }
 
@@ -323,6 +339,12 @@ function officialDetails(u) {
     o.previous && h('p', { class: 'o-prev' }, h('b', null, 'Earlier incidents: '), o.previous));
 }
 
+function repeatNote(u) {
+  const hits = locoNumbers(u.locoNo).filter((n) => repeatMap.has(n));
+  if (!hits.length) return null;
+  return h('p', { class: 'rep-note' }, hits.map((n) => `Loco ${n}: ${repeatMap.get(n)} reports in 90 days`).join('  |  '));
+}
+
 function card(u, showTag) {
   const kind = kindOf(u);
   const [, m, d] = u.day.split('-');
@@ -339,6 +361,7 @@ function card(u, showTag) {
           chip('WAGON', u.wagonNo, true), chip('BPC', u.bpcNo, true))),
       u.det && h('span', { class: 'det' }, h('small', null, 'DET'), u.det)),
     u.reason && h('p', { class: 'ucard-reason' }, u.reason),
+    repeatNote(u),
     officialDetails(u),
     h('div', { class: 'ucard-actions' },
       h('button', { class: 'link', onclick: () => openForm(kind, u) }, 'Edit'),
@@ -367,6 +390,58 @@ function exportBar(sheet, base, title, getText) {
     h('button', { class: 'btn', onclick: run(() => copyText(getText())) }, 'Copy as text'));
 }
 
+function viewOverview() {
+  const list = state.unusuals;
+  const t = today();
+  const month = t.slice(0, 7);
+  const week = addDays(t, -6);
+  const count = (k) => list.filter((u) => kindOf(u) === k).length;
+  const kpi = (view, label, n) => h('button', { class: `kpi ${TYPES[view] ? TYPES[view].accent : ''}`, onclick: () => { ui.view = view; render(); window.scrollTo(0, 0); } },
+    h('b', null, String(n)), h('span', null, label));
+  const days = lastDays(list, 14, t, kindOf);
+  const peak = Math.max(1, ...days.map((d) => d.loco + d.cw + d.other));
+  const rank = (items, empty, sub) => (items.length
+    ? h('ul', { class: 'rank' }, items.map(([name, n, extra]) => h('li', null,
+      h('div', { class: 'row' }, h('span', null, name), h('span', null, extra || `${n}`)),
+      h('div', { class: 'meter' }, h('i', { style: `width:${Math.round((n / items[0][1]) * 100)}%` })),
+      sub && h('div', { class: 'sub' }, sub(name)))))
+    : h('p', { class: 'nothing' }, empty));
+  const since90 = addDays(t, -90);
+  const repeats = repeatLocos(list, since90).slice(0, 5);
+  const longest = longestDetentions(list.filter((u) => u.day >= since90), 5);
+  const latest = L.unusualsByDay(list).slice(0, 2).flatMap(([, items]) => items).slice(0, 4);
+  return h('div', null,
+    h('section', { class: 'hero' },
+      h('div', { class: 'hero-top' },
+        h('div', null, h('div', { class: 'big' }, String(list.length)), h('small', null, 'unusual reports on record')),
+        h('div', { class: 'when' }, h('b', null, String(list.filter((u) => u.day.startsWith(month)).length)), ' this month', h('br'), h('b', null, String(list.filter((u) => u.day >= week).length)), ' in the last 7 days')),
+      h('div', { class: 'hero-actions' }, Object.entries(TYPES).map(([k, ty]) => h('button', { class: 'btn', style: 'background:rgba(255,255,255,0.2)', onclick: () => openForm(k) }, `+ ${ty.name.replace(/s$/, '')}`)))),
+    h('div', { class: 'kpis' }, kpi('loco', 'Loco failures', count('loco')), kpi('cw', 'C&W failures', count('cw')), kpi('other', 'Others', count('other')), kpi('all', 'All reports', list.length)),
+    h('section', { class: 'card-box' },
+      h('h2', null, 'Last 14 days', h('span', { class: 'legend' }, h('span', null, h('i', { style: 'background:var(--k-fail)' }), 'Loco'), h('span', null, h('i', { style: 'background:var(--k-other)' }), 'C&W'), h('span', null, h('i', { style: 'background:var(--k-dpwcs)' }), 'Other'))),
+      h('div', { class: 'chart' }, days.map((d) => {
+        const n = d.loco + d.cw + d.other;
+        return h('div', { class: `bar ${d.day === t ? 'today' : ''}`, title: `${L.fmtDay(d.day)}: ${n}` },
+          h('div', { class: 'stack', style: `flex:${n ? n / peak : 0.02} 0 0` },
+            ['loco', 'cw', 'other'].map((k) => d[k] > 0 && h('i', { class: k, style: `flex:${d[k]} 0 0` }))),
+          h('div', { class: 'lab' }, d.day.slice(8)));
+      }))),
+    h('div', { class: 'cols' },
+      h('section', { class: 'card-box' }, h('h2', null, 'Loco numbers to watch'),
+        rank(repeats.map((r) => [r.loco, r.count, `${r.count} reports`]), 'No loco has more than one report in the last 90 days.', (n) => `latest ${L.fmtDay(repeats.find((r) => r.loco === n).last)}`)),
+      h('section', { class: 'card-box' }, h('h2', null, 'Where it happens'),
+        rank(topCounts(list.filter((u) => u.day >= since90), (u) => [String(u.location || '').trim().toUpperCase()]), 'Nothing in the last 90 days.')),
+      h('section', { class: 'card-box' }, h('h2', null, 'Longest detentions (90 days)'),
+        longest.length
+          ? h('ul', { class: 'rank alert' }, longest.map((x) => h('li', null,
+            h('div', { class: 'row' }, h('span', null, x.u.title || '(no heading)'), h('span', null, fmtMinutes(x.min))),
+            h('div', { class: 'meter' }, h('i', { style: `width:${Math.round((x.min / longest[0].min) * 100)}%` })),
+            h('div', { class: 'sub' }, `${L.fmtDay(x.u.day)}  |  ${x.u.location || ''}  |  ${x.u.trainNo || ''}`))))
+          : h('p', { class: 'nothing' }, 'No detention times written in the last 90 days.'))),
+    h('h2', { class: 'section-title' }, 'Latest reports'),
+    h('div', { class: 'ucards' }, latest.map((u) => card(u, true))));
+}
+
 function viewList() {
   const type = ui.view;
   const pool = type === 'all' ? state.unusuals : state.unusuals.filter((u) => kindOf(u) === type);
@@ -375,7 +450,8 @@ function viewList() {
 
   const buildList = () => {
     const q = ui.search.trim().toLowerCase();
-    const visible = pool.filter((u) => (ui.month === 'all' || u.day.startsWith(ui.month)) &&
+    const since = ui.range === 'all' ? '' : addDays(today(), -(Number(ui.range) - 1));
+    const visible = pool.filter((u) => (ui.month === 'all' || u.day.startsWith(ui.month)) && u.day >= since &&
       (!q || [u.title, u.location, u.trainNo, u.locoNo, u.reason, u.load, u.wagonNo, u.bpcNo, u.incident, L.fmtDay(u.day)].some((v) => (v || '').toLowerCase().includes(q))));
     if (!visible.length) return [h('p', { class: 'empty-big' }, pool.length ? 'No report matches.' : 'No reports yet. Press the button above to write the first one.')];
     const name = type === 'all' ? 'All' : TYPES[type].name.replace(/\W+/g, '-');
@@ -404,7 +480,46 @@ function viewList() {
       'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase (steps are in the README). Nothing is lost meanwhile.'),
     h('div', { class: 'uhead' }, newButtons),
     h('div', { class: 'uhead' }, search, month),
+    h('div', { class: 'chips-row' }, [['all', 'All time'], ['30', 'Last 30 days'], ['7', 'Last 7 days'], ['1', 'Today']].map(([v, text]) => h('button', {
+      class: `rchip ${ui.range === v ? 'on' : ''}`,
+      onclick: () => { ui.range = v; render(); },
+    }, text))),
     h('div', { id: 'ulist' }, buildList().flat()));
+}
+
+// ---------- install as an app ----------
+// Chrome and Edge (Windows and Android) hand us an install prompt; other
+// browsers get short instructions. A strip at the top offers it in one tap.
+
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; });
+window.addEventListener('appinstalled', () => { installPrompt = null; toast('Installed. Open SCR UNUSALS from your apps or home screen.'); render(); });
+
+const BANNER_KEY = 'unusals-install-banner-closed';
+const bannerClosed = () => { try { return localStorage.getItem(BANNER_KEY) === '1'; } catch { return false; } };
+const isInstalled = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+async function installApp() {
+  if (installPrompt) {
+    const p = installPrompt;
+    installPrompt = null;
+    p.prompt();
+    await p.userChoice.catch(() => null);
+    return;
+  }
+  const dlg = document.getElementById('editor');
+  const step = (title, ...lines) => h('section', null, h('h3', null, title), h('ol', null, lines.map((l) => h('li', null, l))));
+  dlg.replaceChildren(h('div', { class: 'editor help' },
+    h('h2', null, 'Install SCR UNUSALS'),
+    h('p', null, 'It installs straight from this page. There is nothing to download from a store.'),
+    step('Windows computer (Chrome or Edge)',
+      'Open this page in Chrome or Edge.',
+      'Click the install icon at the right end of the address bar (a small screen with a down arrow), or open the three-dot menu and choose "Install SCR UNUSALS" (Chrome: Cast, save and share, then Install page as app; Edge: Apps, then Install this site as an app).',
+      'Click Install. It opens in its own window and appears in the Start menu. Right-click its taskbar icon and choose "Pin to taskbar" to keep it handy.'),
+    step('Android phone (Chrome)', 'Open this page in Chrome.', 'Tap the three-dot menu at the top right.', 'Tap "Add to Home screen", then "Install".'),
+    step('iPhone (Safari)', 'Open this page in Safari.', 'Tap the Share button.', 'Tap "Add to Home Screen", then "Add".'),
+    h('div', { class: 'editor-actions' }, h('button', { class: 'btn primary', onclick: () => dlg.close() }, 'Close'))));
+  dlg.showModal();
 }
 
 function statusText() {
@@ -420,10 +535,20 @@ function statusText() {
 
 function render() {
   const count = (t) => state.unusuals.filter((u) => kindOf(u) === t).length;
-  const tabs = [['loco', 'Loco failures', count('loco')], ['cw', 'C&W failures', count('cw')], ['other', 'Others', count('other')], ['all', 'All', state.unusuals.length]];
+  const tabs = [['overview', 'Overview', null], ['loco', 'Loco failures', count('loco')], ['cw', 'C&W failures', count('cw')], ['other', 'Others', count('other')], ['all', 'All', state.unusuals.length]];
+  const dots = { loco: 'var(--k-fail)', cw: 'var(--k-other)', other: 'var(--k-dpwcs)', all: 'var(--navy)', overview: 'var(--navy)' };
+  repeatMap = new Map(repeatLocos(state.unusuals, addDays(today(), -90)).map((r) => [r.loco, r.count]));
   document.getElementById('app').replaceChildren(
-    h('header', { class: 'top' }, h('div', { class: 'top-inner' },
-      h('div', { class: 'top-row' }, h('h1', null, 'UNUSALS')),
+    h('header', { class: `top ${!isInstalled() && !bannerClosed() ? 'has-banner' : ''}` },
+      !isInstalled() && !bannerClosed() && h('div', { class: 'install-banner' },
+        h('button', { class: 'install-go', onclick: installApp },
+          h('strong', null, 'Tap here to install SCR UNUSALS'),
+          h('span', null, 'Opens from your home screen or Start menu like any other app')),
+        h('button', { class: 'install-close', 'aria-label': 'Hide the install message', onclick: () => { try { localStorage.setItem(BANNER_KEY, '1'); } catch { /* private mode */ } render(); } }, '\u00d7')),
+      h('div', { class: 'top-inner' },
+      h('div', { class: 'top-row' },
+        h('h1', null, h('img', { class: 'logo', src: 'icons/icon-192.png', alt: '', width: 34, height: 34 }), 'SCR UNUSALS'),
+        !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app')),
       h('p', null, `${L.fmtDay(today())}  |  ${state.unusuals.length} reports`),
       h('p', { class: 'top-meta' }, h('button', {
         class: `sync ${status.phase}`, id: 'sync-status', title: SHARED ? 'Tap to sync now' : '',
@@ -431,9 +556,9 @@ function render() {
       }, statusText())))),
     h('nav', { class: 'tabs' }, tabs.map(([id, text, n]) => h('button', {
       class: ui.view === id ? 'on' : '',
-      onclick: () => { ui.view = id; ui.month = 'all'; ui.search = ''; render(); window.scrollTo(0, 0); },
-    }, text, h('span', { class: 'n' }, String(n))))),
-    h('main', null, viewList()));
+      onclick: () => { ui.view = id; ui.month = 'all'; ui.search = ''; ui.range = 'all'; render(); window.scrollTo(0, 0); },
+    }, h('i', { class: 'dot-k', style: `--c:${dots[id]}` }), text, n != null && h('span', { class: 'n' }, String(n))))),
+    h('main', null, ui.view === 'overview' ? viewOverview() : viewList()));
 }
 
 function onSyncStatus(next) {
@@ -461,6 +586,7 @@ async function start() {
   }
   render();
   if (sync) sync.start(); else seed();
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
 start();
