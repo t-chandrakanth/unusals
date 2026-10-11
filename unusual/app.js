@@ -10,7 +10,7 @@ import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
 import { unusualSheet } from '../js/sheet.js';
 import { sheetToCanvas, canvasToBlob } from '../js/canvas.js';
 import { sheetToXlsx } from '../js/xlsx.js';
-import { parseBlocks, parseOfficial, fillFromOfficial, parseDetention } from '../js/official.js';
+import { readReports, tidyBatch, reportKey } from '../js/reports.js';
 import { fileToText, FileError } from '../js/filetext.js';
 import { UNUSUAL_RECORDS } from '../js/unusual-data.js';
 import { importUnusuals } from '../js/unusualimport.js';
@@ -42,6 +42,7 @@ const HINT = {
   reason: 'Times, km, what was done, relief loco, TXR fit...',
 };
 const WIDE = new Set(['title', 'locoNo', 'wagonNo', 'bpcNo', 'reason']);
+const FILE_TYPES = '.docx,.pdf,.xlsx,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const kindOf = (u) => (TYPES[u.type] ? u.type : 'loco');
 
 // ---------- storage on this device ----------
@@ -173,59 +174,82 @@ const monthLabel = (key) => { const [y, m] = key.split('-').map(Number); return 
 
 function readOfficial(u) { try { const o = JSON.parse(u.official); return o && typeof o === 'object' ? o : null; } catch { return null; } }
 
-function addMany(blocks) {
-  const key = (u) => `${u.day}|${u.trainNo}|${u.locoNo}`.toUpperCase();
-  const have = new Set(state.unusuals.map(key));
-  const usable = blocks.filter((b) => b.day && b.title);
-  const fresh = usable.filter((b) => !have.has(key(b)));
-  if (!usable.length) { toast('Found the reports but not their dates. Add the dates and try again.'); return false; }
-  if (!fresh.length) { toast(`All ${usable.length} reports in that file are already in the list.`); return false; }
-  const dup = usable.length - fresh.length;
-  if (!confirm(`Found ${usable.length} reports in that file${dup ? `, ${dup} already in the list` : ''}.\n\nAdd the ${fresh.length} new one${fresh.length === 1 ? '' : 's'}?`)) return false;
-  // Each goes to the open group, or by its boxes (wagon or BPC number: C&W) when "All" is open.
-  for (const b of fresh) {
-    const type = TYPES[ui.view] ? ui.view : (b.wagonNo || b.bpcNo ? 'cw' : 'loco');
-    save({ ...L.blankUnusual(b.day), ...b, type });
+/** Adds the new reports of a batch (many files, or a sheet of many) in one go, after asking. */
+function addBatch(reports, { files = 1, unreadable = [] } = {}) {
+  const have = new Set(state.unusuals.map(reportKey));
+  const usable = reports.filter((r) => r.day && r.title);
+  const { fresh, folded, held } = tidyBatch(usable, have);
+  if (!usable.length) {
+    toast(unreadable.length ? `Nothing could be read. ${unreadable.join('; ')}` : 'Found the reports but not their dates. Add the dates and try again.');
+    return false;
   }
+  if (!fresh.length) { toast(`All ${usable.length} report${usable.length === 1 ? '' : 's'} are already in the list.`); return false; }
+  const by = { loco: 0, cw: 0, other: 0 };
+  for (const r of fresh) by[r.type || 'cw']++;
+  const dated = fresh.filter((r) => r.datedFromFile).length;
+  const msg = [
+    `Found ${usable.length} report${usable.length === 1 ? '' : 's'} in ${files} file${files === 1 ? '' : 's'}.`,
+    '',
+    `New: ${fresh.length} (C&W failures ${by.cw}, loco failures ${by.loco}, others ${by.other})`,
+    held ? `Already in the list: ${held}` : '',
+    folded ? `Copies of the same report merged: ${folded}` : '',
+    dated ? `${dated} had no date, so the day the file was saved is used.` : '',
+    unreadable.length ? `\nCould not read: ${unreadable.join('; ')}` : '',
+    `\nAdd the ${fresh.length} new one${fresh.length === 1 ? '' : 's'}?`,
+  ].filter((x) => x !== '').join('\n');
+  if (!confirm(msg)) return false;
+  for (const r of fresh) save({ ...L.blankUnusual(r.day), ...r, type: r.type || 'cw' });
   toast(`Added ${fresh.length} report${fresh.length === 1 ? '' : 's'}`);
   return true;
 }
 
-/** Fills the open form from a Sr.DEE report or one sheet; a sheet of many is added whole. */
+/** Reads many files at once. One report fills the open form, if there is one; more are added as a batch. */
+async function readFiles(list, { draft, rebuild, close } = {}) {
+  const files = [...list];
+  if (!files.length) return;
+  toast(files.length > 1 ? `Reading ${files.length} files...` : `Reading ${files[0].name}...`);
+  const all = [];
+  const bad = [];
+  for (const file of files) {
+    try {
+      const recs = readReports(await fileToText(file), { fileName: file.name, lastModified: file.lastModified });
+      if (!recs.length) bad.push(`${file.name} (nothing found in it)`);
+      all.push(...recs);
+    } catch (e) {
+      console.error(e);
+      bad.push(`${file.name} (${e instanceof FileError ? e.message : 'could not be read'})`);
+    }
+  }
+  if (files.length === 1 && all.length === 1 && draft) { fillForm(draft, all[0], rebuild); return; }
+  if (!all.length) { toast(bad.length ? `Nothing could be read. ${bad.join('; ')}` : 'Nothing found in those files.'); return; }
+  if (addBatch(all, { files: files.length, unreadable: bad }) && close) close();
+  render();
+}
+
+function fillForm(draft, r, rebuild) {
+  for (const key of ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'reason', 'det', 'rep']) {
+    if (r[key] && (key === 'day' || key === 'time' || !String(draft[key] || '').trim())) draft[key] = r[key];
+  }
+  if (r.type) draft.type = r.type;
+  if (r.official) { draft.official = r.official; draft.incident = r.incident || ''; }
+  toast('Read the report. Check the boxes, then save.');
+  rebuild();
+}
+
+/** Pasted text: one report fills the form, many are added as a batch. */
 function takeText(draft, text, rebuild, close) {
-  // A C&W "Detention particulars of goods train" report becomes a C&W failure report.
-  const cw = parseDetention(text);
-  if (cw) {
-    draft.type = 'cw';
-    for (const key of ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'bpcNo', 'wagonNo', 'reason', 'det']) {
-      if (cw[key] && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = cw[key];
-    }
-    toast('Read the C&W detention report. Check the boxes, then save.');
-    rebuild();
-    return;
-  }
-  const sree = /Failure Report|Incident ID/i.test(text) ? parseOfficial(text) : null;
-  if (sree) {
-    for (const [key, value] of Object.entries(fillFromOfficial(sree))) {
-      if (value && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = value;
-    }
-    draft.official = JSON.stringify(sree);
-    draft.incident = sree.id;
-    toast(`Read the Sr.DEE report, incident ${sree.id}. Check the boxes, then save.`);
-    rebuild();
-    return;
-  }
-  const blocks = parseBlocks(text);
-  if (blocks.length === 1) {
-    for (const key of ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'reason', 'det']) {
-      if (blocks[0][key] && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = blocks[0][key];
-    }
-    toast('Read the report. Check the boxes, then save.');
-    rebuild();
-    return;
-  }
-  if (blocks.length > 1) { if (addMany(blocks)) { close(); render(); } return; }
-  toast('Could not find a report in that file. Attach a Sr.DEE PDF or an Excel / PDF unusual sheet.');
+  const reports = readReports(text, { fileName: '', lastModified: 0 });
+  if (!reports.length) { toast('Could not find a report in that. Paste the whole report, or attach the file.'); return; }
+  if (reports.length === 1) { fillForm(draft, reports[0], rebuild); return; }
+  if (addBatch(reports, { files: 1 })) { close(); render(); }
+}
+
+/** Attach files without opening a form: every report in them is added. */
+function bulkAttach() {
+  const input = h('input', { type: 'file', multiple: true, accept: FILE_TYPES, style: 'display:none', onchange: () => { readFiles(input.files); } });
+  document.body.append(input);
+  input.click();
+  setTimeout(() => input.remove(), 60000);
 }
 
 // ---------- the form ----------
@@ -239,7 +263,7 @@ function openForm(type, existing) {
   // Pasting a whole report anywhere in the form is picked up and fills the boxes.
   dlg.onpaste = (e) => {
     const text = (e.clipboardData || window.clipboardData).getData('text');
-    if (!/DETENTION\s+PARTICULARS|BRIEF\s+HISTORY|Failure Report|Incident ID|TRAIN\s+DETAILS/i.test(text)) return;
+    if (!/DETENTION\s+PARTICULARS|ASSET\s+FAILURE|FIRST\s+INFORMATION\s+REPORT|BRIEF\s+HISTORY|Failure Report|Incident ID|TRAIN\s+DETAILS/i.test(text)) return;
     e.preventDefault();
     takeText(draft, text, build, close);
   };
@@ -271,27 +295,20 @@ function openForm(type, existing) {
       if (key === 'locoNo') el.setAttribute('list', 'u-locos');
       return h('label', { class: `field ${WIDE.has(key) ? 'wide' : ''}` }, h('span', null, LABEL[key]), el);
     };
-    const readFile = async (file) => {
-      if (!file) return;
-      toast(`Reading ${file.name}...`);
-      try { takeText(draft, await fileToText(file), build, close); } catch (e) {
-        console.error(e);
-        toast(e instanceof FileError ? e.message : 'Could not read that file.');
-      }
-    };
+    const take = (list) => readFiles(list, { draft, rebuild: build, close });
     const chooser = h('input', {
-      type: 'file', accept: '.pdf,.xlsx,.csv,.txt,application/pdf', style: 'display:none',
-      onchange: (e) => { const f = e.target.files[0]; e.target.value = ''; readFile(f); },
+      type: 'file', multiple: true, accept: FILE_TYPES, style: 'display:none',
+      onchange: (e) => { const list = [...e.target.files]; e.target.value = ''; take(list); },
     });
     const attach = h('button', { type: 'button', class: 'attach', onclick: () => chooser.click() },
-      h('b', null, 'Attach PDF or Excel'),
-      h('span', null, 'a C&W detention report, a Sr.DEE report or a report sheet: the data is read and the boxes are filled. A whole month adds every report.'));
+      h('b', null, 'Attach Word, PDF or Excel files'),
+      h('span', null, 'Select as many files as you like at a time. One report fills the boxes below; several are all read and added together.'));
     const paste = h('textarea', { rows: 2, placeholder: 'Or paste the report here (it is read as soon as you paste)', style: 'margin-bottom:6px' });
     const pasteRow = h('div', { class: 'opaste-actions', style: 'margin:0 0 14px' },
       h('button', { type: 'button', class: 'btn small', onclick: () => takeText(draft, paste.value, build, close) }, 'Read the pasted text'));
     attach.addEventListener('dragover', (e) => { e.preventDefault(); attach.classList.add('over'); });
     attach.addEventListener('dragleave', () => attach.classList.remove('over'));
-    attach.addEventListener('drop', (e) => { e.preventDefault(); attach.classList.remove('over'); readFile(e.dataTransfer.files[0]); });
+    attach.addEventListener('drop', (e) => { e.preventDefault(); attach.classList.remove('over'); take(e.dataTransfer.files); });
 
     dlg.replaceChildren(h('div', { class: 'editor' },
       h('div', { class: `dlg-head ${kind}` }, existing ? `Edit ${TYPES[kind].name.toLowerCase()} report, ${L.fmtDay(existing.day)}` : `New report: ${TYPES[kind].name}`),
@@ -415,7 +432,7 @@ function viewOverview() {
       h('div', { class: 'hero-top' },
         h('div', null, h('div', { class: 'big' }, String(list.length)), h('small', null, 'unusual reports on record')),
         h('div', { class: 'when' }, h('b', null, String(list.filter((u) => u.day.startsWith(month)).length)), ' this month', h('br'), h('b', null, String(list.filter((u) => u.day >= week).length)), ' in the last 7 days')),
-      h('div', { class: 'hero-actions' }, Object.entries(TYPES).map(([k, ty]) => h('button', { class: 'btn', style: 'background:rgba(255,255,255,0.2)', onclick: () => openForm(k) }, `+ ${ty.name.replace(/s$/, '')}`)))),
+      h('div', { class: 'hero-actions' }, [...Object.entries(TYPES).map(([k, ty]) => h('button', { class: 'btn', onclick: () => openForm(k) }, `+ ${ty.name.replace(/s$/, '')}`)), h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files')])),
     h('div', { class: 'kpis' }, kpi('loco', 'Loco failures', count('loco')), kpi('cw', 'C&W failures', count('cw')), kpi('other', 'Others', count('other')), kpi('all', 'All reports', list.length)),
     h('section', { class: 'card-box' },
       h('h2', null, 'Last 14 days', h('span', { class: 'legend' }, h('span', null, h('i', { style: 'background:var(--k-fail)' }), 'Loco'), h('span', null, h('i', { style: 'background:var(--k-other)' }), 'C&W'), h('span', null, h('i', { style: 'background:var(--k-dpwcs)' }), 'Other'))),
@@ -475,6 +492,7 @@ function viewList() {
   const newButtons = TYPES[type]
     ? [h('button', { class: `btn new ${type}`, onclick: () => openForm(type) }, `+ New ${TYPES[type].name.toLowerCase().replace(/s$/, '')} report`)]
     : Object.entries(TYPES).map(([k, t]) => h('button', { class: `btn new ${k}`, onclick: () => openForm(k) }, `+ ${t.name}`));
+  newButtons.push(h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files'));
   return h('div', null,
     SHARED && status.unusualsMissing && h('p', { class: 'notice' },
       'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase (steps are in the README). Nothing is lost meanwhile.'),

@@ -1,13 +1,13 @@
-import * as L from './logic.js';
-import { loadState, saveState } from './db.js';
-import { seedState } from './seed.js';
-import { STYLES, reportSheet, historySheet, workKind } from './sheet.js';
-import { sheetToXlsx } from './xlsx.js';
-import { sheetToCanvas, canvasToBlob } from './canvas.js';
-import { createSync } from './sync.js';
-import { diffOps } from './syncdata.js';
-import { importHistory, alreadyImported } from './historyimport.js';
-import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from './config.js';
+import * as L from '../js/logic.js';
+import { loadState, saveState } from '../js/db.js';
+import { seedState } from '../js/seed.js';
+import { STYLES, reportSheet, historySheet, workKind } from '../js/sheet.js';
+import { sheetToXlsx } from '../js/xlsx.js';
+import { sheetToCanvas, canvasToBlob } from '../js/canvas.js';
+import { createSync } from '../js/sync.js';
+import { diffOps } from '../js/syncdata.js';
+import { importHistory, alreadyImported } from '../js/historyimport.js';
+import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
 
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const today = () => L.dayKey(new Date());
@@ -86,7 +86,7 @@ async function importOldRecords() {
   if (sync && !(state.sync.linked && status.phase === 'synced')) return;
   importing = true;
   try {
-    const { SNAPSHOTS } = await import('./history-data.js');
+    const { SNAPSHOTS } = await import('../js/history-data.js');
     if (!alreadyImported(state) && (!sync || status.phase === 'synced')) {
       commit(importHistory(state, SNAPSHOTS));
       render();
@@ -806,7 +806,7 @@ function render() {
       }, '\u00d7')),
     h('div', { class: 'top-inner' },
       h('div', { class: 'top-row' },
-        h('h1', null, h('img', { class: 'logo', src: 'icons/logo.png', alt: 'Indian Railways', width: 34, height: 34 }), 'DPWCS LOCO'),
+        h('h1', null, h('img', { class: 'logo', src: '../icons/logo.png', alt: 'Indian Railways', width: 34, height: 34 }), 'DPWCS LOCO'),
         !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app')),
       h('p', null, signedOut
         ? L.fmtDay(today())

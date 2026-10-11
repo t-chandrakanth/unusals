@@ -4,17 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12263f">
-<title>DPWCS LOCO</title>
-<link rel="manifest" href="manifest.webmanifest">
+<title>SCR apps</title>
 <link rel="icon" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="styles.css">
+<style>
+  :root { --bg: #f3f4f7; --card: #fff; --ink: #17202b; --soft: #5b6878; --line: #d9dee6; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0e1620; --card: #17222f; --ink: #e8edf3; --soft: #9aa8b8; --line: #2a3a4d; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100dvh; display: grid; place-content: center; gap: 18px; padding: 24px 16px; background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  h1 { margin: 0; text-align: center; font-size: 20px; letter-spacing: 0.5px; }
+  p.sub { margin: -10px 0 0; text-align: center; color: var(--soft); font-size: 14px; }
+  .apps { display: grid; gap: 14px; width: min(460px, 100%); }
+  a.app { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); color: inherit; text-decoration: none; box-shadow: 0 6px 20px rgba(18, 38, 63, 0.08); }
+  a.app img { width: 64px; height: 64px; border-radius: 16px; flex: none; }
+  a.app b { display: block; font-size: 18px; }
+  a.app span { color: var(--soft); font-size: 14px; }
+  a.app:hover { border-color: #3b82d6; }
+</style>
 </head>
 <body>
-<div id="app"><p class="loading">Loading...</p></div>
-<dialog id="editor"></dialog>
-<div id="toast" role="status" aria-live="polite"></div>
-<noscript>This app needs JavaScript turned on.</noscript>
-<script type="module" src="js/app.js"></script>
+<h1>South Central Railway</h1>
+<p class="sub">Two separate apps. Open one, then install it from there.</p>
+<div class="apps">
+  <a class="app" href="dpwcs/"><img src="icons/logo.png" alt=""><div><b>DPWCS LOCO</b><span>Loco positions, the daily report and history</span></div></a>
+  <a class="app" href="unusual/"><img src="unusual/icons/icon-192.png" alt=""><div><b>SCR UNUSALS</b><span>Loco, C&amp;W and other unusual reports, day by day</span></div></a>
+</div>
+<script>
+  // The first DPWCS LOCO install opens this address; send it to the app itself.
+  if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) location.replace('dpwcs/');
+</script>
 </body>
 </html>

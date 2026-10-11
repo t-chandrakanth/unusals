@@ -1,4 +1,26 @@
-# DPWCS LOCO
+# Two apps, one site
+
+This repository publishes two separate installable apps, each in its own
+folder with its own manifest, scope and service worker, so each installs as an
+app of its own (on Windows and phones) and neither opens inside the other:
+
+| App | Address | Folder |
+|---|---|---|
+| **DPWCS LOCO** | `https://t-chandrakanth.github.io/unusals/dpwcs/` | `dpwcs/` |
+| **SCR UNUSALS** | `https://t-chandrakanth.github.io/unusals/unusual/` | `unusual/` |
+
+`https://t-chandrakanth.github.io/unusals/` is only a front page with a link to
+each. Shared code (`js/`), styles and icons sit above both folders. If an older
+DPWCS LOCO install (from the front-page address) is still on a PC or phone,
+uninstall it and install again from `dpwcs/`.
+
+**Attaching reports to SCR UNUSALS**: Word (.docx), PDF and Excel (.xlsx) files,
+many at a time. Detention particulars, asset failure tables, first
+information reports and the hot axle form are recognised; copies of the same
+report are merged; reports already in the list are skipped. Old .doc files
+must be saved as .docx first.
+
+## DPWCS LOCO
 
 A small app for tracking DPWS locos: where each one is, which train it is on,
 and whether it is in SC division or handed over to another division. It

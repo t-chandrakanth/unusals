@@ -146,12 +146,54 @@ export function fixLigatures(text) {
   });
 }
 
-/** Plain text of a PDF, Excel (.xlsx), CSV or text file. */
+// ---------- word (.docx) ----------
+
+/**
+ * A Word document as text: a line per paragraph, and a line per table row with
+ * the cells separated by tabs (a cell with several paragraphs keeps them as
+ * lines). Headers, footers and text boxes are left out.
+ */
+export async function docxToText(buffer) {
+  const files = await unzip(buffer, (n) => n === 'word/document.xml');
+  if (!files.has('word/document.xml')) throw new FileError('That is not a Word (.docx) file. Old .doc files must be saved as .docx first.');
+  const xml = new TextDecoder().decode(files.get('word/document.xml'));
+  const lines = [];
+  let row = null; // cells of the table row being read
+  let cell = null; // paragraphs of the cell being read
+  let para = null; // text of the paragraph being read
+  const token = /<w:tbl\b[^>]*>|<\/w:tbl>|<w:tr\b[^>]*>|<\/w:tr>|<w:tc\b[^>]*>|<\/w:tc>|<w:p\b[^>]*\/>|<w:p\b[^>]*>|<\/w:p>|<w:t\b[^>]*>[^<]*<\/w:t>|<w:tab\s*\/>|<w:br\b[^>]*\/>|<w:noBreakHyphen\s*\/>/g;
+  for (const m of xml.matchAll(token)) {
+    const t = m[0];
+    if (t.startsWith('<w:tr ') || t === '<w:tr>') row = [];
+    else if (t.startsWith('<w:tc ') || t === '<w:tc>') cell = [];
+    else if (t.startsWith('<w:p ') || t === '<w:p>') para = '';
+    else if (/^<w:p\b.*\/>$/.test(t)) { if (cell) cell.push(''); else lines.push(''); }
+    else if (t.startsWith('<w:t ') || t.startsWith('<w:t>')) { if (para !== null) para += unescapeXml(t.replace(/<[^>]+>/g, '')); }
+    else if (t.startsWith('<w:tab')) { if (para !== null) para += ' '; }
+    else if (t.startsWith('<w:br')) { if (para !== null) para += '\n'; }
+    else if (t.startsWith('<w:noBreakHyphen')) { if (para !== null) para += '-'; }
+    else if (t === '</w:p>') {
+      if (para !== null) { if (cell) cell.push(para); else lines.push(para); }
+      para = null;
+    } else if (t === '</w:tc>') {
+      if (row && cell) row.push(cell.join('\n').replace(/\n+$/, ''));
+      cell = null;
+    } else if (t === '</w:tr>') {
+      if (row) lines.push(row.join('\t'));
+      row = null;
+    }
+  }
+  return lines.join('\n');
+}
+
+/** Plain text of a PDF, Word (.docx), Excel (.xlsx), CSV or text file. */
 export async function fileToText(file) {
   const name = (file.name || '').toLowerCase();
   if (name.endsWith('.pdf') || file.type === 'application/pdf') return pdfToText(await file.arrayBuffer());
   if (name.endsWith('.xlsx')) return xlsxToText(await file.arrayBuffer());
+  if (name.endsWith('.docx') || name.endsWith('.docm')) return docxToText(await file.arrayBuffer());
+  if (name.endsWith('.doc')) throw new FileError('Old .doc files cannot be read. In Word use Save As, choose .docx, and attach that.');
   if (name.endsWith('.xls')) throw new FileError('Old .xls files cannot be read. In Excel use Save As, choose .xlsx, and attach that.');
   if (/\.(csv|txt)$/.test(name)) return (await file.text()).replace(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '\t');
-  throw new FileError('Attach a PDF or an Excel (.xlsx) file.');
+  throw new FileError('Attach a Word (.docx), PDF or Excel (.xlsx) file.');
 }
