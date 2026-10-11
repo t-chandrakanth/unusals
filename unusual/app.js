@@ -170,6 +170,11 @@ async function copyText(text) {
   toast('Copied. Paste it in WhatsApp or a message.');
 }
 
+const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+/** "07-09-2026 (MONDAY)", the way a day is written on a report. */
+const officialDay = (key) => { const [y, m, d] = key.split('-').map(Number); return `${L.fmtDay(key)} (${WEEKDAYS[new Date(y, m - 1, d).getDay()]})`; };
+/** "MONDAY, 12-10-2026 | 14:35 HRS", the clock in the header. */
+const officialNow = () => { const n = new Date(); return `${WEEKDAYS[n.getDay()]}, ${L.fmtDay(L.dayKey(n))}  |  ${L.fmtTime(n)} HRS`; };
 const monthLabel = (key) => { const [y, m] = key.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleString('en-GB', { month: 'short', year: 'numeric' }); };
 
 // ---------- reading files and pasted text ----------
@@ -383,7 +388,7 @@ function card(u, showTag) {
   const run = (fn) => async () => { try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); } };
   return h('article', { class: `ucard ${TYPES[kind].accent}` },
     h('div', { class: 'ucard-top' },
-      h('div', { class: 'udate' }, h('b', null, d), h('span', null, `${MONTHS[Number(m) - 1]} ${u.day.slice(0, 4)}`), u.time && h('em', null, u.time)),
+      h('div', { class: 'udate' }, h('b', null, d), h('span', null, `${MONTHS[Number(m) - 1]} ${u.day.slice(0, 4)}`), u.time && h('em', null, `${u.time} HRS`)),
       h('div', { class: 'utitle' },
         showTag && h('span', { class: 'tag' }, TYPES[kind].name),
         h('strong', null, u.title || '(no heading)'),
@@ -507,7 +512,7 @@ function viewList() {
         `Unusals-${name}${ui.month === 'all' ? '' : `-${monthLabel(ui.month).replace(' ', '-')}`}${span ? `-${(since || 'start')}_to_${until || today()}` : ''}`,
         heading, () => `*${heading}*\n\n${L.unusualText(visible)}`),
       L.unusualsByDay(visible).map(([day, items]) => h('section', null,
-        h('h2', { class: 'section-title' }, L.fmtDay(day), h('span', { class: 'count' }, items.length)),
+        h('h2', { class: 'section-title' }, officialDay(day), h('span', { class: 'count' }, items.length)),
         h('div', { class: 'ucards' }, items.map((u) => card(u, type === 'all'))))),
     ];
   };
@@ -608,9 +613,13 @@ function render() {
         h('button', { class: 'install-close', 'aria-label': 'Hide the install message', onclick: () => { try { localStorage.setItem(BANNER_KEY, '1'); } catch { /* private mode */ } render(); } }, '\u00d7')),
       h('div', { class: 'top-inner' },
       h('div', { class: 'top-row' },
-        h('h1', null, h('img', { class: 'logo', src: 'icons/icon-192.png', alt: '', width: 34, height: 34 }), 'SCR UNUSALS'),
+        h('div', { class: 'brand' },
+          h('img', { class: 'brand-l', src: 'icons/tigoods.png', alt: 'TI GOODS', width: 64, height: 64 }),
+          h('div', { class: 'brand-mid' }, h('h1', null, 'SCR UNUSALS'), h('span', { class: 'brand-sub' }, 'SOUTH CENTRAL RAILWAY')),
+          h('img', { class: 'brand-r', src: '../icons/logo.png', alt: 'Indian Railways', width: 64, height: 64 })),
         !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app')),
-      h('p', null, `${L.fmtDay(today())}  |  ${rows().length} reports`),
+      h('p', { class: 'clock', id: 'clock' }, officialNow()),
+      h('p', { class: 'count-line' }, `${rows().length} unusual reports on record`),
       h('p', { class: 'top-meta' }, h('button', {
         class: `sync ${status.phase}`, id: 'sync-status', title: SHARED ? 'Tap to sync now' : '',
         onclick: () => { if (sync) sync.syncNow(); },
@@ -646,6 +655,7 @@ async function start() {
     status = { ...status, email: sync.email };
   }
   render();
+  setInterval(() => { const el = document.getElementById('clock'); if (el) el.textContent = officialNow(); }, 15000);
   if (sync) sync.start(); else seed();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
