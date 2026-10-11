@@ -1,4 +1,4 @@
-# DPWS Loco Tracker
+# DPWCS LOCO
 
 A small app for tracking DPWS locos: where each one is, which train it is on,
 and whether it is in SC division or handed over to another division. It
