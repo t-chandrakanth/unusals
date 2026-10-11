@@ -1,7 +1,7 @@
 import * as L from './logic.js';
 import { loadState, saveState } from './db.js';
 import { seedState } from './seed.js';
-import { STYLES, reportSheet, historySheet, unusualSheet } from './sheet.js';
+import { STYLES, reportSheet, historySheet, unusualSheet, workKind } from './sheet.js';
 import { sheetToXlsx } from './xlsx.js';
 import { sheetToCanvas, canvasToBlob } from './canvas.js';
 import { createSync } from './sync.js';
@@ -403,6 +403,19 @@ function openEditor(loco) {
 
 // ---------- Report ----------
 
+/** Counts above the position report: how the fleet stands at a glance. */
+function positionStats(locos) {
+  const sc = locos.filter((l) => l.division === 'SC');
+  const kinds = sc.map((l) => workKind(l.working));
+  const tile = (label, n, tone) => h('div', { class: `stat ${tone}` }, h('b', null, String(n)), h('span', null, label));
+  return h('div', { class: 'stats' },
+    tile('In other divisions', locos.length - sc.length, ''),
+    tile('In SC division', sc.length, 'teal'),
+    tile('Working', kinds.filter((k) => k === 'good').length, 'green'),
+    tile('In shed / planned', kinds.filter((k) => k === 'warn').length, 'amber'),
+    tile('Defective', kinds.filter((k) => k === 'bad').length, 'red'));
+}
+
 function viewReport() {
   const saved = ui.reportId && state.reports.find((r) => r.id === ui.reportId);
   const isToday = ui.reportDay === today();
@@ -441,6 +454,7 @@ function viewReport() {
         class: 'btn', onclick: () => { ui.reportId = null; ui.reportDay = today(); render(); },
       }, 'Back to today')),
     h('p', { class: 'hint' }, note),
+    positionStats(locos),
     exportBar(sheet, fileBase, sheet.rows[0][0].v, () => L.reportText(locos, day), keepCopy),
     h('div', { class: 'sheet-wrap', id: 'printable' }, sheetTable(sheet)),
     h('h2', { class: 'section-title' }, 'Reports sent', h('span', { class: 'count' }, state.reports.length)),

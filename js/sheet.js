@@ -8,12 +8,19 @@
 import { numbered, reportTitles, historyTitle, fmtDay, unusualsInOrder } from './logic.js';
 
 export const STYLES = {
-  title:    { bg: '#FFFF00', color: '#000000', align: 'center' },
-  titleRed: { bg: '#FFFF00', color: '#FF0000', align: 'center' },
-  head:     { bg: '#E6A19C', color: '#3A3A3A', align: 'center' },
-  serial:   { bg: '#FFFF00', color: '#000000', align: 'center' },
-  cell:     { bg: '#FFFFFF', color: '#000000', align: 'center' },
-  text:     { bg: '#FFFFFF', color: '#000000', align: 'left' },
+  // Navy title for other divisions, teal for SC division; light bands on
+  // alternate rows; green, amber and red marks for the working column.
+  title:    { bg: '#12263F', color: '#FFFFFF', align: 'center' },
+  titleRed: { bg: '#0B6B5C', color: '#FFFFFF', align: 'center' },
+  head:     { bg: '#DCE6F2', color: '#12263F', align: 'center' },
+  serial:   { bg: '#F2B705', color: '#1B1300', align: 'center' },
+  cell:     { bg: '#FFFFFF', color: '#17202B', align: 'center' },
+  text:     { bg: '#FFFFFF', color: '#17202B', align: 'left' },
+  alt:      { bg: '#F0F5FB', color: '#17202B', align: 'center' },
+  altText:  { bg: '#F0F5FB', color: '#17202B', align: 'left' },
+  good:     { bg: '#DDF3E6', color: '#12633A', align: 'center' },
+  warn:     { bg: '#FFF0C7', color: '#7A5600', align: 'center' },
+  bad:      { bg: '#FBE0DD', color: '#A12A22', align: 'center' },
   muted:    { bg: '#F3F3F3', color: '#555555', align: 'center' },
   gap:      { bg: null, color: '#000000', align: 'center', noBorder: true },
   // Unusual reports: red date above, yellow bands for the heading and DET.
@@ -24,6 +31,15 @@ export const STYLES = {
 
 const c = (v, s = 'cell', extra = {}) => ({ v: v == null ? '' : String(v), s, ...extra });
 const spanRow = (cell, n) => [cell, ...Array(n - 1).fill(null)];
+
+/** How a loco's "working" entry reads: good, warn (in shed, planned), bad (defective) or ''. */
+export function workKind(working) {
+  const w = String(working || '');
+  if (/DEFIC|DEFECT|FAIL|NOT WORK/i.test(w)) return 'bad';
+  if (/SHED|PLAN|P\/I/i.test(w)) return 'warn';
+  if (/^\s*YES/i.test(w)) return 'good';
+  return '';
+}
 
 export function reportSheet(locos, day) {
   const t = reportTitles(day);
@@ -37,8 +53,9 @@ export function reportSheet(locos, day) {
   const other = all.filter((r) => r.loco.division === 'OTHER');
   for (const r of other) {
     const l = r.loco;
-    rows.push([serialCell(r), c(l.locoNo), c(l.dueDate), c(l.trainNo), c(l.location),
-      c(l.hoTrain), c(l.hoPoint), c(l.hoTime), c(l.remarks, 'text')]);
+    const z = r.serial % 2 ? 'cell' : 'alt';
+    rows.push([serialCell(r), c(l.locoNo, z), c(l.dueDate, z), c(l.trainNo, z), c(l.location, z),
+      c(l.hoTrain, z), c(l.hoPoint, z), c(l.hoTime, z), c(l.remarks, r.serial % 2 ? 'text' : 'altText')]);
   }
   if (!other.length) rows.push(spanRow(c('NIL', 'cell', { colSpan: 9 }), 9));
 
@@ -50,8 +67,9 @@ export function reportSheet(locos, day) {
   const sc = all.filter((r) => r.loco.division === 'SC');
   for (const r of sc) {
     const l = r.loco;
-    rows.push([serialCell(r), c(l.locoNo), c(l.dueDate), c(l.trainNo), c(l.location),
-      c(l.working), c(l.remarks, 'cell', { colSpan: 3 }), null, null]);
+    const z = r.serial % 2 ? 'cell' : 'alt';
+    rows.push([serialCell(r), c(l.locoNo, z), c(l.dueDate, z), c(l.trainNo, z), c(l.location, z),
+      c(l.working, workKind(l.working) || z), c(l.remarks, z, { colSpan: 3 }), null, null]);
   }
   if (!sc.length) rows.push(spanRow(c('NIL', 'cell', { colSpan: 9 }), 9));
 

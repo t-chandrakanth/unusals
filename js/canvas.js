@@ -63,7 +63,7 @@ export function sheetToCanvas(sheet, scale = 2) {
   ctx.font = FONT;
   ctx.textBaseline = 'middle';
   ctx.lineWidth = 1;
-  ctx.strokeStyle = '#000000';
+  ctx.strokeStyle = '#8FA3BD';
 
   laid.forEach((row, r) => row.forEach((it, c) => {
     if (!it) return;

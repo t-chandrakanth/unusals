@@ -121,9 +121,9 @@ dialog::backdrop { background: rgba(8, 16, 28, 0.55); }
 
 /* ---- report sheet (always the printed colours, in light and dark) ---- */
 
-.sheet-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; -webkit-overflow-scrolling: touch; }
+.sheet-wrap { overflow-x: auto; border: 1px solid #c9d6e6; border-radius: 12px; background: #fff; box-shadow: 0 6px 22px rgba(18, 38, 63, 0.10); -webkit-overflow-scrolling: touch; }
 .sheet { border-collapse: collapse; table-layout: fixed; font: bold 14px/1.25 Arial, Helvetica, sans-serif; }
-.sheet td { border: 1px solid #000; padding: 5px 6px; vertical-align: middle; overflow-wrap: anywhere; }
+.sheet td { border: 1px solid #8fa3bd; padding: 6px 7px; vertical-align: middle; overflow-wrap: anywhere; }
 
 .rows { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); overflow: hidden; }
 .rows li { display: flex; align-items: center; gap: 8px; padding: 2px 12px; border-top: 1px solid var(--line); }
@@ -317,3 +317,22 @@ button.dot.due { cursor: pointer; box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.18);
   .print-only { display: block; }
   .u-screen { display: none !important; }
 }
+
+/* ---- position report: summary tiles ---- */
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 0 0 12px; max-width: 760px; }
+.stat { --tone: var(--navy); display: grid; gap: 1px; padding: 9px 12px; border: 1px solid var(--line); border-left: 5px solid var(--tone); border-radius: 12px; background: var(--card); }
+.stat b { font-size: 22px; line-height: 1.1; color: var(--tone); }
+.stat span { font-size: 12px; font-weight: 600; color: var(--soft); }
+.stat.teal { --tone: #0b6b5c; }
+.stat.green { --tone: #1c8a4c; }
+.stat.amber { --tone: #c98400; }
+.stat.red { --tone: #c62828; }
+@media (prefers-color-scheme: dark) {
+  .stat { --tone: #8ab8ff; }
+  .stat.teal { --tone: #5ee0c6; }
+  .stat.green { --tone: #6fd39b; }
+  .stat.amber { --tone: #ffc24d; }
+  .stat.red { --tone: #ff8a80; }
+}
+@media print { .stats { display: none !important; } }

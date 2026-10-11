@@ -87,7 +87,7 @@ function stylesXml(names) {
   const fonts = ['<font><sz val="11"/><name val="Arial"/></font>'];
   const fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'];
   const xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'];
-  const side = (n) => `<${n} style="thin"><color rgb="FF000000"/></${n}>`;
+  const side = (n) => `<${n} style="thin"><color rgb="FF8FA3BD"/></${n}>`;
   for (const name of names) {
     const st = STYLES[name];
     fonts.push(`<font><b/><sz val="11"/><color rgb="${argb(st.color)}"/><name val="Arial"/></font>`);
