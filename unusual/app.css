@@ -190,3 +190,11 @@ dialog { border-radius: 20px; }
 /* DET, with From and To beside it */
 .det-row { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 10px; }
 @media (max-width: 420px) { .det-row { grid-template-columns: 1fr 1fr; } .det-row .field:last-child { grid-column: 1 / -1; } }
+
+/* From and To dates beside the quick chips */
+.chips-row { align-items: center; }
+.dfield { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--soft); }
+.dfield input { width: auto; padding: 5px 9px; font-size: 13px; }
+
+.btn.whatsapp { border-color: #25d366; color: #128c4b; }
+@media (prefers-color-scheme: dark) { .btn.whatsapp { color: #5be58d; } }

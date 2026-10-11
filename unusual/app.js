@@ -78,7 +78,7 @@ const NO_SYNC = { outbox: [], cursor: {}, linked: false };
 let state = L.emptyState();
 let sync = null;
 let status = { phase: SHARED ? 'syncing' : 'local', pending: 0, email: '', error: '', unusualsMissing: false };
-const ui = { view: 'overview', search: '', month: 'all', range: 'all' };
+const ui = { view: 'overview', search: '', month: 'all', range: 'all', from: '', to: '' };
 let repeatMap = new Map(); // loco number -> reports in the last 90 days, when more than one
 
 const who = () => (sync && sync.email ? sync.email.split('@')[0] : '');
@@ -416,7 +416,17 @@ function exportBar(sheet, base, title, getText) {
   return h('div', { class: 'actions' },
     h('button', { class: 'btn primary', onclick: run(async () => shareOrDownload(await canvasToBlob(sheetToCanvas(sheet)), `${base}.png`, title)) }, 'Share image'),
     h('button', { class: 'btn', onclick: run(async () => shareOrDownload(new Blob([sheetToXlsx(sheet)], { type: XLSX_TYPE }), `${base}.xlsx`, title)) }, 'Excel file'),
-    h('button', { class: 'btn', onclick: run(() => copyText(getText())) }, 'Copy as text'));
+    h('button', { class: 'btn', onclick: run(() => copyText(getText())) }, 'Copy as text'),
+    h('button', { class: 'btn whatsapp', onclick: () => sendWhatsApp(getText()) }, 'Send on WhatsApp'));
+}
+
+/** Opens WhatsApp with the reports as a message to send to anyone or any group. */
+function sendWhatsApp(text) {
+  const max = 5500; // a longer message does not fit in a WhatsApp link
+  const cut = text.length > max;
+  const body = cut ? `${text.slice(0, max).replace(/\n[^\n]*$/, '')}\n...` : text;
+  window.open(`https://wa.me/?text=${encodeURIComponent(body)}`, '_blank', 'noopener');
+  if (cut) toast('A long list is cut for WhatsApp. Use Share image or Excel file to send all of it.');
 }
 
 function viewOverview() {
@@ -479,14 +489,21 @@ function viewList() {
 
   const buildList = () => {
     const q = ui.search.trim().toLowerCase();
-    const since = ui.range === 'all' ? '' : addDays(today(), -(Number(ui.range) - 1));
-    const visible = pool.filter((u) => (ui.month === 'all' || u.day.startsWith(ui.month)) && u.day >= since &&
+    // the quick chips, or the From and To dates typed in
+    let since = ui.range === 'all' || ui.range === 'custom' ? '' : addDays(today(), -(Number(ui.range) - 1));
+    let until = '';
+    if (ui.range === 'custom') { since = ui.from || ''; until = ui.to || ''; }
+    const visible = pool.filter((u) => (ui.month === 'all' || u.day.startsWith(ui.month)) && u.day >= since && (!until || u.day <= until) &&
       (!q || [u.title, u.location, u.trainNo, u.locoNo, u.reason, u.load, u.wagonNo, u.bpcNo, u.incident, L.fmtDay(u.day)].some((v) => (v || '').toLowerCase().includes(q))));
     if (!visible.length) return [h('p', { class: 'empty-big' }, pool.length ? 'No report matches.' : 'No reports yet. Press the button above to write the first one.')];
     const name = type === 'all' ? 'All' : TYPES[type].name.replace(/\W+/g, '-');
+    const span = since || until ? `${since ? L.fmtDay(since) : 'the start'} to ${until ? L.fmtDay(until) : L.fmtDay(today())}` : '';
+    const heading = `SCR UNUSALS ${TYPES[type] ? TYPES[type].name : 'all reports'}${span ? ` ${span}` : ''}`;
     return [
-      h('p', { class: 'hint' }, `${visible.length} report${visible.length === 1 ? '' : 's'}, day by day. Share them all as one sheet, oldest first.`),
-      exportBar(unusualSheet(visible, 'Unusals'), `Unusals-${name}${ui.month === 'all' ? '' : `-${monthLabel(ui.month).replace(' ', '-')}`}`, `UNUSALS ${TYPES[type] ? TYPES[type].name : ''}`.trim(), () => L.unusualText(visible)),
+      h('p', { class: 'hint' }, `${visible.length} report${visible.length === 1 ? '' : 's'}${span ? `, ${span}` : ''}, day by day. Share them all as one sheet, oldest first.`),
+      exportBar(unusualSheet(visible, 'Unusals'),
+        `Unusals-${name}${ui.month === 'all' ? '' : `-${monthLabel(ui.month).replace(' ', '-')}`}${span ? `-${(since || 'start')}_to_${until || today()}` : ''}`,
+        heading, () => `*${heading}*\n\n${L.unusualText(visible)}`),
       L.unusualsByDay(visible).map(([day, items]) => h('section', null,
         h('h2', { class: 'section-title' }, L.fmtDay(day), h('span', { class: 'count' }, items.length)),
         h('div', { class: 'ucards' }, items.map((u) => card(u, type === 'all'))))),
@@ -510,10 +527,22 @@ function viewList() {
       'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase (steps are in the README). Nothing is lost meanwhile.'),
     h('div', { class: 'uhead' }, newButtons),
     h('div', { class: 'uhead' }, search, month),
-    h('div', { class: 'chips-row' }, [['all', 'All time'], ['30', 'Last 30 days'], ['7', 'Last 7 days'], ['1', 'Today']].map(([v, text]) => h('button', {
-      class: `rchip ${ui.range === v ? 'on' : ''}`,
-      onclick: () => { ui.range = v; render(); },
-    }, text))),
+    h('div', { class: 'chips-row' },
+      [['all', 'All time'], ['30', 'Last 30 days'], ['7', 'Last 7 days'], ['1', 'Today']].map(([v, text]) => h('button', {
+        class: `rchip ${ui.range === v ? 'on' : ''}`,
+        onclick: () => { ui.range = v; ui.from = ''; ui.to = ''; render(); },
+      }, text)),
+      ...['from', 'to'].map((k) => h('label', { class: 'dfield' }, k === 'from' ? 'From' : 'To', h('input', {
+        type: 'date', value: ui[k], 'aria-label': k === 'from' ? 'From date' : 'To date',
+        onchange: (e) => {
+          ui[k] = e.target.value;
+          ui.range = ui.from || ui.to ? 'custom' : 'all';
+          // swap them if they were typed the wrong way round
+          if (ui.from && ui.to && ui.from > ui.to) { [ui.from, ui.to] = [ui.to, ui.from]; }
+          render();
+        },
+      }))),
+      (ui.from || ui.to) && h('button', { class: 'rchip', onclick: () => { ui.range = 'all'; ui.from = ''; ui.to = ''; render(); } }, 'Clear dates')),
     h('div', { id: 'ulist' }, buildList().flat()));
 }
 
@@ -586,7 +615,7 @@ function render() {
       }, statusText())))),
     h('nav', { class: 'tabs' }, tabs.map(([id, text, n]) => h('button', {
       class: ui.view === id ? 'on' : '',
-      onclick: () => { ui.view = id; ui.month = 'all'; ui.search = ''; ui.range = 'all'; render(); window.scrollTo(0, 0); },
+      onclick: () => { ui.view = id; ui.month = 'all'; ui.search = ''; ui.range = 'all'; ui.from = ''; ui.to = ''; render(); window.scrollTo(0, 0); },
     }, h('i', { class: 'dot-k', style: `--c:${dots[id]}` }), text, n != null && h('span', { class: 'n' }, String(n))))),
     h('main', null, ui.view === 'overview' ? viewOverview() : viewList()));
 }
