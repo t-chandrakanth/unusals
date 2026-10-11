@@ -227,7 +227,7 @@ button.dot.due { cursor: pointer; box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.18);
 .progress .since { font-weight: 400; color: var(--soft); }
 .editor .toggle { display: block; margin-top: 10px; }
 @media (min-width: 760px) {
-  .list-head, .card { grid-template-columns: 64px 1.1fr 1fr 1.4fr 70px; }
+  .list-head, .card { grid-template-columns: 64px 1.1fr 1fr 1.4fr 1fr 70px; }
   .card .dot { margin: 0; justify-self: start; }
 }
 
@@ -383,3 +383,13 @@ button.dot.due { cursor: pointer; box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.18);
 .opaste .drop span { font-size: 12px; color: var(--soft); }
 .opaste.over { background: color-mix(in srgb, var(--o-ink) 18%, var(--card)); }
 .opaste.over .drop { border-style: solid; }
+
+/* the Working cell is tinted like the report: green working, amber in shed, red defective */
+.card .cell-input.w-good { background: #ddf3e6; border-color: #9fd5b5; color: #12633a; font-weight: 600; }
+.card .cell-input.w-warn { background: #fff0c7; border-color: #ecc866; color: #7a5600; font-weight: 600; }
+.card .cell-input.w-bad { background: #fbe0dd; border-color: #eba39d; color: #a12a22; font-weight: 600; }
+@media (prefers-color-scheme: dark) {
+  .card .cell-input.w-good { background: #17402b; border-color: #2b6b4a; color: #8ee3b2; }
+  .card .cell-input.w-warn { background: #4a3a10; border-color: #7a6020; color: #ffd978; }
+  .card .cell-input.w-bad { background: #4a1c19; border-color: #7a3732; color: #ffaaa3; }
+}

@@ -210,7 +210,7 @@ function locoCard(row, since) {
   // On a wide screen, train number and location can be changed right in the
   // table. A phone hides these two boxes and opens the full form instead.
   const cell = (key, label) => h('input', {
-    type: 'text', class: 'col cell-input', value: l[key], placeholder: '-',
+    type: 'text', class: `col cell-input${key === 'working' && workKind(l.working) ? ` w-${workKind(l.working)}` : ''}`, value: l[key], placeholder: '-',
     'aria-label': `${label} of ${l.locoNo}`, 'data-id': l.id, 'data-field': key,
     autocapitalize: 'characters', autocomplete: 'off',
     onclick: (e) => e.stopPropagation(),
@@ -250,6 +250,7 @@ function locoCard(row, since) {
     h('button', { class: 'loco-no', title: 'Open this loco' }, l.locoNo || '(no number)'),
     cell('trainNo', 'Train no'),
     cell('location', 'Current location'),
+    cell('working', 'Working'),
     dot);
 }
 
@@ -259,14 +260,14 @@ function viewLocos() {
     const sentToday = state.reports.some((r) => r.at === since);
     const q = ui.search.trim().toLowerCase();
     const rows = L.numbered(state.locos).filter((r) => !q ||
-      [r.loco.locoNo, r.loco.trainNo, r.loco.location, r.loco.hoPoint, r.loco.remarks]
+      [r.loco.locoNo, r.loco.trainNo, r.loco.location, r.loco.working, r.loco.hoPoint, r.loco.remarks]
         .some((v) => v.toLowerCase().includes(q)));
     const section = (division, title) => {
       const list = rows.filter((r) => r.loco.division === division);
       return h('section', null,
         h('h2', { class: `section-title ${division.toLowerCase()}` }, title, h('span', { class: 'count' }, list.length)),
         list.length > 0 && h('div', { class: 'list-head', 'aria-hidden': 'true' },
-          h('span', null, 'Sr. No'), h('span', null, 'Loco No'), h('span', null, 'Train No'), h('span', null, 'Current location'), h('span', null, 'Updated')),
+          h('span', null, 'Sr. No'), h('span', null, 'Loco No'), h('span', null, 'Train No'), h('span', null, 'Current location'), h('span', null, 'Working'), h('span', null, 'Updated')),
         list.length ? list.map((r) => locoCard(r, since)) : h('p', { class: 'empty' }, q ? 'No match.' : 'No locos here.'));
     };
     const done = state.locos.filter((l) => L.isUpdated(l, since)).length;
@@ -289,7 +290,7 @@ function viewLocos() {
   return h('div', null,
     h('div', { class: 'toolbar' }, search,
       h('button', { class: 'btn primary', onclick: () => openEditor(null) }, '+ Add loco')),
-    h('p', { class: 'hint wide-only' }, 'Type in the Train No or Current location box to change it. Click a loco number for all its details.'),
+    h('p', { class: 'hint wide-only' }, 'Type in the Train No, Current location or Working box to change it. Click a loco number for all its details.'),
     h('p', { class: 'hint narrow-only' }, 'Tap a loco number to see and update its details.'),
     h('div', { id: 'lists' }, buildLists()));
 }
@@ -349,6 +350,7 @@ function openEditor(loco) {
       field('Loco no', 'locoNo', { placeholder: '27609+28411', wide: !showAll }),
       field('Train no', 'trainNo'),
       field('Current location', 'location'),
+      field('Working', 'working', { placeholder: 'YES, Shed in, ...' }),
       showAll && field('Due date', 'dueDate', { placeholder: '15-Oct or FRESH' }),
       showAll && other && field('H/O train to other div', 'hoTrain'),
       showAll && other && field('H/O point', 'hoPoint'),
@@ -356,7 +358,6 @@ function openEditor(loco) {
         placeholder: 'DD-MM-YY HH:MM',
         extra: h('button', { type: 'button', class: 'link', onclick: () => { draft.hoTime = L.fmtDateTime(new Date()); build(); } }, 'Use current time'),
       }),
-      showAll && !other && field('Working', 'working', { placeholder: 'YES, Shed in, ...' }),
       // Picking the FOIS message date writes the standard remark with that
       // date. The remark can still be edited by hand afterwards.
       showAll && other && h('label', { class: 'field' },
