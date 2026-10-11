@@ -1,6 +1,6 @@
 // Offline support: use the network when there is one (so updates arrive
 // straight away) and fall back to the last saved copy when there is not.
-const CACHE = 'loco-tracker-v25';
+const CACHE = 'loco-tracker-v26';
 const FILES = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'js/app.js', 'js/logic.js', 'js/seed.js', 'js/sheet.js', 'js/xlsx.js', 'js/canvas.js', 'js/db.js', 'js/sync.js', 'js/syncdata.js', 'js/config.js', 'js/historyimport.js', 'js/unusualimport.js', 'js/unusual-data.js', 'js/unusual-official.js', 'js/official.js', 'js/filetext.js',
