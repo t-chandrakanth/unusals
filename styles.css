@@ -44,7 +44,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .top { background: var(--navy); color: #fff; padding: 14px 16px 12px; padding-top: calc(14px + env(safe-area-inset-top)); }
 .top-inner, main, .tabs { max-width: 1100px; margin: 0 auto; }
 .top h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
-.top h1::before { content: ""; display: inline-block; width: 10px; height: 18px; margin-right: 9px; border-radius: 2px; background: var(--amber); vertical-align: -2px; }
+.top h1 { display: flex; align-items: center; gap: 10px; }
+.top h1 .logo { flex: none; width: 34px; height: 34px; border-radius: 50%; background: #fff; }
 .top p { margin: 3px 0 0; font-size: 13px; color: #c5d2e3; white-space: pre-wrap; }
 
 .tabs { position: sticky; top: 0; z-index: 5; display: flex; background: var(--navy-2); }

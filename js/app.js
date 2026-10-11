@@ -878,7 +878,7 @@ function render() {
   const header = h('header', { class: 'top' },
     h('div', { class: 'top-inner' },
       h('div', { class: 'top-row' },
-        h('h1', null, 'DPWS Loco Tracker'),
+        h('h1', null, h('img', { class: 'logo', src: 'icons/logo.png', alt: 'Indian Railways', width: 34, height: 34 }), 'DPWS Loco Tracker'),
         !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app')),
       h('p', null, signedOut
         ? L.fmtDay(today())
