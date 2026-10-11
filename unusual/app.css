@@ -210,3 +210,14 @@ dialog { border-radius: 20px; }
 .top .clock { margin: 6px 0 0; text-align: center; font-size: 13px; font-weight: 800; letter-spacing: 0.8px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .top .count-line { margin: 2px 0 0; text-align: center; font-size: 12px; color: var(--soft); }
 @media (max-width: 420px) { .top .brand { gap: 9px; } .top .brand img { width: 54px; height: 54px; } .top .brand-mid h1 { font-size: 18px; letter-spacing: 1px; } }
+
+/* header: the two logos at the very ends, as tall as the header, the name between */
+.top.top { padding-left: 10px; padding-right: 10px; padding-top: 12px; padding-bottom: 12px; }
+.top .top-wide { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; max-width: none; }
+.top .edge { width: clamp(82px, 26vw, 150px); height: clamp(82px, 26vw, 150px); object-fit: cover; flex: none; }
+.top .edge-l { border-radius: 22px; box-shadow: 0 6px 18px rgba(11, 26, 48, 0.4); }
+.top .edge-r { border-radius: 50%; background: #fff; box-shadow: 0 6px 18px rgba(150, 20, 30, 0.35); }
+.top .top-center { display: grid; justify-items: center; gap: 2px; min-width: 0; text-align: center; }
+.top .top-center h1 { margin: 0; font-size: clamp(18px, 5.4vw, 28px); letter-spacing: 1.5px; }
+.top .top-center .top-meta { justify-content: center; margin: 0; }
+.top .top-center .install { margin-top: 6px; }
