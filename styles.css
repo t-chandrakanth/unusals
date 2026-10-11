@@ -336,3 +336,43 @@ button.dot.due { cursor: pointer; box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.18);
   .stat.red { --tone: #ff8a80; }
 }
 @media print { .stats { display: none !important; } }
+
+/* ---- all tabs: one look ---- */
+
+.top { background: linear-gradient(110deg, #0c1c31 0%, var(--navy) 45%, #24507f 100%); }
+.tabs { background: var(--navy-2); box-shadow: 0 4px 14px rgba(18, 38, 63, 0.25); }
+.tabs button { position: relative; font-size: 14px; }
+.tabs button.on { background: rgba(255, 255, 255, 0.08); }
+.btn { border-radius: 10px; }
+.btn.primary { background: linear-gradient(120deg, var(--navy) 0%, #2a5a8f 100%); border-color: transparent; }
+@media (prefers-color-scheme: dark) { .btn.primary { background: var(--amber); } }
+.panel, .rows { box-shadow: 0 1px 2px rgba(18, 38, 63, 0.06), 0 6px 18px rgba(18, 38, 63, 0.06); }
+
+/* locos */
+#lists .section-title { width: fit-content; margin: 20px 0 10px; padding: 5px 12px 5px 10px; border-radius: 99px; background: var(--navy); color: #fff; letter-spacing: 0.7px; }
+#lists .section-title.sc { background: #0b6b5c; }
+#lists .section-title.other { color: #fff; }
+#lists .section-title .count { background: rgba(255, 255, 255, 0.22); color: #fff; }
+@media (prefers-color-scheme: dark) {
+  #lists .section-title { background: #2a5a8f; }
+  #lists .section-title.sc { background: #0f8573; }
+}
+.card { border-left: 5px solid var(--navy); border-radius: 12px; box-shadow: 0 1px 2px rgba(18, 38, 63, 0.05); }
+#lists section:has(.section-title.sc) .card { border-left-color: #0b6b5c; }
+.progress { padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); width: fit-content; max-width: 100%; }
+@media (min-width: 760px) {
+  .list-head { background: #dce6f2; color: #12263f; }
+  .card { border-radius: 0; }
+  .card:last-child { border-radius: 0 0 12px 12px; }
+  .card:nth-child(even) { background: color-mix(in srgb, var(--navy) 4%, var(--card)); }
+}
+@media (min-width: 760px) and (prefers-color-scheme: dark) { .list-head { background: #223449; color: #c5d2e3; } }
+
+/* history */
+.segs { border-radius: 99px; padding: 3px; background: var(--card); }
+.seg { border-radius: 99px; }
+.seg.on { background: linear-gradient(120deg, var(--navy) 0%, #2a5a8f 100%); }
+@media (prefers-color-scheme: dark) { .seg.on { background: var(--amber); color: #1b1300; } }
+.day { background: var(--card); }
+.day.on { background: var(--navy); }
+.days { border-radius: 14px; }

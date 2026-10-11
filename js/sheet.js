@@ -87,16 +87,18 @@ export function historySheet(label, summary, fromKey, toKey) {
     spanRow(c(historyTitle(label, fromKey, toKey), 'title', { colSpan: head.length }), head.length),
     head.map((v) => c(v, 'head')),
   ];
+  let n = 0;
   for (const r of summary) {
     const d = r.data;
-    const s = r.carried ? 'muted' : 'cell';
+    if (!r.carried) n++;
+    const s = r.carried ? 'muted' : (n % 2 ? 'cell' : 'alt');
     const row = [
       c(fmtDay(r.day), 'serial'),
       c(r.carried ? 'no change' : r.time, s),
       c(d.trainNo, s), c(d.location, s),
       c(d.division === 'OTHER' ? 'OTHER DIV' : 'SC DIV', s),
-      c(d.hoTrain, s), c(d.hoPoint, s), c(d.hoTime, s), c(d.working, s),
-      c(r.kind === 'removed' ? 'REMOVED FROM LIST' : d.remarks, r.carried ? 'muted' : 'text'),
+      c(d.hoTrain, s), c(d.hoPoint, s), c(d.hoTime, s), c(d.working, (!r.carried && workKind(d.working)) || s),
+      c(r.kind === 'removed' ? 'REMOVED FROM LIST' : d.remarks, r.carried ? 'muted' : (n % 2 ? 'text' : 'altText')),
     ];
     if (withBy) row.push(c(r.by, s));
     rows.push(row);
