@@ -205,6 +205,78 @@ function exportBar(sheet, fileBase, title, getText, before) {
 
 // ---------- Locos ----------
 
+// ---------- paste from Excel, and suggestions for the Working cell ----------
+
+// The three boxes of the table, left to right. A block copied from Excel
+// lands starting at the box it is pasted into, one row per loco going down.
+const PASTE_COLS = ['trainNo', 'location', 'working'];
+
+function pasteCells(e, loco, key) {
+  const raw = (e.clipboardData || window.clipboardData).getData('text').replace(/\r/g, '');
+  const text = raw.replace(/\n+$/, '');
+  if (!/[\t\n]/.test(text)) return; // a single cell: paste as usual
+  e.preventDefault();
+  const rows = text.split('\n').map((line) => line.split('\t').map((v) => v.trim().replace(/^"(.*)"$/s, '$1')));
+  const ids = [...document.querySelectorAll('#lists .card')].map((c) => c.querySelector('.cell-input').dataset.id);
+  const row0 = ids.indexOf(loco.id);
+  const col0 = PASTE_COLS.indexOf(key);
+  const edits = new Map();
+  let cells = 0;
+  let outside = 0;
+  rows.forEach((cols, i) => {
+    const id = ids[row0 + i];
+    if (!id) { outside++; return; }
+    cols.forEach((value, j) => {
+      const field = PASTE_COLS[col0 + j];
+      if (!field) return;
+      if (!edits.has(id)) edits.set(id, {});
+      edits.get(id)[field] = value;
+      cells++;
+    });
+  });
+  const now = new Date().toISOString();
+  let next = state;
+  for (const [id, fields] of edits) {
+    const current = next.locos.find((l) => l.id === id);
+    if (current) next = L.reduce(next, { type: 'save', loco: { ...current, ...fields }, now, by: who() });
+  }
+  hideSuggest();
+  commit(next);
+  render();
+  toast(`Pasted ${cells} cell${cells === 1 ? '' : 's'} into ${edits.size} loco${edits.size === 1 ? '' : 's'}${outside ? `. ${outside} row${outside === 1 ? '' : 's'} went past the end of the list and were left out` : ''}`);
+}
+
+const WORKING_OPTIONS = ['YES', 'YES/MU', 'Shed in', 'DEFICTIVE', 'P/I -PLANING'];
+let suggestBox = null;
+
+function hideSuggest() {
+  if (suggestBox) { suggestBox.remove(); suggestBox = null; }
+}
+
+/** A small list under the Working box: the usual entries and any already used. */
+function showSuggest(input) {
+  hideSuggest();
+  const typed = input.value.trim().toLowerCase();
+  const all = [...new Set([...WORKING_OPTIONS, ...state.locos.map((l) => (l.working || '').trim()).filter(Boolean)])];
+  const list = all.filter((o) => o.toLowerCase().includes(typed) && o.toLowerCase() !== typed);
+  if (!list.length) return;
+  const r = input.getBoundingClientRect();
+  if (!input.isConnected || !r.width) return;
+  suggestBox = h('div', { class: 'suggest', style: `left:${r.left}px;top:${r.bottom + 2}px;min-width:${r.width}px` },
+    list.map((o) => h('button', {
+      type: 'button',
+      // mousedown, not click: the box must not lose focus before the choice is made
+      onmousedown: (ev) => {
+        ev.preventDefault();
+        input.value = o;
+        hideSuggest();
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+    }, o)));
+  document.body.append(suggestBox);
+}
+window.addEventListener('scroll', hideSuggest, true);
+
 function locoCard(row, since) {
   const l = row.loco;
   // On a wide screen, train number and location can be changed right in the
@@ -214,7 +286,11 @@ function locoCard(row, since) {
     'aria-label': `${label} of ${l.locoNo}`, 'data-id': l.id, 'data-field': key,
     autocapitalize: 'characters', autocomplete: 'off',
     onclick: (e) => e.stopPropagation(),
-    onkeydown: (e) => { if (e.key === 'Escape') { e.target.value = l[key]; e.target.blur(); } },
+    onpaste: (e) => pasteCells(e, l, key),
+    onfocus: key === 'working' ? (e) => showSuggest(e.target) : null,
+    oninput: key === 'working' ? (e) => showSuggest(e.target) : null,
+    onblur: key === 'working' ? hideSuggest : null,
+    onkeydown: (e) => { if (e.key === 'Escape') { hideSuggest(); e.target.value = l[key]; e.target.blur(); } },
     onchange: (e) => {
       // A box removed by a redraw reports a change too; that is not the
       // person finishing their edit, so it must not be saved.
@@ -290,7 +366,7 @@ function viewLocos() {
   return h('div', null,
     h('div', { class: 'toolbar' }, search,
       h('button', { class: 'btn primary', onclick: () => openEditor(null) }, '+ Add loco')),
-    h('p', { class: 'hint wide-only' }, 'Type in the Train No, Current location or Working box to change it. Click a loco number for all its details.'),
+    h('p', { class: 'hint wide-only' }, 'Type in the Train No, Current location or Working box to change it, or paste a block copied from Excel. Click a loco number for all its details.'),
     h('p', { class: 'hint narrow-only' }, 'Tap a loco number to see and update its details.'),
     h('div', { id: 'lists' }, buildLists()));
 }

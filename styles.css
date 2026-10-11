@@ -393,3 +393,10 @@ button.dot.due { cursor: pointer; box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.18);
   .card .cell-input.w-warn { background: #4a3a10; border-color: #7a6020; color: #ffd978; }
   .card .cell-input.w-bad { background: #4a1c19; border-color: #7a3732; color: #ffaaa3; }
 }
+
+/* suggestions under the Working box */
+.suggest { position: fixed; z-index: 30; display: grid; max-height: 220px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); box-shadow: 0 8px 24px rgba(8, 16, 28, 0.22); }
+.suggest button { padding: 9px 12px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; font-size: 14px; font-weight: 600; cursor: pointer; }
+.suggest button:first-child { border-top: 0; }
+.suggest button:hover { background: var(--bg); }
+@media print { .suggest { display: none; } }
