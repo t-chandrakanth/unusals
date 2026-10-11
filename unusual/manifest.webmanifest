@@ -1,0 +1,16 @@
+{
+  "name": "Unusals",
+  "short_name": "Unusals",
+  "description": "Write and keep unusual reports: loco failures, C&W failures and others, day-wise.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f4f7",
+  "theme_color": "#12263f",
+  "icons": [
+    { "src": "../icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "../icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "id": "./"
+}

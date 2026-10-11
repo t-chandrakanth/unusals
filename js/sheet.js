@@ -27,6 +27,8 @@ export const STYLES = {
   dateTitle: { bg: '#FFFFFF', color: '#FF0000', align: 'center' },
   band:      { bg: '#FFFF00', color: '#FF0000', align: 'center' },
   label:     { bg: '#FFFFFF', color: '#000000', align: 'left' },
+  redLabel:  { bg: '#FFFFFF', color: '#D00000', align: 'left' },
+  redText:   { bg: '#FFFFFF', color: '#D00000', align: 'left' },
 };
 
 const c = (v, s = 'cell', extra = {}) => ({ v: v == null ? '' : String(v), s, ...extra });
@@ -124,6 +126,8 @@ export function unusualSheet(list, name = 'Unusuals') {
       ['LOCO NO', u.locoNo, 'label', 'cell'],
       u.load && ['LOAD', u.load, 'label', 'cell'],
       ['REASON', u.reason, 'label', 'text'],
+      u.wagonNo && ['WAGON NO', u.wagonNo, 'redLabel', 'redText'],
+      u.bpcNo && ['BPC NO', u.bpcNo, 'redLabel', 'redText'],
       ['DET', u.det, 'band', 'band'],
       u.rep && ['REP', u.rep, 'label', 'cell'],
     ].filter(Boolean);

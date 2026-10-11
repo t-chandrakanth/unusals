@@ -1,0 +1,27 @@
+/* Unusals app: the main look comes from ../styles.css */
+
+.top h1::before { background: #ff8a65; }
+.tabs button { font-size: 13px; padding-left: 2px; padding-right: 2px; }
+.tabs button .n { margin-left: 5px; padding: 0 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.18); font-size: 11px; }
+.tabs button.on .n { background: var(--amber); color: #1b1300; }
+
+.uhead { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+.uhead .search { flex: 1 1 200px; }
+.uhead select { width: auto; }
+.btn.new { background: linear-gradient(120deg, #c62828 0%, #e0562b 100%); border-color: transparent; color: #fff; }
+.btn.new.cw { background: linear-gradient(120deg, #b87400 0%, #e0a000 100%); }
+.btn.new.other { background: linear-gradient(120deg, #12263f 0%, #2a5a8f 100%); }
+
+.ucard .tag { display: inline-block; margin-bottom: 4px; padding: 1px 8px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 16%, var(--card)); color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; }
+.chip.red { background: color-mix(in srgb, #c62828 10%, var(--card)); color: #a12a22; }
+@media (prefers-color-scheme: dark) { .chip.red { color: #ffaaa3; } }
+
+.dlg-head { display: flex; align-items: center; gap: 10px; margin: -18px -16px 14px; padding: 13px 16px; border-radius: 16px 16px 0 0; color: #fff; font-size: 16px; font-weight: 700; background: linear-gradient(110deg, #c62828, #e0562b); }
+.dlg-head.cw { background: linear-gradient(110deg, #b87400, #e0a000); }
+.dlg-head.other { background: linear-gradient(110deg, #12263f, #2a5a8f); }
+.attach { display: grid; gap: 2px; width: 100%; margin-bottom: 14px; padding: 12px; border: 1.5px dashed var(--o-ink); border-radius: 12px; background: color-mix(in srgb, var(--o-ink) 7%, var(--card)); color: var(--ink); text-align: center; cursor: pointer; }
+.attach b { color: var(--o-ink); }
+.attach span { font-size: 12px; color: var(--soft); }
+.attach.over { background: color-mix(in srgb, var(--o-ink) 20%, var(--card)); }
+.okline { margin: -6px 0 12px; font-size: 13px; font-weight: 700; color: var(--o-ink); }
+.empty-big { padding: 28px 8px; text-align: center; color: var(--soft); }

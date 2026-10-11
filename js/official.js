@@ -125,9 +125,9 @@ function cutBlock(part) {
     return m ? { start: from + m.index, end: from + m.index + m[0].length } : null;
   };
   const loc = find('\\bLOCATION\\b', 0);
-  const tr = loc && find('\\bTRAIN\\s*NO\\b', loc.end);
+  const tr = loc && find('\\bTR(?:AIN)?\\.?\\s*NO\\b', loc.end);
   const lo = tr && find('\\bLOCO\\s*(?:NO|NUMBER)\\b', tr.end);
-  const reason = lo && find('\\bREASON\\b', lo.end);
+  const reason = lo && find('\\b(?:REASON|READON)\\b', lo.end);
   if (!reason) return null;
   // Between LOCO NO and REASON: the loco number (first line), maybe a LOAD
   // row, and, in a PDF where the REASON label sits in the middle of a wrapped
@@ -147,7 +147,24 @@ function cutBlock(part) {
   const rest = part.slice(reason.end);
   const dets = [...rest.matchAll(/(?:^|\s)DET\b/gi)];
   const det = dets[dets.length - 1];
-  const reasonText = [...before, det ? rest.slice(0, det.index) : rest].join('\n');
+  const mid = det ? rest.slice(0, det.index) : rest;
+  // C&W reports carry the wagon and BPC numbers after the reason.
+  // The words can also appear inside the reason, so the label is the last
+  // one that starts a line or a cell.
+  const lastLabel = (re) => {
+    const starts = [...mid.matchAll(new RegExp(`(?:^|[\\n\\t])[ \\t]*(${re})`, 'gi'))];
+    const m = starts[starts.length - 1];
+    if (m) return { index: m.index + m[0].length - m[1].length, 0: m[1] };
+    const any = [...mid.matchAll(new RegExp(`\\b${re}\\b`, 'gi'))];
+    const a = any[any.length - 1];
+    return a ? { index: a.index, 0: a[0] } : null;
+  };
+  const wag = lastLabel('WAGON\\s*NO');
+  const bpc = lastLabel('BPC\\s*NO');
+  const cut = Math.min(...[wag, bpc].filter(Boolean).map((m) => m.index), mid.length);
+  const reasonText = [...before, mid.slice(0, cut)].join('\n');
+  const wagonNo = wag ? mid.slice(wag.index + wag[0].length, bpc && bpc.index > wag.index ? bpc.index : undefined) : '';
+  const bpcNo = bpc ? mid.slice(bpc.index + bpc[0].length, wag && wag.index > bpc.index ? wag.index : undefined) : '';
   const tail = det ? rest.slice(det.index + det[0].length) : '';
   const rep = /\bREP\b/i.exec(tail);
   return {
@@ -157,7 +174,9 @@ function cutBlock(part) {
     locoNo: one(locoText),
     load: one(load),
     reason: reasonText.split('\n').map((l) => l.replace(/[\t ]+/g, ' ').trim()).filter(Boolean).join('\n'),
-    det: one(rep ? tail.slice(0, rep.index) : tail),
+    wagonNo: one(wagonNo),
+    bpcNo: one(bpcNo),
+    det: one((rep ? tail.slice(0, rep.index) : tail).replace(/^[\s:-]+/, '')),
     rep: rep ? one(tail.slice(rep.index + rep[0].length)) : '',
   };
 }

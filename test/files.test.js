@@ -99,3 +99,24 @@ test('letters the Sr.DEE PDF drops are put back', () => {
   const bad = 'Failed Sec � on/Div/Zone Mul � Loco Train le � LTRR crea � ng A � er 10 Deten � on (minutes)';
   assert.equal(fixLigatures(bad), 'Failed Section/Div/Zone Multi Loco Train left LTRR creating After 10 Detention (minutes)');
 });
+
+test('C&W failure sheets (wagon no, BPC no, "TR. NO", "READON") are read', () => {
+  const text = `DATE-03/04/2025
+1\tTRAIN DETAILS\tbrake binding
+\tLOCATION\tTNGM-YP/GNN
+\tTR. NO\tICDT C/S
+\tLOCO NO\t42821
+\tREADON\tBRAKE BINDINDING FOUND TNGM -YP AT 10:58 WAGON NO CNCR 6125060159 BLCM 16 TH FROM BV ,SAME ISOLATED
+\tWAGON NO\tCNCR 6125060159 BLCM
+\tBPC NO\t70000102716 TKD/25-03/CC
+\tDET-\tAT GNN 03:20 HRS`;
+  const [b] = parseBlocks(text.replace('DATE-03/04/2025', 'DATE-03-04-2025'));
+  assert.equal(b.day, '2025-04-03');
+  assert.equal(b.trainNo, 'ICDT C/S');
+  assert.equal(b.locoNo, '42821');
+  assert.equal(b.wagonNo, 'CNCR 6125060159 BLCM');
+  assert.equal(b.bpcNo, '70000102716 TKD/25-03/CC');
+  assert.equal(b.det, 'AT GNN 03:20 HRS');
+  assert.match(b.reason, /^BRAKE BINDINDING FOUND TNGM -YP AT 10:58 WAGON NO CNCR 6125060159 BLCM 16 TH FROM BV/);
+  assert.doesNotMatch(b.reason, /BPC/);
+});

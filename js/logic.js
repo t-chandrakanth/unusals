@@ -5,7 +5,7 @@ export const FIELDS = [
   'hoTrain', 'hoPoint', 'hoTime', 'foisDate', 'working', 'remarks', 'sameSerial',
 ];
 
-export const UNUSUAL_FIELDS = ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'rep', 'incident', 'official'];
+export const UNUSUAL_FIELDS = ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'rep', 'incident', 'official', 'type', 'wagonNo', 'bpcNo'];
 
 export const DIVISIONS ={ OTHER: 'Other division', SC: 'SC division' };
 
@@ -120,7 +120,7 @@ export function isUpdated(loco, since) {
 }
 
 export function blankUnusual(day) {
-  return { id: uid(), day, time: '', title: '', location: '', trainNo: '', locoNo: '', load: '', reason: '', det: '', rep: '', incident: '', official: '' };
+  return { id: uid(), day, time: '', title: '', location: '', trainNo: '', locoNo: '', load: '', reason: '', det: '', rep: '', incident: '', official: '', type: '', wagonNo: '', bpcNo: '' };
 }
 
 /** Only the written fields of an unusual report, trimmed. */
@@ -162,6 +162,8 @@ export function unusualText(list) {
     lines.push(`Loco no: ${u.locoNo || '-'}`);
     if (u.load) lines.push(`Load: ${u.load}`);
     lines.push(`Reason: ${u.reason || '-'}`);
+    if (u.wagonNo) lines.push(`Wagon no: ${u.wagonNo}`);
+    if (u.bpcNo) lines.push(`BPC no: ${u.bpcNo}`);
     lines.push(`DET: ${u.det || '-'}`);
     if (u.rep) lines.push(`REP: ${u.rep}`);
   });
