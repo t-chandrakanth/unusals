@@ -178,3 +178,11 @@ dialog { border-radius: 20px; }
 .nothing { margin: 0; font-size: 13px; color: var(--soft); }
 
 .o-panel { border-radius: 12px; }
+
+/* header: the symbol above the name */
+.top .top-row { flex-direction: column; justify-content: center; gap: 8px; text-align: center; }
+.top h1 { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 2px 0 0; font-size: 22px; letter-spacing: 2px; text-align: center; }
+.top h1 .logo { width: 68px; height: 68px; margin: 0; border-radius: 18px; vertical-align: baseline; box-shadow: 0 6px 18px rgba(30, 100, 140, 0.28); }
+.top .top-inner > p { text-align: center; }
+.top .top-meta { justify-content: center; }
+.top .install { margin-top: 2px; }
