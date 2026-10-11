@@ -14,8 +14,10 @@ each. Shared code (`js/`), styles and icons sit above both folders. If an older
 DPWCS LOCO install (from the front-page address) is still on a PC or phone,
 uninstall it and install again from `dpwcs/`.
 
-**Attaching reports to SCR UNUSALS**: Word (.docx), PDF and Excel (.xlsx) files,
-many at a time. Detention particulars, asset failure tables, first
+**Attaching reports to SCR UNUSALS**: photos (read in the browser), Word (.docx),
+PDF and Excel (.xlsx) files, many at a time. Any layout with labels such as Train No,
+Loco No, Location, Reason and DET is read, as is an Excel register with headings
+across the top. Detention particulars, asset failure tables, first
 information reports and the hot axle form are recognised; copies of the same
 report are merged; reports already in the list are skipped. Old .doc files
 must be saved as .docx first.

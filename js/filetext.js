@@ -186,14 +186,61 @@ export async function docxToText(buffer) {
   return lines.join('\n');
 }
 
-/** Plain text of a PDF, Word (.docx), Excel (.xlsx), CSV or text file. */
-export async function fileToText(file) {
+// ---------- photos (text recognition in the browser) ----------
+
+const TESSERACT = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
+
+function loadTesseract() {
+  if (globalThis.Tesseract) return Promise.resolve(globalThis.Tesseract);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = TESSERACT;
+    s.onload = () => resolve(globalThis.Tesseract);
+    s.onerror = () => reject(new FileError('Reading a photo needs the internet the first time (the text reader is downloaded). Connect and try again.'));
+    document.head.append(s);
+  });
+}
+
+/** A big phone photo is shrunk first: the text reads as well and much faster. */
+async function shrink(file, maxSide = 2400) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * k);
+    c.height = Math.round(bmp.height * k);
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise((res) => c.toBlob(res, 'image/png'));
+  } catch {
+    return file;
+  }
+}
+
+/** The text in a photo of a report or a screenshot. */
+export async function imageToText(file, onProgress) {
+  const T = await loadTesseract();
+  const img = await shrink(file);
+  const { data } = await T.recognize(img, 'eng', {
+    logger: (m) => { if (m.status === 'recognizing text' && onProgress) onProgress(Math.round(m.progress * 100)); },
+  });
+  const text = String(data.text || '').trim();
+  if (!text) throw new FileError('No text could be read in that photo. Take it straight on, in good light, and try again.');
+  return text;
+}
+
+/** Plain text of a photo, PDF, Word (.docx), Excel (.xlsx), CSV or text file. */
+export async function fileToText(file, onProgress) {
   const name = (file.name || '').toLowerCase();
+  if (/\.(heic|heif)$/.test(name)) throw new FileError('HEIC photos cannot be read. Take the photo as JPG, or share it as JPG.');
+  if (/^image\//.test(file.type || '') || /\.(jpe?g|png|webp|bmp|gif|tiff?)$/.test(name)) return imageToText(file, onProgress);
   if (name.endsWith('.pdf') || file.type === 'application/pdf') return pdfToText(await file.arrayBuffer());
   if (name.endsWith('.xlsx')) return xlsxToText(await file.arrayBuffer());
   if (name.endsWith('.docx') || name.endsWith('.docm')) return docxToText(await file.arrayBuffer());
   if (name.endsWith('.doc')) throw new FileError('Old .doc files cannot be read. In Word use Save As, choose .docx, and attach that.');
   if (name.endsWith('.xls')) throw new FileError('Old .xls files cannot be read. In Excel use Save As, choose .xlsx, and attach that.');
   if (/\.(csv|txt)$/.test(name)) return (await file.text()).replace(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/g, '\t');
-  throw new FileError('Attach a Word (.docx), PDF or Excel (.xlsx) file.');
+  throw new FileError('Attach a photo, a Word (.docx), PDF or Excel (.xlsx) file.');
 }

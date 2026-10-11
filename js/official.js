@@ -442,3 +442,138 @@ export function classifyReport(r) {
   if (LOCO_TITLE.test(title)) return 'loco';
   return r.bpcNo ? 'cw' : 'other';
 }
+
+// ---------- any other layout: read it by its labels ----------
+
+// What each label may be called in a report, an Excel register or a form.
+const LABEL_WORDS = {
+  day: ['date', 'date of incident', 'date & time of incident', 'date and time', 'dt', 'incident date', 'date of failure'],
+  time: ['time', 'time of incident'],
+  title: ['train details', 'heading', 'nature', 'nature of failure', 'type of failure', 'type of unusual', 'subject', 'incident', 'failure', 'cause', 'cause of incident', 'unusual', 'type of incident', 'particulars'],
+  location: ['location', 'station', 'place', 'stn', 'place of incident', 'station/section', 'section/station', 'location of incident'],
+  trainNo: ['train no', 'tr no', 'train', 'train number', 'trno', 'train no/type', 'tr', 'train name'],
+  locoNo: ['loco no', 'loco', 'loco number', 'engine no', 'eno', 'loco nos', 'locos', 'loco no/type', 'engine', 'loco number/type'],
+  load: ['load', 'ld', 'total load', 'rake load'],
+  wagonNo: ['wagon no', 'wagon', 'wagon number', 'wagon details', 'wagon number with owning railway', 'wagon particulars', 'wagon no/type'],
+  bpcNo: ['bpc no', 'bpc', 'bpc details', 'bpc number'],
+  det: ['det', 'detention', 'detention time', 'detained', 'detention min', 'detention minutes'],
+  reason: ['reason', 'brief details', 'brief history', 'description', 'details', 'brief description', 'remarks', 'brief', 'brief of incident', 'incident details', 'narration', 'how it happened'],
+  rep: ['rep', 'reported to', 'reported by'],
+};
+const WORD_TO_KEY = new Map();
+for (const [key, words] of Object.entries(LABEL_WORDS)) for (const w of words) WORD_TO_KEY.set(w, key);
+
+const cleanLabel = (s) => String(s || '').toLowerCase().replace(/^[\s\d.)(-]+(?=[a-z])/, '').replace(/[^a-z&/\s]/g, ' ').replace(/\s+/g, ' ').trim();
+/** The report box a label stands for, or ''. */
+export function keyOfLabel(label) {
+  const c = cleanLabel(label);
+  return WORD_TO_KEY.get(c) || WORD_TO_KEY.get(c.replace(/\s+no$/, ' no')) || '';
+}
+
+// Words that are labels on their own even with only a space after them ("LOCATION TNGM-YP/GNN").
+const STRONG = /^(train no\.?|tr\.? no\.?|loco no\.?|loco number|location|station|load|bpc no\.?|wagon no\.?|reason|detention|det\.?|date)\s+(\S.*)$/i;
+
+/**
+ * One report from labelled lines (a note, a Word table, an Excel form, an OCR'd photo):
+ * "Train No: BOXNE", "Loco No<TAB>60212/G-12", "LOCATION RRPM"... Lines that are not
+ * labels carry on the reason.
+ */
+export function parseLabelled(text) {
+  const lines = String(text || '').split('\r\n').join('\n').split('\n').map((l) => l.replace(/ /g, ' ').replace(/\*/g, '').trimEnd());
+  const f = {};
+  const pre = [];
+  let last = '';
+  const set = (key, value) => {
+    const v = String(value || '').replace(/[\t ]+/g, ' ').trim();
+    f[key] = f[key] ? `${f[key]}${key === 'reason' ? '\n' : ' '}${v}` : v;
+    last = key;
+  };
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    let key = '';
+    let value = '';
+    const cells = line.split('\t').map((c) => c.trim());
+    if (cells.length >= 2) {
+      // a table row: [serial] label value...
+      const at = keyOfLabel(cells[0]) ? 0 : (/^\d+(\.0)?$/.test(cells[0]) && keyOfLabel(cells[1]) ? 1 : -1);
+      if (at >= 0) { key = keyOfLabel(cells[at]); value = cells.slice(at + 1).filter(Boolean).join(' '); }
+    }
+    if (!key) {
+      const c = /^(.{1,38}?)\s*[:=–-]\s+(.*)$/.exec(line) || /^(.{1,38}?)\s*:\s*(.*)$/.exec(line);
+      if (c && keyOfLabel(c[1])) { key = keyOfLabel(c[1]); value = c[2]; }
+    }
+    if (!key) {
+      const s = STRONG.exec(line);
+      if (s && keyOfLabel(s[1])) { key = keyOfLabel(s[1]); value = s[2]; }
+    }
+    if (key) { if (value || !f[key]) set(key, value); else last = key; continue; }
+    if (!Object.keys(f).length) { pre.push(line); continue; }
+    // not a label: it carries on the reason (or the box that is still being written)
+    if (last === 'reason' || last === 'title' || last === '') set('reason', line);
+    else if (last === 'wagonNo' || last === 'bpcNo') set(last, line);
+    else set('reason', line);
+  }
+  const found = ['trainNo', 'locoNo', 'location', 'reason', 'day', 'wagonNo', 'bpcNo', 'det'].filter((k) => f[k]);
+  if (found.length < 2) return null;
+  let title = f.title || '';
+  if (!title) {
+    const head = pre.find((l) => /due to|failure|failed|binding|axle|stall|trouble|detach|wagon|loco/i.test(l)) || pre[0] || '';
+    const m = /due\s+to\s+(.+)$/i.exec(head);
+    title = (m ? m[1] : head).replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 120);
+  }
+  return {
+    day: shortDay(f.day), time: (/(\d{1,2})[.:](\d{2})/.exec(f.time || '') || []).slice(1, 3).map((x, i) => (i ? x : x.padStart(2, '0'))).join(':'),
+    title: title || 'UNUSUAL REPORT', location: f.location || '', trainNo: f.trainNo || '', locoNo: f.locoNo || '', load: f.load || '',
+    wagonNo: f.wagonNo || '', bpcNo: f.bpcNo || '', det: f.det || '', reason: f.reason || '', rep: f.rep || '',
+  };
+}
+
+// ---------- a register: headings across the top, a report on every row ----------
+
+const COLUMN_WORDS = new Map([
+  ...WORD_TO_KEY,
+  ['tr.no', 'trainNo'], ['tr no', 'trainNo'], ['stalled at(km no and time)', 'reason'],
+]);
+const HEADING_NOTE = /^(base and due date|section|stn dep time|stalled at|backed|banker loco|relief loco|restarted|fouling|tmr mobile|wagon type|wagon count|counted from|issued|valid|loco failure|remarks)/i;
+
+/** Excel stores dates as day numbers: 46301 -> 2026-10-02 */
+function excelDay(n) {
+  const d = new Date(Date.UTC(1899, 11, 30) + Number(n) * 86400000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+/** The reports of a register (an Excel or Word table with a heading row), one per row. */
+export function parseColumns(text) {
+  const lines = String(text || '').split('\r\n').join('\n').split('\n');
+  const keyFor = (h) => COLUMN_WORDS.get(cleanLabel(h).replace(/\./g, '')) || COLUMN_WORDS.get(cleanLabel(h)) || '';
+  let head = -1;
+  let cols = [];
+  for (let i = 0; i < Math.min(lines.length, 12); i++) {
+    const cells = lines[i].split('\t').map((c) => c.trim());
+    if (cells.length < 3) continue;
+    const keys = cells.map(keyFor);
+    if (new Set(keys.filter(Boolean)).size >= 3) { head = i; cols = cells.map((h, j) => ({ h, key: keys[j] })); break; }
+  }
+  if (head < 0) return [];
+  const out = [];
+  for (const line of lines.slice(head + 1)) {
+    const cells = line.split('\t').map((c) => c.trim());
+    if (cells.filter(Boolean).length < 2) continue;
+    const r = { reason: '' };
+    const notes = [];
+    cols.forEach(({ h, key }, j) => {
+      const v = cells[j];
+      if (!v) return;
+      if (key === 'day') r.day = /^\d{5}(\.0)?$/.test(v) ? excelDay(v) : shortDay(v);
+      else if (key === 'reason') r.reason = r.reason ? `${r.reason}\n${v}` : v;
+      else if (key) r[key] = r[key] ? `${r[key]} ${v}` : v;
+      else if (h) notes.push(`${h}: ${v}`);
+    });
+    if (!(r.trainNo || r.locoNo || r.location)) continue;
+    r.reason = [r.reason, notes.join(' | ')].filter(Boolean).join('\n\n');
+    r.title = r.title || 'UNUSUAL REPORT';
+    out.push({ day: '', time: '', location: '', trainNo: '', locoNo: '', load: '', wagonNo: '', bpcNo: '', det: '', rep: '', ...r });
+  }
+  return out;
+}

@@ -42,7 +42,7 @@ const HINT = {
   reason: 'Times, km, what was done, relief loco, TXR fit...',
 };
 const WIDE = new Set(['title', 'locoNo', 'wagonNo', 'bpcNo', 'reason']);
-const FILE_TYPES = '.docx,.pdf,.xlsx,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const FILE_TYPES = 'image/*,.docx,.pdf,.xlsx,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const kindOf = (u) => (TYPES[u.type] ? u.type : 'loco');
 
 // ---------- storage on this device ----------
@@ -212,7 +212,10 @@ async function readFiles(list, { draft, rebuild, close } = {}) {
   const bad = [];
   for (const file of files) {
     try {
-      const recs = readReports(await fileToText(file), { fileName: file.name, lastModified: file.lastModified });
+      const photo = /^image\//.test(file.type || '') || /\.(jpe?g|png|webp|bmp|gif|tiff?)$/i.test(file.name);
+      if (photo) toast(`Reading the photo ${file.name}. The first photo can take a minute...`);
+      const text = await fileToText(file, (pct) => toast(`Reading the photo ${file.name}: ${pct}%`));
+      const recs = readReports(text, { fileName: file.name, lastModified: file.lastModified });
       if (!recs.length) bad.push(`${file.name} (nothing found in it)`);
       all.push(...recs);
     } catch (e) {
@@ -230,7 +233,7 @@ function fillForm(draft, r, rebuild) {
   for (const key of ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'reason', 'det', 'rep']) {
     if (r[key] && (key === 'day' || key === 'time' || !String(draft[key] || '').trim())) draft[key] = r[key];
   }
-  if (r.type) draft.type = r.type;
+  if (r.type && !draft.type) draft.type = r.type;
   if (r.official) { draft.official = r.official; draft.incident = r.incident || ''; }
   toast('Read the report. Check the boxes, then save.');
   rebuild();
@@ -301,8 +304,8 @@ function openForm(type, existing) {
       onchange: (e) => { const list = [...e.target.files]; e.target.value = ''; take(list); },
     });
     const attach = h('button', { type: 'button', class: 'attach', onclick: () => chooser.click() },
-      h('b', null, 'Attach Word, PDF or Excel files'),
-      h('span', null, 'Select as many files as you like at a time. One report fills the boxes below; several are all read and added together.'));
+      h('b', null, 'Attach a photo, Word, PDF or Excel file'),
+      h('span', null, 'Select as many files as you like at a time. The data is read from them and the boxes are filled; several reports are all added together.'));
     const paste = h('textarea', { rows: 2, placeholder: 'Or paste the report here (it is read as soon as you paste)', style: 'margin-bottom:6px' });
     const pasteRow = h('div', { class: 'opaste-actions', style: 'margin:0 0 14px' },
       h('button', { type: 'button', class: 'btn small', onclick: () => takeText(draft, paste.value, build, close) }, 'Read the pasted text'));
@@ -326,7 +329,7 @@ function openForm(type, existing) {
           render();
         },
       },
-      h('div', { class: 'grid' }, FORM[kind].map(field)),
+      h('div', { class: 'grid' }, [...FORM[kind].slice(0, -1), ...['load', 'wagonNo', 'bpcNo'].filter((k) => !FORM[kind].includes(k) && String(draft[k] || '').trim()), 'reason'].map(field)),
       h('div', { id: 'repeat-hint', class: 'repeat-hint', style: 'display:none' }),
       h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
       h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),

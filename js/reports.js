@@ -1,7 +1,7 @@
 // Reads reports out of the text of an attached file or a paste, whichever
 // layout it is in, and tidies a batch of them (bulk upload of many files).
 
-import { parseOfficial, fillFromOfficial, parseBlocks, parseDetention, parseFIR, parseHotAxleForm, classifyReport, shortDay } from './official.js';
+import { parseOfficial, fillFromOfficial, parseBlocks, parseDetention, parseFIR, parseHotAxleForm, parseLabelled, parseColumns, classifyReport, shortDay } from './official.js';
 
 const FIELDS = ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason', 'rep'];
 
@@ -43,7 +43,11 @@ export function readReports(text, meta = {}) {
         push({ ...fillFromOfficial(sree), type: 'loco' }, { official: JSON.stringify(sree), incident: sree.id });
       } else {
         const blocks = parseBlocks(t);
+        const cols = blocks.length ? [] : parseColumns(t);
+        const lab = blocks.length || cols.length ? null : parseLabelled(t);
         if (blocks.length) for (const b of blocks) push({ ...b, type: classifyReport(b) });
+        else if (cols.length) for (const c of cols) push({ ...c, type: classifyReport(c) });
+        else if (lab) push({ ...lab, type: classifyReport(lab) });
         else {
           // a plain note: its first line is the heading, the rest the reason
           const lines = t.split('\n').map((l) => l.replace(/[\t ]+/g, ' ').trim()).filter(Boolean);
