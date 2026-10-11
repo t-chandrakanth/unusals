@@ -611,9 +611,9 @@ function render() {
           h('strong', null, 'Tap here to install SCR UNUSALS'),
           h('span', null, 'Opens from your home screen or Start menu like any other app')),
         h('button', { class: 'install-close', 'aria-label': 'Hide the install message', onclick: () => { try { localStorage.setItem(BANNER_KEY, '1'); } catch { /* private mode */ } render(); } }, '\u00d7')),
-      // the TI GOODS symbol at the left end, the Indian Railways logo at the right end, the name between
+      // the Indian Railways logo on the left, the TI GOODS symbol on the right, the name between
       h('div', { class: 'top-wide' },
-        h('img', { class: 'edge edge-l', src: 'icons/tigoods.png', alt: 'TI GOODS' }),
+        h('img', { class: 'edge edge-round', src: '../icons/logo.png', alt: 'Indian Railways' }),
         h('div', { class: 'top-center' },
           h('h1', null, 'SCR UNUSALS'),
           h('span', { class: 'brand-sub' }, 'SOUTH CENTRAL RAILWAY'),
@@ -624,7 +624,7 @@ function render() {
             onclick: () => { if (sync) sync.syncNow(); },
           }, statusText())),
           !isInstalled() && h('button', { class: 'install', onclick: installApp }, 'Install app')),
-        h('img', { class: 'edge edge-r', src: '../icons/logo.png', alt: 'Indian Railways' }))),
+        h('img', { class: 'edge edge-badge', src: 'icons/tigoods.png', alt: 'TI GOODS' }))),
     h('nav', { class: 'tabs' }, tabs.map(([id, text, n]) => h('button', {
       class: ui.view === id ? 'on' : '',
       onclick: () => { ui.view = id; ui.month = 'all'; ui.search = ''; ui.range = 'all'; ui.from = ''; ui.to = ''; render(); window.scrollTo(0, 0); },

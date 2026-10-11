@@ -221,3 +221,9 @@ dialog { border-radius: 20px; }
 .top .top-center h1 { margin: 0; font-size: clamp(18px, 5.4vw, 28px); letter-spacing: 1.5px; }
 .top .top-center .top-meta { justify-content: center; margin: 0; }
 .top .top-center .install { margin-top: 6px; }
+
+/* sides swapped: the Indian Railways logo left, the TI GOODS symbol right, with a little room at the edges */
+.top.top { padding-left: clamp(16px, 6vw, 40px); padding-right: clamp(16px, 6vw, 40px); }
+.top .edge-round { border-radius: 50%; background: #fff; box-shadow: 0 6px 18px rgba(150, 20, 30, 0.35); }
+.top .edge-badge { border-radius: 22px; box-shadow: 0 6px 18px rgba(11, 26, 48, 0.4); }
+.top .edge { width: clamp(78px, 24vw, 140px); height: clamp(78px, 24vw, 140px); }
