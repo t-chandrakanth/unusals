@@ -34,7 +34,7 @@ const FORM = {
 };
 const LABEL = {
   day: 'Date', time: 'Time', title: 'Train details (heading)', location: 'Location', trainNo: 'Train no',
-  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', det: 'DET (detention)', reason: 'Reason (what happened)',
+  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Reason (what happened)',
 };
 const HINT = {
   title: 'brake binding', location: 'TNGM-YP/GNN', trainNo: 'ICDT C/S', locoNo: '42821', load: '40/40/3910',
@@ -230,7 +230,7 @@ async function readFiles(list, { draft, rebuild, close } = {}) {
 }
 
 function fillForm(draft, r, rebuild) {
-  for (const key of ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'reason', 'det', 'rep']) {
+  for (const key of ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'reason', 'det', 'detFrom', 'detTo', 'rep']) {
     if (r[key] && (key === 'day' || key === 'time' || !String(draft[key] || '').trim())) draft[key] = r[key];
   }
   if (r.type && !draft.type) draft.type = r.type;
@@ -290,10 +290,18 @@ function openForm(type, existing) {
       const el = key === 'reason'
         ? h('textarea', { rows: 6, value: draft[key], placeholder: HINT[key] })
         : h('input', {
-          type: key === 'day' ? 'date' : key === 'time' ? 'time' : 'text', value: draft[key], placeholder: HINT[key] || '',
-          autocapitalize: key === 'day' || key === 'time' ? null : 'characters', autocomplete: 'off',
+          type: key === 'day' ? 'date' : (key === 'time' || key === 'detFrom' || key === 'detTo') ? 'time' : 'text', value: draft[key], placeholder: HINT[key] || '',
+          autocapitalize: key === 'day' || key === 'time' || key === 'detFrom' || key === 'detTo' ? null : 'characters', autocomplete: 'off',
         });
-      el.addEventListener('input', (e) => { draft[key] = e.target.value; if (key === 'locoNo') showRepeat(); });
+      el.addEventListener('input', (e) => {
+        draft[key] = e.target.value;
+        if (key === 'locoNo') showRepeat();
+        if (key === 'detFrom' || key === 'detTo') {
+          const d = L.detentionBetween(draft.detFrom, draft.detTo);
+          if (d) { draft.det = d; const box = dlg.querySelector('[data-detbox]'); if (box) box.value = d; }
+        }
+      });
+      if (key === 'det') el.setAttribute('data-detbox', '1');
       if (key === 'title') el.setAttribute('list', 'u-titles');
       if (key === 'locoNo') el.setAttribute('list', 'u-locos');
       return h('label', { class: `field ${WIDE.has(key) ? 'wide' : ''}` }, h('span', null, LABEL[key]), el);
@@ -329,7 +337,8 @@ function openForm(type, existing) {
           render();
         },
       },
-      h('div', { class: 'grid' }, [...FORM[kind].slice(0, -1), ...['load', 'wagonNo', 'bpcNo'].filter((k) => !FORM[kind].includes(k) && String(draft[k] || '').trim()), 'reason'].map(field)),
+      h('div', { class: 'grid' }, [...FORM[kind].slice(0, -1), ...['load', 'wagonNo', 'bpcNo'].filter((k) => !FORM[kind].includes(k) && String(draft[k] || '').trim()), 'reason']
+        .map((k) => (k === 'det' ? h('div', { class: 'det-row' }, field('detFrom'), field('detTo'), field('det')) : field(k)))),
       h('div', { id: 'repeat-hint', class: 'repeat-hint', style: 'display:none' }),
       h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
       h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),

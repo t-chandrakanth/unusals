@@ -186,3 +186,7 @@ dialog { border-radius: 20px; }
 .top .top-inner > p { text-align: center; }
 .top .top-meta { justify-content: center; }
 .top .install { margin-top: 2px; }
+
+/* DET, with From and To beside it */
+.det-row { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 10px; }
+@media (max-width: 420px) { .det-row { grid-template-columns: 1fr 1fr; } .det-row .field:last-child { grid-column: 1 / -1; } }
