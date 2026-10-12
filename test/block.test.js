@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toMin, gap, burstMinutes, longMins, blankBlock, blockName, blockTitle, computeBlock, blockMessage } from '../js/block.js';
+import { toMin, gap, burstMinutes, longMins, blankBlock, blockName, blockTitle, computeBlock, blockMessage, stn } from '../js/block.js';
 
 // the example report
 const example = () => ({
@@ -72,6 +72,24 @@ test('empty rows are left out and the numbering follows; a report with none says
   assert.match(text, /1\. \*K1\* -CT STN- ARR: 10:00 HRS/);
   assert.match(text, /2\. \*K2\* ARR: 10:00 HRS, DEP: 10:40 HRS, \*DET: 40 MINS\*/);
   assert.match(blockMessage({ ...example(), rows: [] }), /\*NIL\*/);
+});
+
+test('STN goes only on a plain station; home, outer, section and yard are left as typed', () => {
+  assert.equal(stn('ct'), 'CT STN');
+  assert.equal(stn('CT STN'), 'CT STN');
+  assert.equal(stn('CT STATION'), 'CT STATION');
+  assert.equal(stn('CT HOME'), 'CT HOME');
+  assert.equal(stn('ct outer'), 'CT OUTER');
+  assert.equal(stn('CT-SUH SEC'), 'CT-SUH SEC');
+  assert.equal(stn('CT-SUH'), 'CT-SUH');
+  assert.equal(stn('CT/SUH SECTION'), 'CT/SUH SECTION');
+  assert.equal(stn('KM 123/4'), 'KM 123/4');
+  assert.equal(stn('KMT'), 'KMT STN'); // a station whose code starts with KM
+  assert.equal(stn('SECUNDERABAD'), 'SECUNDERABAD STN');
+  assert.equal(stn(''), '');
+  const m = blockMessage({ ...example(), rows: [{ tr: 'KSNK', at: 'CT HOME', from: '12:34', to: '15:10' }, { tr: 'PSNH', at: 'CT-SUH SEC', from: '13:00', to: '' }] });
+  assert.match(m, /1\. \*KSNK\* -CT HOME- ARR: 12:34 HRS, DEP: 15:10 HRS, \*DET: 156 MINS\*/);
+  assert.match(m, /2\. \*PSNH\* -CT-SUH SEC- ARR: 13:00 HRS, STILL NOT DEPARTED, \*DET: 250 MINS \(UP TO 17:10 HRS\)\*/);
 });
 
 test('BLOCK is added to the name by itself, and never twice', () => {

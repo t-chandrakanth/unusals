@@ -74,8 +74,17 @@ export function computeBlock(b) {
 }
 
 const U = (s) => String(s || '').trim().toUpperCase();
-/** "CT" -> "CT STN"; left alone when STN or STATION is already there. */
-const stn = (at) => (U(at) && !/(^|\s)(STN|STATION)$/.test(U(at)) ? `${U(at)} STN` : U(at));
+/**
+ * "CT" -> "CT STN". Left exactly as typed when it already says what it is (STN, HOME, OUTER,
+ * SEC, SECTION, YARD, CABIN, SIGNAL, a km) or names a section ("CT-SUH"), so a train kept at
+ * the home signal or in the section is not called a station.
+ */
+export function stn(at) {
+  const a = U(at);
+  if (!a) return '';
+  if (/(^|\s)(STN|STATION|HOME|OUTER|SEC|SECTION|YARD|CABIN|SIGNAL|SIGNALS|SDG|SIDING)(\s|$)|\bKM\b|\bKM\s*\d|[-/]/.test(a)) return a;
+  return `${a} STN`;
+}
 
 /** The WhatsApp message, in the usual wording. */
 export function blockMessage(b) {

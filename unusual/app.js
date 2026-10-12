@@ -535,7 +535,7 @@ function openBlockForm(existing) {
         bare(() => r.from, (v) => { r.from = v; }, 'From', 'time'),
         bare(() => r.to, (v) => { r.to = v; }, 'To (empty if not departed)', 'time'),
         h('div', { class: 'autochip', title: 'Detention in minutes, worked out by itself' }, (detEls[i] = h('b'))))),
-      h('p', { class: 'rep-note' }, 'Leave To empty if the train has not left: its detention then runs up to the "As on" time (marked *).'));
+      h('p', { class: 'rep-note' }, 'Leave To empty if the train has not left: its detention then runs up to the "As on" time (marked *). For a train kept at the home signal or in the section, write the place yourself, for example CT HOME or CT-SUH SEC: STN is added only to a plain station name.'));
 
     dlg.replaceChildren(h('div', { class: 'editor' },
       h('div', { class: 'dlg-head block' }, existing ? 'Edit block detention report' : 'New block detention report'),
