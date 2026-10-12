@@ -46,11 +46,21 @@ export function blockName(name) {
   return n && !/(^|\s)BLOCK$/i.test(n) ? `${n} BLOCK` : n;
 }
 
-/** "BCM BLOCK AT UP CT - SUH" */
+/** "WP - BG", "WP-BG STN" -> ["WP", "BG"]; "WP" -> ["WP"] */
+export function blockStations(station) {
+  return String(station || '').split(/\s*[-\u2013\u2014]\s*/)
+    .map((s) => s.trim().replace(/\s*(STN|STATION)\.?$/i, '').trim()).filter(Boolean);
+}
+
+/**
+ * The heading: "PQRS BLOCK PERMITTED IN UP DIRECTION B/W WP-BG STATION" when two stations are
+ * written with a dash between them, "... AT WP STATION" for a single station.
+ */
 export function blockTitle(b) {
-  const where = [b.dir, b.station].map((x) => String(x || '').trim()).filter(Boolean).join(' ');
-  const name = blockName(b.name);
-  return (name && where ? `${name} AT ${where}` : name || where).toUpperCase();
+  const parts = blockStations(b.station);
+  const dir = String(b.dir || '').trim();
+  const where = parts.length > 1 ? `B/W ${parts.join('-')} STATION` : parts.length === 1 ? `AT ${parts[0]} STATION` : '';
+  return [blockName(b.name) || 'BLOCK', 'PERMITTED', dir && `IN ${dir} DIRECTION`, where].filter(Boolean).join(' ').toUpperCase();
 }
 
 /** The detention of one train: from its start to its departure, or to the "as on" time when it has not left. */
@@ -95,14 +105,13 @@ export function blockMessage(b) {
   if (c.burst !== null) lines.push(`*BLOCK BURST: ${c.burst > 0 ? `${c.burst} MINS` : 'NIL'}*`);
   lines.push('', '*REPERCUSSIONS:*', '');
   if (!c.rows.length) lines.push('*NIL*');
-  c.rows.forEach((r, i) => {
+  c.rows.forEach((r) => {
     const head = `${r.n}. *${U(r.tr) || 'TRAIN'}*${stn(r.at) ? ` -${stn(r.at)}-` : ''}`;
     const parts = [];
     if (r.from) parts.push(`ARR: ${r.from} HRS`);
     parts.push(r.to ? `DEP: ${r.to} HRS` : 'STILL NOT DEPARTED');
     const det = r.det ? `, *DET: ${r.det.mins} MINS${r.det.still ? ` (UP TO ${b.asOn} HRS)` : ''}*` : '';
     lines.push(`${head} ${parts.join(', ')}${det}`);
-    if (i < c.rows.length - 1) lines.push('');
   });
   return lines.join('\n');
 }

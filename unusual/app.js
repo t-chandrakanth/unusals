@@ -556,7 +556,7 @@ function openBlockForm(existing) {
       h('div', { class: 'grid' },
         box(() => b.day, (v) => { b.day = v; }, 'Date', 'date'),
         h('div', { class: 'field' }, h('span', null, 'Direction'), dirs),
-        box(() => b.station, (v) => { b.station = v; }, '1. Station / section', 'text', 'CT - SUH'),
+        box(() => b.station, (v) => { b.station = v; }, '1. Station (two with a dash: WP-BG)', 'text', 'WP-BG'),
         box(() => b.name, (v) => { b.name = v; }, '2. Name of block (BLOCK is added at the end)', 'text', 'BCM'),
         h('div', { class: 'det-row three' },
           box(() => b.from, (v) => { b.from = v; }, '3. Block permitted from', 'time'),

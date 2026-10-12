@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toMin, gap, burstMinutes, longMins, blankBlock, blockName, blockTitle, computeBlock, blockMessage, stn } from '../js/block.js';
+import { toMin, gap, burstMinutes, longMins, blankBlock, blockName, blockTitle, blockStations, computeBlock, blockMessage, stn } from '../js/block.js';
 
 // the example report
 const example = () => ({
@@ -37,7 +37,7 @@ test('the burst is the minutes past the permitted time, nothing when cleared in 
 
 test('the numbers of the example report come out as in the message', () => {
   const c = computeBlock(example());
-  assert.equal(c.title, 'BCM BLOCK AT UP CT - SUH');
+  assert.equal(c.title, 'BCM BLOCK PERMITTED IN UP DIRECTION B/W CT-SUH STATION');
   assert.equal(c.duration, 150);
   assert.equal(c.burst, 55);
   assert.deepEqual(c.rows.map((r) => r.det.mins), [267, 276, 122, 124, 104, 153, 45]);
@@ -48,7 +48,7 @@ test('the WhatsApp message is worded like the example', () => {
   const m = blockMessage(example());
   const lines = m.split('\n');
   assert.equal(lines[0], '*SIR,*');
-  assert.equal(lines[2], '*BCM BLOCK AT UP CT - SUH*');
+  assert.equal(lines[2], '*BCM BLOCK PERMITTED IN UP DIRECTION B/W CT-SUH STATION*');
   assert.ok(lines.includes('*BLOCK TIME: 12:00 TO 14:30 HRS*'));
   assert.ok(lines.includes('*BLOCK CLEAR: 15:25 HRS*'));
   assert.ok(lines.includes('*BLOCK BURST: 55 MINS*'));
@@ -92,21 +92,39 @@ test('STN goes only on a plain station; home, outer, section and yard are left a
   assert.match(m, /2\. \*PSNH\* -CT-SUH SEC- ARR: 13:00 HRS, STILL NOT DEPARTED, \*DET: 250 MINS \(UP TO 17:10 HRS\)\*/);
 });
 
+test('the heading: two stations with a dash are B/W, one station is AT; STN is not doubled', () => {
+  const t = (name, dir, station) => blockTitle({ name, dir, station });
+  assert.equal(t('PQRS', 'UP', 'WP-BG'), 'PQRS BLOCK PERMITTED IN UP DIRECTION B/W WP-BG STATION');
+  assert.equal(t('PQRS', 'UP', 'wp - bg'), 'PQRS BLOCK PERMITTED IN UP DIRECTION B/W WP-BG STATION');
+  assert.equal(t('PQRS', 'DN', 'WP'), 'PQRS BLOCK PERMITTED IN DN DIRECTION AT WP STATION');
+  assert.equal(t('PQRS', 'UP', 'WP STN'), 'PQRS BLOCK PERMITTED IN UP DIRECTION AT WP STATION');
+  assert.deepEqual(blockStations('WP – BG STN'), ['WP', 'BG']);
+});
+
+test('no blank line between the repercussion rows', () => {
+  const lines = blockMessage(example()).split('\n');
+  const first = lines.findIndex((l) => l.startsWith('1. *KSNK*'));
+  assert.ok(lines[first + 1].startsWith('2. *PSNH*'));
+  assert.ok(lines[first + 6].startsWith('7. *PSNH*'));
+  assert.equal(lines[first - 1], '');
+  assert.equal(lines[first - 2], '*REPERCUSSIONS:*');
+});
+
 test('BLOCK is added to the name by itself, and never twice', () => {
   assert.equal(blockName('BCM'), 'BCM BLOCK');
   assert.equal(blockName('bcm'), 'bcm BLOCK');
   assert.equal(blockName('BCM BLOCK'), 'BCM BLOCK');
   assert.equal(blockName('bcm block '), 'bcm block');
   assert.equal(blockName('  '), '');
-  assert.equal(blockTitle({ name: 'BCM', dir: 'UP', station: 'CT - SUH' }), 'BCM BLOCK AT UP CT - SUH');
-  assert.equal(blockTitle({ name: 'BCM BLOCK', dir: 'UP', station: 'CT - SUH' }), 'BCM BLOCK AT UP CT - SUH');
-  assert.match(blockMessage({ ...blankBlock('2026-10-12'), name: 'BCM', dir: 'DN', station: 'MQR' }), /^\*SIR,\*\n\n\*BCM BLOCK AT DN MQR\*/);
+  assert.equal(blockTitle({ name: 'BCM', dir: 'UP', station: 'CT - SUH' }), 'BCM BLOCK PERMITTED IN UP DIRECTION B/W CT-SUH STATION');
+  assert.equal(blockTitle({ name: 'BCM BLOCK', dir: 'UP', station: 'CT - SUH' }), 'BCM BLOCK PERMITTED IN UP DIRECTION B/W CT-SUH STATION');
+  assert.match(blockMessage({ ...blankBlock('2026-10-12'), name: 'BCM', dir: 'DN', station: 'MQR' }), /^\*SIR,\*\n\n\*BCM BLOCK PERMITTED IN DN DIRECTION AT MQR STATION\*/);
 });
 
 test('a block cleared in time says burst NIL; the title copes with missing parts', () => {
   assert.match(blockMessage({ ...example(), cleared: '14:00' }), /BLOCK BURST: NIL/);
-  assert.equal(blockTitle({ name: 'bcm', dir: 'DN', station: '' }), 'BCM BLOCK AT DN');
-  assert.equal(blockTitle({ name: '', dir: 'UP', station: 'CT' }), 'UP CT');
+  assert.equal(blockTitle({ name: 'bcm', dir: 'DN', station: '' }), 'BCM BLOCK PERMITTED IN DN DIRECTION');
+  assert.equal(blockTitle({ name: '', dir: 'UP', station: 'CT' }), 'BLOCK PERMITTED IN UP DIRECTION AT CT STATION');
 });
 
 import { blockSheet } from '../js/sheet.js';
@@ -116,7 +134,7 @@ test('the table of a block report has the title, the block lines and a row for e
     rows: [{ tr: 'ksnk', at: 'ct', from: '11:30', to: '15:57' }, { tr: 'PSNH', at: 'CT', from: '12:34', to: '' }] };
   const s = blockSheet(b);
   const text = s.rows.map((r) => r.filter(Boolean).map((c) => c.v).join(' | '));
-  assert.equal(text[1], 'BCM BLOCK AT UP CT - SUH');
+  assert.equal(text[1], 'BCM BLOCK PERMITTED IN UP DIRECTION B/W CT-SUH STATION');
   assert.match(text[2], /BLOCK PERMITTED \| 12:00 TO 14:30 HRS {3}\(DURATION 150 MINS \(02:30 HRS\)\)/);
   assert.ok(text.includes('BLOCK BURST | 55 MINS'));
   assert.ok(text.some((t) => t === '1 | KSNK | CT | 11:30 HRS | 15:57 HRS | 267 MINS'));
