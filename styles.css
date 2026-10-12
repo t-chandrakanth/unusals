@@ -449,5 +449,10 @@ a.install { text-decoration: none; }
 @media (prefers-color-scheme: dark) { .cell-sel { background: #1d3552 !important; } }
 body.selecting .cell-input { user-select: none; caret-color: transparent; }
 @media (min-width: 760px) {
-  .list-head, .card { grid-template-columns: 150px 1.1fr 1fr 1.4fr 1fr 96px; }
+  #lists section { max-width: 1100px; }
+  .list-head, .card { grid-template-columns: 56px 190px 1fr 1.5fr 1fr 104px; gap: 14px; }
+  .list-head > :nth-child(2) { text-align: center; }
+  .card .loco-btn { width: 100%; }
+  .card .prev-btn, .card .dot { justify-self: start; margin: 0; }
+  .card .prev-btn { width: 100%; text-align: center; padding: 7px 8px; }
 }
