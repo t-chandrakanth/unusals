@@ -262,9 +262,148 @@ document.addEventListener('paste', (e) => {
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
   const raw = (e.clipboardData || window.clipboardData).getData('text');
+  const g = rangeOf();
+  // one value over several selected cells fills them all, as in a spreadsheet
+  if (multi(g) && !isBlock(raw)) { e.preventDefault(); fillRange(g, raw.trim()); return; }
   if (!isBlock(raw)) return;
   e.preventDefault();
-  applyPaste(raw, null);
+  applyPaste(raw, g ? { id: idOfRow(g.r0), field: SEL_COLS[Math.max(g.c0, 1)] } : null);
+});
+
+// ---------- cells like a spreadsheet: select a range, copy it, paste or clear over it ----------
+
+const SEL_COLS = ['locoNo', 'trainNo', 'location', 'working'];
+let sel = null; // { a: { r, c }, b: { r, c } }: the corners of the selected cells, by row and column
+let dragging = false;
+const cardEls = () => [...document.querySelectorAll('#lists .card')];
+const idOfRow = (r) => { const c = cardEls()[r]; const i = c && c.querySelector('.cell-input'); return i ? i.dataset.id : null; };
+function locate(el) {
+  const card = el.closest && el.closest('.card');
+  if (!card) return null;
+  const r = cardEls().indexOf(card);
+  const f = el.dataset && el.dataset.field;
+  const c = f ? SEL_COLS.indexOf(f) : (el.classList.contains('loco-btn') ? 0 : -1);
+  return r >= 0 && c >= 0 ? { r, c } : null;
+}
+function rangeOf() {
+  if (!sel) return null;
+  return { r0: Math.min(sel.a.r, sel.b.r), r1: Math.max(sel.a.r, sel.b.r), c0: Math.min(sel.a.c, sel.b.c), c1: Math.max(sel.a.c, sel.b.c) };
+}
+const multi = (g) => !!g && (g.r0 !== g.r1 || g.c0 !== g.c1);
+
+function paintSel() {
+  document.querySelectorAll('.cell-sel').forEach((e) => e.classList.remove('cell-sel'));
+  const g = rangeOf();
+  document.body.classList.toggle('selecting', multi(g));
+  if (!multi(g)) return;
+  const cards = cardEls();
+  for (let r = g.r0; r <= g.r1; r++) {
+    for (let c = g.c0; c <= g.c1; c++) {
+      const card = cards[r];
+      const el = card && (c === 0 ? card.querySelector('.loco-btn') : card.querySelector(`.cell-input[data-field="${SEL_COLS[c]}"]`));
+      if (el) el.classList.add('cell-sel');
+    }
+  }
+}
+
+/** The text of one cell: what the loco holds, even while the box shows the previous value in grey. */
+function cellText(r, c) {
+  const loco = state.locos.find((l) => l.id === idOfRow(r));
+  return loco ? String(loco[SEL_COLS[c]] || '') : '';
+}
+
+function commitEdits(edits, message) {
+  const now = new Date().toISOString();
+  let next = state;
+  for (const [id, fields] of edits) {
+    const current = next.locos.find((l) => l.id === id);
+    if (current) next = L.reduce(next, { type: 'save', loco: { ...current, ...fields }, now, by: who() });
+  }
+  hideSuggest();
+  commit(next);
+  render();
+  toast(message);
+}
+
+/** The same value in every selected box (pasting one value over a range), or nothing to clear them. */
+function fillRange(g, value) {
+  const edits = new Map();
+  let n = 0;
+  for (let r = g.r0; r <= g.r1; r++) {
+    const id = idOfRow(r);
+    for (let c = Math.max(g.c0, 1); c <= g.c1; c++) {
+      if (!id) continue;
+      if (!edits.has(id)) edits.set(id, {});
+      edits.get(id)[SEL_COLS[c]] = value;
+      n++;
+    }
+  }
+  if (!n) { toast('Select Train no, Location or Working cells first.'); return; }
+  commitEdits(edits, value ? `Filled ${n} cell${n === 1 ? '' : 's'}` : `Cleared ${n} cell${n === 1 ? '' : 's'}`);
+}
+
+document.addEventListener('mousedown', (e) => {
+  const t = e.target;
+  if (t.classList && t.classList.contains('cell-input')) {
+    const loc = locate(t);
+    if (e.shiftKey && sel && loc) { // Shift + click extends the selection, as in a spreadsheet
+      e.preventDefault();
+      sel.b = loc;
+      if (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('cell-input')) document.activeElement.blur();
+      paintSel();
+      return;
+    }
+    sel = loc ? { a: loc, b: loc } : null;
+    dragging = !!loc;
+    paintSel();
+  } else if (!(t.closest && (t.closest('.suggest') || t.closest('dialog')))) {
+    if (sel) { sel = null; paintSel(); }
+  }
+});
+document.addEventListener('mouseover', (e) => {
+  if (!dragging || !sel) return;
+  const t = e.target;
+  if (!(t.classList && (t.classList.contains('cell-input') || t.classList.contains('loco-btn')))) return;
+  const loc = locate(t);
+  if (!loc || (sel.b.r === loc.r && sel.b.c === loc.c)) return;
+  sel.b = loc;
+  paintSel();
+  if (multi(rangeOf())) {
+    if (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('cell-input')) document.activeElement.blur();
+    window.getSelection().removeAllRanges();
+  }
+});
+document.addEventListener('mouseup', () => { dragging = false; });
+
+document.addEventListener('copy', (e) => {
+  if (ui.view !== 'locos') return;
+  const g = rangeOf();
+  if (multi(g)) {
+    const lines = [];
+    for (let r = g.r0; r <= g.r1; r++) {
+      const cols = [];
+      for (let c = g.c0; c <= g.c1; c++) cols.push(cellText(r, c));
+      lines.push(cols.join('\t'));
+    }
+    e.clipboardData.setData('text/plain', lines.join('\n'));
+    e.preventDefault();
+    toast(`Copied ${(g.r1 - g.r0 + 1) * (g.c1 - g.c0 + 1)} cells`);
+    return;
+  }
+  // one box, with no text picked inside it: copy the whole cell, like a spreadsheet
+  const f = document.activeElement;
+  if (f && f.classList && f.classList.contains('cell-input') && f.selectionStart === f.selectionEnd) {
+    const loco = state.locos.find((l) => l.id === f.dataset.id);
+    const text = loco ? String(loco[f.dataset.field] || '') : '';
+    if (text) { e.clipboardData.setData('text/plain', text); e.preventDefault(); }
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (ui.view !== 'locos' || !sel) return;
+  const typing = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('cell-input');
+  if (e.key === 'Escape') { sel = null; paintSel(); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && multi(rangeOf()) && !typing) { e.preventDefault(); fillRange(rangeOf(), ''); }
 });
 
 const WORKING_OPTIONS = ['YES', 'YES/MU', 'Shed in', 'DEFICTIVE', 'P/I -PLANING'];
@@ -300,24 +439,44 @@ window.addEventListener('scroll', hideSuggest, true);
 
 function locoCard(row, since) {
   const l = row.loco;
-  // On a wide screen, train number and location can be changed right in the
-  // table. A phone hides these two boxes and opens the full form instead.
+  // Updated since the last report (or confirmed unchanged): green. Not yet: the cells show the
+  // previous values in grey, and a Previous button keeps them without typing anything.
+  const ok = L.isUpdated(l, since);
+  // On a wide screen, train number, location and working can be changed right in the
+  // table. A phone hides these boxes and opens the full form from the loco number.
   const cell = (key, label) => h('input', {
-    type: 'text', class: `col cell-input${key === 'working' && workKind(l.working) ? ` w-${workKind(l.working)}` : ''}`, value: l[key], placeholder: '-',
+    type: 'text', class: `col cell-input${ok ? '' : ' prev'}${key === 'working' && ok && workKind(l.working) ? ` w-${workKind(l.working)}` : ''}`,
+    value: ok ? l[key] : '', placeholder: ok ? '-' : (l[key] || '-'),
     'aria-label': `${label} of ${l.locoNo}`, 'data-id': l.id, 'data-field': key,
     autocapitalize: 'characters', autocomplete: 'off',
-    onclick: (e) => e.stopPropagation(),
     onpaste: (e) => pasteCells(e, l, key),
     onfocus: key === 'working' ? (e) => showSuggest(e.target) : null,
     oninput: key === 'working' ? (e) => showSuggest(e.target) : null,
     onblur: key === 'working' ? hideSuggest : null,
-    onkeydown: (e) => { if (e.key === 'Escape') { hideSuggest(); e.target.value = l[key]; e.target.blur(); } },
+    onkeydown: (e) => {
+      if (e.key === 'Escape') { hideSuggest(); e.target.value = ok ? l[key] : ''; e.target.blur(); return; }
+      // like a spreadsheet: Enter and the arrow keys move up and down the column
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
+        e.preventDefault();
+        const cards = [...document.querySelectorAll('#lists .card')];
+        const at = cards.indexOf(e.target.closest('.card'));
+        const next = cards[at + (e.key === 'ArrowUp' ? -1 : 1)];
+        const box = next && next.querySelector(`.cell-input[data-field="${key}"]`);
+        if (box) box.focus(); else e.target.blur();
+      }
+    },
     onchange: (e) => {
       // A box removed by a redraw reports a change too; that is not the
       // person finishing their edit, so it must not be saved.
       if (redrawing || !e.target.isConnected) return;
       const value = e.target.value.trim();
-      if (value === l[key]) return;
+      if (!ok && !value) return; // nothing typed: this loco is still waiting for its update
+      // typing what was there before is a confirmation of it
+      if (value === l[key]) {
+        if (ok) return;
+        setTimeout(() => { dispatch({ type: 'check', id: l.id, now: new Date().toISOString() }); toast(`${l.locoNo}: kept as before`); }, 0);
+        return;
+      }
       // Wait a moment so that, when moving to the next box with Tab, the
       // cursor is already there and stays there after the list redraws.
       setTimeout(() => {
@@ -328,27 +487,24 @@ function locoCard(row, since) {
       }, 0);
     },
   });
-  // Green: updated since the last report. Red: still to be updated. Pressing
-  // a red dot confirms "no change" without typing anything.
-  const ok = L.isUpdated(l, since);
-  const dot = h('button', {
-    class: `dot ${ok ? 'ok' : 'due'}`,
-    title: ok ? 'Updated' : 'Not updated yet. Press to confirm there is no change.',
-    'aria-label': ok ? `${l.locoNo} is updated` : `${l.locoNo} is not updated yet. Press to confirm there is no change.`,
-    onclick: (e) => {
-      e.stopPropagation();
-      if (ok) return;
-      dispatch({ type: 'check', id: l.id, now: new Date().toISOString() });
-      toast(`${l.locoNo}: confirmed, no change`);
-    },
-  }, ok ? '\u2713' : '!');
-  return h('div', { class: 'card', onclick: () => openEditor(l) },
+  const status = ok
+    ? h('span', { class: 'dot ok', title: 'Updated', 'aria-label': `${l.locoNo} is updated` }, '✓')
+    : h('button', {
+      class: 'prev-btn', title: 'Keep the previous train no, location and working',
+      'aria-label': `Keep the previous details of ${l.locoNo}`,
+      onclick: () => {
+        dispatch({ type: 'check', id: l.id, now: new Date().toISOString() });
+        toast(`${l.locoNo}: previous details kept`);
+      },
+    }, 'Previous');
+  // Only the loco number opens the Update form, never a click elsewhere on the row.
+  return h('div', { class: 'card' },
     h('span', { class: 'serial' }, row.span === 0 ? '' : String(row.serial)),
-    h('button', { class: 'loco-no', title: 'Open this loco' }, l.locoNo || '(no number)'),
+    h('button', { class: 'loco-no loco-btn', title: 'Click to update this loco', onclick: () => openEditor(l) }, l.locoNo || '(no number)'),
     cell('trainNo', 'Train no'),
     cell('location', 'Current location'),
     cell('working', 'Working'),
-    dot);
+    status);
 }
 
 function viewLocos() {
@@ -381,6 +537,7 @@ function viewLocos() {
     value: ui.search,
     oninput: (e) => {
       ui.search = e.target.value;
+      sel = null;
       document.getElementById('lists').replaceChildren(...buildLists());
     },
   });
@@ -1244,10 +1401,11 @@ function render() {
     header,
     h('nav', { class: 'tabs' }, TABS.map(([id, text]) => h('button', {
       class: ui.view === id ? 'on' : '',
-      onclick: () => { ui.view = id; render(); window.scrollTo(0, 0); },
+      onclick: () => { sel = null; ui.view = id; render(); window.scrollTo(0, 0); },
     }, text))),
     h('main', null, VIEWS[ui.view]()));
   redrawing = false;
+  paintSel();
   if (keepWriting) {
     const box = document.querySelector(`#app .u-input[data-ukey="${keepWriting.key}"]`);
     if (box) {
