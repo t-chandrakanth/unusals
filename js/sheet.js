@@ -6,6 +6,7 @@
 // null  = a position covered by a merged cell above or to the left.
 
 import { numbered, reportTitles, historyTitle, fmtDay, unusualsInOrder } from './logic.js';
+import { computeBlock, longMins } from './block.js';
 
 export const STYLES = {
   // Navy title for other divisions, teal for SC division; light bands on
@@ -138,4 +139,27 @@ export function unusualSheet(list, name = 'Unusuals') {
   });
   if (!rows.length) rows.push(spanRow(c('No unusual reports', 'cell', { colSpan: 3 }), 3));
   return { name, cols: [6, 18, 72], rows };
+}
+
+/** A block detention report as a table, for the picture, the PDF and the Excel file. */
+export function blockSheet(b) {
+  const k = computeBlock(b);
+  const pair = (label, value) => [c(label, 'head', { colSpan: 2 }), null, c(value, 'cell', { colSpan: 4 }), null, null, null];
+  const rows = [
+    spanRow(c('SIR,', 'text', { colSpan: 6 }), 6),
+    spanRow(c(k.title, 'title', { colSpan: 6 }), 6),
+  ];
+  if (b.from || b.to) rows.push(pair('BLOCK PERMITTED', `${b.from || '--:--'} TO ${b.to || '--:--'} HRS${k.duration !== null ? `   (DURATION ${longMins(k.duration)})` : ''}`));
+  if (b.cleared) rows.push(pair('BLOCK CLEARED AT', `${b.cleared} HRS`));
+  if (k.burst !== null) rows.push(pair('BLOCK BURST', k.burst > 0 ? `${k.burst} MINS` : 'NIL'));
+  rows.push(spanRow(c('', 'gap', { colSpan: 6 }), 6));
+  rows.push(spanRow(c('REP DETENTION PARTICULARS', 'titleRed', { colSpan: 6 }), 6));
+  rows.push(['S NO', 'TR.NO', 'AT', 'FROM', 'TO', 'DETENTION'].map((v) => c(v, 'head')));
+  for (const r of k.rows) {
+    const z = r.n % 2 ? 'cell' : 'alt';
+    rows.push([c(r.n, 'serial'), c(String(r.tr || '').toUpperCase(), z), c(String(r.at || '').toUpperCase(), z), c(r.from ? `${r.from} HRS` : '', z),
+      c(r.to ? `${r.to} HRS` : 'STILL NOT DEPARTED', z), c(r.det ? `${r.det.mins} MINS${r.det.still ? ` (UP TO ${b.asOn} HRS)` : ''}` : '', z)]);
+  }
+  if (!k.rows.length) rows.push(spanRow(c('NIL', 'cell', { colSpan: 6 }), 6));
+  return { name: 'Block detention', cols: [7, 14, 12, 14, 24, 34], rows };
 }

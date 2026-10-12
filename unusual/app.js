@@ -7,7 +7,9 @@ import * as L from '../js/logic.js';
 import { createSync } from '../js/sync.js';
 import { diffOps } from '../js/syncdata.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
-import { unusualSheet } from '../js/sheet.js';
+import { unusualSheet, blockSheet } from '../js/sheet.js';
+import { blankBlock, blankRow, computeBlock, blockMessage, blockTitle, rowDetention, longMins } from '../js/block.js';
+import { buildPdf } from '../js/pdf.js';
 import { sheetToCanvas, canvasToBlob } from '../js/canvas.js';
 import { sheetToXlsx } from '../js/xlsx.js';
 import { readReports, tidyBatch, reportKey } from '../js/reports.js';
@@ -45,7 +47,7 @@ const HINT = {
 const WIDE = new Set(['title', 'locoNo', 'wagonNo', 'bpcNo', 'reason']);
 const FILE_TYPES = 'image/*,.docx,.pdf,.xlsx,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 // The DPWCS LOCO app keeps a list of its own (app = 'dpwcs'); it is not part of this register.
-const rows = () => state.unusuals.filter((u) => u.app !== 'dpwcs');
+const rows = () => state.unusuals.filter((u) => u.app !== 'dpwcs' && u.type !== 'block');
 const kindOf = (u) => (TYPES[u.type] ? u.type : 'loco');
 
 // ---------- storage on this device ----------
@@ -440,6 +442,146 @@ function sendWhatsApp(text) {
   if (cut) toast('A long list is cut for WhatsApp. Use Share image or Excel file to send all of it.');
 }
 
+// ---------- block detention ----------
+
+const blocks = () => state.unusuals.filter((u) => u.type === 'block');
+const readBlock = (u) => { try { return { ...blankBlock(u.day), ...JSON.parse(u.block) }; } catch { return blankBlock(u.day); } };
+const blockFile = (b, ext) => `Block-detention-${L.fmtDay(b.day)}-${String(b.name || b.station || 'report').replace(/[^0-9A-Za-z]+/g, '-')}.${ext}`;
+
+async function blockPdfBlob(b) {
+  const canvas = sheetToCanvas(blockSheet(b));
+  const jpeg = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.92));
+  return new Blob([buildPdf(new Uint8Array(await jpeg.arrayBuffer()), canvas.width, canvas.height)], { type: 'application/pdf' });
+}
+
+function blockCard(u) {
+  const b = readBlock(u);
+  const k = computeBlock(b);
+  const [, m, d] = u.day.split('-');
+  const run = (fn) => async () => { try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); } };
+  const chip = (label, value, red) => value && h('span', { class: `chip ${red ? 'red' : ''}` }, h('small', null, label), value);
+  return h('article', { class: 'ucard k-dpwcs' },
+    h('div', { class: 'ucard-top' },
+      h('div', { class: 'udate' }, h('b', null, d), h('span', null, `${MONTHS[Number(m) - 1]} ${u.day.slice(0, 4)}`)),
+      h('div', { class: 'utitle' },
+        h('strong', null, k.title || 'BLOCK'),
+        h('div', { class: 'chips' },
+          chip('BLOCK', b.from || b.to ? `${b.from || '--:--'} to ${b.to || '--:--'}` : ''),
+          chip('CLEARED', b.cleared),
+          chip('BURST', k.burst === null ? '' : (k.burst > 0 ? `${k.burst} MINS` : 'NIL'), k.burst > 0),
+          chip('TRAINS', k.rows.length ? String(k.rows.length) : '')))),
+    k.rows.length > 0 && h('ol', { class: 'brows' }, k.rows.map((r) => h('li', null,
+      h('b', null, `${String(r.tr || 'TRAIN').toUpperCase()}${r.at ? ` at ${String(r.at).toUpperCase()}` : ''}`),
+      h('span', null, r.det ? `${r.det.mins} MINS${r.det.still ? ' (not departed)' : ''}` : '')))),
+    k.total > 0 && h('p', { class: 'ucard-rep' }, h('b', null, 'TOTAL DETENTION '), `${k.total} MINS`),
+    h('div', { class: 'ucard-actions' },
+      h('button', { class: 'link', onclick: () => openBlockForm(u) }, 'Edit'),
+      h('button', { class: 'link', onclick: () => sendWhatsApp(blockMessage(b)) }, 'Send on WhatsApp'),
+      h('button', { class: 'link', onclick: run(() => copyText(blockMessage(b))) }, 'Copy text'),
+      h('button', { class: 'link', onclick: run(async () => shareOrDownload(await canvasToBlob(sheetToCanvas(blockSheet(b))), blockFile(b, 'png'), k.title)) }, 'Image'),
+      h('button', { class: 'link', onclick: run(async () => shareOrDownload(await blockPdfBlob(b), blockFile(b, 'pdf'), k.title)) }, 'PDF'),
+      h('button', {
+        class: 'link danger',
+        onclick: () => {
+          if (!confirm(`Delete the block report of ${L.fmtDay(u.day)} (${k.title || 'block'})?`)) return;
+          commit(L.reduce(state, { type: 'removeUnusual', id: u.id }));
+          toast('Deleted');
+          render();
+        },
+      }, 'Delete')));
+}
+
+/** The form: the block, then the trains held up. Durations, burst and detentions come by themselves. */
+function openBlockForm(existing) {
+  const dlg = document.getElementById('editor');
+  const b = existing ? readBlock(existing) : blankBlock(today());
+  const detEls = [];
+  let durEl;
+  let burstEl;
+  let totalEl;
+
+  const refresh = () => {
+    const k = computeBlock(b);
+    durEl.textContent = k.duration === null ? '' : longMins(k.duration);
+    burstEl.textContent = k.burst === null ? '' : (k.burst > 0 ? `${k.burst} MINS` : 'NIL (cleared in time)');
+    b.rows.forEach((r, i) => {
+      const d = rowDetention(b, r);
+      if (detEls[i]) detEls[i].textContent = d ? `${d.mins} MINS${d.still ? ' (not departed)' : ''}` : '';
+    });
+    totalEl.textContent = k.total > 0 ? `${k.rows.length} trains, ${k.total} MINS in all` : '';
+  };
+  const box = (get, set, label, type = 'text', placeholder = '') => {
+    const el = h('input', { type, value: get(), placeholder, autocomplete: 'off', autocapitalize: type === 'text' ? 'characters' : null });
+    el.addEventListener('input', (e) => { set(e.target.value); refresh(); });
+    return h('label', { class: 'field' }, h('span', null, label), el);
+  };
+  const auto = (label, setEl) => h('div', { class: 'field' }, h('span', null, `${label} (automatic)`), h('div', { class: 'autochip' }, setEl(h('b'))));
+
+  const build = () => {
+    detEls.length = 0;
+    const dirs = h('div', { class: 'segs' }, ['UP', 'DN'].map((v) => h('button', { type: 'button', class: `seg ${b.dir === v ? 'on' : ''}`, onclick: () => { b.dir = v; build(); } }, v)));
+    const rowsBox = h('div', { class: 'rep-rows' }, b.rows.map((r, i) => h('div', { class: 'rep-row' },
+      h('span', { class: 'rn' }, String(i + 1)),
+      box(() => r.tr, (v) => { r.tr = v; }, 'Tr.no', 'text', 'KSNK'),
+      box(() => r.at, (v) => { r.at = v; }, 'At station', 'text', 'CT'),
+      box(() => r.from, (v) => { r.from = v; }, 'From', 'time'),
+      box(() => r.to, (v) => { r.to = v; }, 'To (blank if not departed)', 'time'),
+      h('div', { class: 'field det' }, h('span', null, 'Detention (automatic)'), h('div', { class: 'autochip' }, (detEls[i] = h('b')))))));
+
+    dlg.replaceChildren(h('div', { class: 'editor' },
+      h('div', { class: 'dlg-head block' }, existing ? 'Edit block detention report' : 'New block detention report'),
+      h('form', {
+        class: 'u-form',
+        onsubmit: (e) => {
+          e.preventDefault();
+          if (!b.day) { toast('Pick the date'); return; }
+          if (!String(b.name).trim() && !String(b.station).trim()) { toast('Enter the name of the block or the station'); return; }
+          b.name = String(b.name).trim().toUpperCase();
+          b.station = String(b.station).trim().toUpperCase();
+          dlg.close();
+          save({ ...(existing || L.blankUnusual(b.day)), day: b.day, type: 'block', title: blockTitle(b), location: b.station, block: JSON.stringify(b) });
+          toast('Block report saved');
+          render();
+        },
+      },
+      h('div', { class: 'grid' },
+        box(() => b.day, (v) => { b.day = v; }, 'Date', 'date'),
+        h('div', { class: 'field' }, h('span', null, 'Direction'), dirs),
+        box(() => b.station, (v) => { b.station = v; }, '1. Station / section', 'text', 'CT - SUH'),
+        box(() => b.name, (v) => { b.name = v; }, '2. Name of block', 'text', 'BCM BLOCK'),
+        h('div', { class: 'det-row three' },
+          box(() => b.from, (v) => { b.from = v; }, '3. Block permitted from', 'time'),
+          box(() => b.to, (v) => { b.to = v; }, 'to', 'time'),
+          auto('Duration', (el) => { durEl = el; return el; })),
+        h('div', { class: 'det-row three' },
+          box(() => b.cleared, (v) => { b.cleared = v; }, '4. Block cleared at', 'time'),
+          auto('5. Block burst', (el) => { burstEl = el; return el; }),
+          box(() => b.asOn, (v) => { b.asOn = v; }, 'As on (trains not departed)', 'time'))),
+      h('h3', { class: 'rep-title' }, 'Repercussion'),
+      rowsBox,
+      h('div', { class: 'rep-foot' },
+        h('button', { type: 'button', class: 'btn small', onclick: () => { b.rows.push(blankRow()); build(); } }, '+ Add a row'),
+        (totalEl = h('span', { class: 'total' }))),
+      h('div', { class: 'editor-actions' },
+        h('button', { type: 'submit', class: 'btn primary' }, 'Save report'),
+        h('button', { type: 'button', class: 'btn', onclick: () => dlg.close() }, 'Cancel')))));
+    refresh();
+  };
+  build();
+  dlg.showModal();
+}
+
+function viewBlocks() {
+  const list = blocks();
+  return h('div', null,
+    h('div', { class: 'uhead' }, h('button', { class: 'btn new block', onclick: () => openBlockForm() }, 'New block detention report')),
+    list.length
+      ? L.unusualsByDay(list).map(([day, items]) => h('section', null,
+        h('h2', { class: 'section-title' }, officialDay(day), h('span', { class: 'count' }, items.length)),
+        h('div', { class: 'ucards' }, items.map(blockCard))))
+      : h('p', { class: 'empty-big' }, 'No block detention reports yet. Press the button above to write the first one.'));
+}
+
 function viewOverview() {
   const list = rows();
   const t = today();
@@ -617,8 +759,8 @@ function statusText() {
 
 function render() {
   const count = (t) => rows().filter((u) => kindOf(u) === t).length;
-  const tabs = [['overview', 'Overview', null], ['loco', 'Loco failures', count('loco')], ['cw', 'C&W failures', count('cw')], ['other', 'Others', count('other')], ['all', 'All', rows().length]];
-  const dots = { loco: 'var(--k-fail)', cw: 'var(--k-other)', other: 'var(--k-dpwcs)', all: 'var(--navy)', overview: 'var(--navy)' };
+  const tabs = [['overview', 'Overview', null], ['loco', 'Loco failures', count('loco')], ['cw', 'C&W failures', count('cw')], ['other', 'Others', count('other')], ['all', 'All', rows().length], ['block', 'Block detention', blocks().length]];
+  const dots = { loco: 'var(--k-fail)', cw: 'var(--k-other)', other: 'var(--k-dpwcs)', all: 'var(--navy)', overview: 'var(--navy)', block: '#6f8bff' };
   repeatMap = new Map(repeatLocos(rows(), addDays(today(), -90)).map((r) => [r.loco, r.count]));
   document.getElementById('app').replaceChildren(
     h('header', { class: `top ${!isInstalled() && !bannerClosed() ? 'has-banner' : ''}` },
@@ -645,7 +787,7 @@ function render() {
       class: ui.view === id ? 'on' : '',
       onclick: () => { ui.view = id; ui.month = 'all'; ui.search = ''; ui.range = 'all'; ui.from = ''; ui.to = ''; render(); window.scrollTo(0, 0); },
     }, h('i', { class: 'dot-k', style: `--c:${dots[id]}` }), text, n != null && h('span', { class: 'n' }, String(n))))),
-    h('main', null, ui.view === 'overview' ? viewOverview() : viewList()));
+    h('main', null, ui.view === 'overview' ? viewOverview() : ui.view === 'block' ? viewBlocks() : viewList()));
 }
 
 function onSyncStatus(next) {

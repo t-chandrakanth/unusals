@@ -250,3 +250,34 @@ dialog { border-radius: 20px; }
 .sum-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .btn.whatsapp.big { padding: 13px 20px; font-size: 16px; font-weight: 800; background: #25d366; border-color: #25d366; color: #05381d; }
 @media (prefers-color-scheme: dark) { .btn.whatsapp.big { color: #05381d; } }
+
+/* block detention */
+.btn.new.block { background: linear-gradient(135deg, #2f58d4, #6f8bff); box-shadow: 0 10px 26px rgba(47, 88, 212, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.dlg-head.block { background: color-mix(in srgb, #3b6fd9 15%, var(--card)); color: color-mix(in srgb, #3b6fd9 70%, #0a1a40); }
+@media (prefers-color-scheme: dark) { .dlg-head.block { color: var(--ink); } }
+.det-row.three { grid-template-columns: repeat(3, 1fr); align-items: end; }
+@media (max-width: 420px) { .det-row.three { grid-template-columns: 1fr 1fr; } .det-row.three > :last-child { grid-column: 1 / -1; } }
+.autochip { min-height: 42px; display: flex; align-items: center; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 12px; background: var(--tint); color: var(--ink); font-size: 14px; font-weight: 700; }
+.autochip b { font-weight: 800; }
+.rep-title { margin: 16px 0 8px; font-size: 13px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--soft); }
+.rep-rows { display: grid; gap: 10px; }
+.rep-row { display: grid; grid-template-columns: 30px 1fr 1fr; gap: 8px; align-items: end; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.rep-row .rn { grid-row: 1 / span 3; align-self: start; display: grid; place-items: center; width: 26px; height: 26px; margin-top: 18px; border-radius: 50%; background: var(--navy); color: #fff; font-size: 13px; font-weight: 800; }
+.rep-row .field.det { grid-column: 2 / -1; }
+.rep-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.rep-foot .total { font-size: 13px; font-weight: 800; color: var(--navy); }
+.brows { list-style: decimal; margin: 10px 0 0; padding: 8px 12px 8px 30px; border-radius: 12px; background: var(--bg); font-size: 14px; }
+.brows li { padding: 3px 0; }
+.brows li b { margin-right: 8px; }
+.brows li span { color: var(--soft); font-weight: 700; }
+
+/* the "new report" buttons: smaller and smoother, still easy to see */
+.btn.new { flex: 0 1 auto; min-width: min(100%, 250px); padding: 11px 20px; gap: 9px; border-radius: 14px; font-size: 15px; font-weight: 700; letter-spacing: 0.2px; animation: none; background: linear-gradient(135deg, #ef6a7c, #f48c70); box-shadow: 0 4px 12px rgba(239, 106, 124, 0.28); }
+.btn.new.cw { background: linear-gradient(135deg, #eda23c, #f3bd62); box-shadow: 0 4px 12px rgba(237, 162, 60, 0.28); }
+.btn.new.other { background: linear-gradient(135deg, #2fb5a4, #55cdbd); box-shadow: 0 4px 12px rgba(47, 181, 164, 0.28); }
+.btn.new.block { background: linear-gradient(135deg, #5b84e6, #86a1f0); box-shadow: 0 4px 12px rgba(91, 132, 230, 0.28); }
+.btn.new::before { width: 24px; height: 24px; font-size: 19px; background: rgba(255, 255, 255, 0.3); }
+.hero-actions .btn.hero-new { padding: 9px 15px; border-radius: 12px; font-size: 13px; font-weight: 700; box-shadow: 0 3px 9px rgba(0, 0, 0, 0.12); background: linear-gradient(135deg, #ef6a7c, #f48c70) !important; }
+.hero-actions .btn.hero-new.cw { background: linear-gradient(135deg, #eda23c, #f3bd62) !important; }
+.hero-actions .btn.hero-new.other { background: linear-gradient(135deg, #2fb5a4, #55cdbd) !important; }
+.u-form .editor-actions .btn.primary { padding: 13px; font-size: 15px; font-weight: 700; border-radius: 12px; }
