@@ -506,7 +506,7 @@ function openBlockForm(existing) {
     burstEl.textContent = k.burst === null ? '' : (k.burst > 0 ? `${k.burst} MINS` : 'NIL (cleared in time)');
     b.rows.forEach((r, i) => {
       const d = rowDetention(b, r);
-      if (detEls[i]) detEls[i].textContent = d ? `${d.mins} MINS${d.still ? ' (not departed)' : ''}` : '';
+      if (detEls[i]) detEls[i].textContent = d ? `${d.mins}${d.still ? '*' : ''}` : '';
     });
     totalEl.textContent = k.total > 0 ? `${k.rows.length} trains, ${k.total} MINS in all` : '';
   };
@@ -515,18 +515,27 @@ function openBlockForm(existing) {
     el.addEventListener('input', (e) => { set(e.target.value); refresh(); });
     return h('label', { class: 'field' }, h('span', null, label), el);
   };
+  // a box with no label of its own: the row heads above the rows name the columns
+  const bare = (get, set, label, type = 'text', placeholder = '') => {
+    const el = h('input', { type, value: get(), placeholder, 'aria-label': label, autocomplete: 'off', autocapitalize: type === 'text' ? 'characters' : null });
+    el.addEventListener('input', (e) => { set(e.target.value); refresh(); });
+    return el;
+  };
   const auto = (label, setEl) => h('div', { class: 'field' }, h('span', null, `${label} (automatic)`), h('div', { class: 'autochip' }, setEl(h('b'))));
 
   const build = () => {
     detEls.length = 0;
     const dirs = h('div', { class: 'segs' }, ['UP', 'DN'].map((v) => h('button', { type: 'button', class: `seg ${b.dir === v ? 'on' : ''}`, onclick: () => { b.dir = v; build(); } }, v)));
-    const rowsBox = h('div', { class: 'rep-rows' }, b.rows.map((r, i) => h('div', { class: 'rep-row' },
-      h('span', { class: 'rn' }, String(i + 1)),
-      box(() => r.tr, (v) => { r.tr = v; }, 'Tr.no', 'text', 'KSNK'),
-      box(() => r.at, (v) => { r.at = v; }, 'At station', 'text', 'CT'),
-      box(() => r.from, (v) => { r.from = v; }, 'From', 'time'),
-      box(() => r.to, (v) => { r.to = v; }, 'To (blank if not departed)', 'time'),
-      h('div', { class: 'field det' }, h('span', null, 'Detention (automatic)'), h('div', { class: 'autochip' }, (detEls[i] = h('b')))))));
+    const rowsBox = h('div', { class: 'rep-rows' },
+      h('div', { class: 'rep-head' }, ['S', 'Tr.no', 'At stn', 'From', 'To', 'Det mins'].map((t) => h('span', null, t))),
+      b.rows.map((r, i) => h('div', { class: 'rep-row' },
+        h('span', { class: 'rn' }, String(i + 1)),
+        bare(() => r.tr, (v) => { r.tr = v; }, 'Train number', 'text', 'KSNK'),
+        bare(() => r.at, (v) => { r.at = v; }, 'At station', 'text', 'CT'),
+        bare(() => r.from, (v) => { r.from = v; }, 'From', 'time'),
+        bare(() => r.to, (v) => { r.to = v; }, 'To (empty if not departed)', 'time'),
+        h('div', { class: 'autochip', title: 'Detention in minutes, worked out by itself' }, (detEls[i] = h('b'))))),
+      h('p', { class: 'rep-note' }, 'Leave To empty if the train has not left: its detention then runs up to the "As on" time (marked *).'));
 
     dlg.replaceChildren(h('div', { class: 'editor' },
       h('div', { class: 'dlg-head block' }, existing ? 'Edit block detention report' : 'New block detention report'),

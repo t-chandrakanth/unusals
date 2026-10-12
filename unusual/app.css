@@ -281,3 +281,30 @@ dialog { border-radius: 20px; }
 .hero-actions .btn.hero-new.cw { background: linear-gradient(135deg, #eda23c, #f3bd62) !important; }
 .hero-actions .btn.hero-new.other { background: linear-gradient(135deg, #2fb5a4, #55cdbd) !important; }
 .u-form .editor-actions .btn.primary { padding: 13px; font-size: 15px; font-weight: 700; border-radius: 12px; }
+
+/* repercussions: one train on one line */
+.rep-head, .rep-row { display: grid; grid-template-columns: 24px minmax(0, 1.2fr) minmax(0, 1fr) 76px 76px minmax(0, 0.9fr); gap: 6px; align-items: center; }
+.rep-head { padding: 0 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; color: var(--soft); }
+.rep-head span:first-child { text-align: center; }
+.rep-rows { gap: 8px; }
+.rep-row { padding: 6px; border-radius: 12px; }
+.rep-row .rn { grid-row: auto; align-self: center; margin: 0; width: 22px; height: 22px; font-size: 12px; }
+.rep-row input { min-width: 0; padding: 8px 6px; font-size: 14px; }
+.rep-row input[type="time"]::-webkit-calendar-picker-indicator { display: none; }
+.rep-row .autochip { min-height: 36px; padding: 4px 6px; justify-content: center; border-radius: 10px; font-size: 14px; }
+.rep-note { margin: 2px 2px 0; font-size: 12px; color: var(--soft); }
+@media (max-width: 400px) {
+  .rep-head, .rep-row { grid-template-columns: 22px minmax(0, 1.1fr) minmax(0, 1fr) 68px 68px minmax(0, 0.8fr); gap: 4px; }
+  .rep-row input { padding: 8px 4px; font-size: 13px; }
+}
+@media (max-width: 400px) {
+  .editor { padding-left: 10px; padding-right: 10px; }
+  .dlg-head { margin-left: -10px; margin-right: -10px; }
+  .rep-head, .rep-row { grid-template-columns: 20px minmax(0, 1.2fr) minmax(0, 1fr) 56px 56px 36px; gap: 4px; }
+  .rep-row { padding: 5px 4px; }
+  .rep-row input { padding: 8px 3px; font-size: 13px; }
+  .rep-row input[type="time"] { font-size: 12px; padding-left: 2px; padding-right: 2px; text-align: center; }
+  .rep-row .rn { width: 20px; height: 20px; font-size: 11px; }
+  .rep-row .autochip { padding: 4px 2px; font-size: 12px; }
+  .rep-head { font-size: 10px; padding: 0 4px; }
+}
