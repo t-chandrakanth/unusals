@@ -54,9 +54,10 @@ test('the WhatsApp message is worded like the example', () => {
   assert.ok(lines.includes('*BLOCK BURST: 55 MINS*'));
   assert.ok(lines.includes('*REPERCUSSIONS:*'));
   assert.ok(!m.includes('PARTICULARS'));
-  assert.ok(lines.includes('*1. KSNK AT CT:* ARR: 11:30 HRS, DEP: 15:57 HRS, *DETENTION: 267 MINS*'));
-  assert.ok(lines.includes('*2. PSNH AT CT:* ARR: 12:34 HRS, STILL NOT DEPARTED, *DETENTION: 276 MINS (UP TO 17:10 HRS)*'));
-  assert.ok(lines.includes('*7. PSNH AT RMY:* ARR: 16:25 HRS, STILL NOT DEPARTED, *DETENTION: 45 MINS (UP TO 17:10 HRS)*'));
+  assert.ok(lines.includes('1. *KSNK* -CT STN- ARR: 11:30 HRS, DEP: 15:57 HRS, *DET: 267 MINS*'));
+  assert.ok(lines.includes('2. *PSNH* -CT STN- ARR: 12:34 HRS, STILL NOT DEPARTED, *DET: 276 MINS (UP TO 17:10 HRS)*'));
+  assert.ok(lines.includes('7. *PSNH* -RMY STN- ARR: 16:25 HRS, STILL NOT DEPARTED, *DET: 45 MINS (UP TO 17:10 HRS)*'));
+  assert.ok(lines.includes('3. *BTPK* -MQR STN- ARR: 13:30 HRS, DEP: 15:32 HRS, *DET: 122 MINS*'));
 });
 
 test('empty rows are left out and the numbering follows; a report with none says NIL', () => {
@@ -64,7 +65,12 @@ test('empty rows are left out and the numbering follows; a report with none says
   const c = computeBlock(b);
   assert.equal(c.rows.length, 1);
   assert.equal(c.rows[0].n, 1);
-  assert.match(blockMessage(b), /\*1\. ABC AT X:\* ARR: 10:00 HRS, DEP: 11:00 HRS, \*DETENTION: 60 MINS\*/);
+  assert.match(blockMessage(b), /1\. \*ABC\* -X STN- ARR: 10:00 HRS, DEP: 11:00 HRS, \*DET: 60 MINS\*/);
+  // STN is not added twice, and a row with no station has no station part
+  const two = { ...example(), rows: [{ tr: 'K1', at: 'CT STN', from: '10:00', to: '10:30' }, { tr: 'K2', at: '', from: '10:00', to: '10:40' }] };
+  const text = blockMessage(two);
+  assert.match(text, /1\. \*K1\* -CT STN- ARR: 10:00 HRS/);
+  assert.match(text, /2\. \*K2\* ARR: 10:00 HRS, DEP: 10:40 HRS, \*DET: 40 MINS\*/);
   assert.match(blockMessage({ ...example(), rows: [] }), /\*NIL\*/);
 });
 

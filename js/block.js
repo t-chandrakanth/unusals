@@ -74,6 +74,8 @@ export function computeBlock(b) {
 }
 
 const U = (s) => String(s || '').trim().toUpperCase();
+/** "CT" -> "CT STN"; left alone when STN or STATION is already there. */
+const stn = (at) => (U(at) && !/(^|\s)(STN|STATION)$/.test(U(at)) ? `${U(at)} STN` : U(at));
 
 /** The WhatsApp message, in the usual wording. */
 export function blockMessage(b) {
@@ -85,12 +87,12 @@ export function blockMessage(b) {
   lines.push('', '*REPERCUSSIONS:*', '');
   if (!c.rows.length) lines.push('*NIL*');
   c.rows.forEach((r, i) => {
-    const head = `${r.n}. ${U(r.tr) || 'TRAIN'}${U(r.at) ? ` AT ${U(r.at)}` : ''}:`;
+    const head = `${r.n}. *${U(r.tr) || 'TRAIN'}*${stn(r.at) ? ` -${stn(r.at)}-` : ''}`;
     const parts = [];
     if (r.from) parts.push(`ARR: ${r.from} HRS`);
     parts.push(r.to ? `DEP: ${r.to} HRS` : 'STILL NOT DEPARTED');
-    const det = r.det ? `, *DETENTION: ${r.det.mins} MINS${r.det.still ? ` (UP TO ${b.asOn} HRS)` : ''}*` : '';
-    lines.push(`*${head}* ${parts.join(', ')}${det}`);
+    const det = r.det ? `, *DET: ${r.det.mins} MINS${r.det.still ? ` (UP TO ${b.asOn} HRS)` : ''}*` : '';
+    lines.push(`${head} ${parts.join(', ')}${det}`);
     if (i < c.rows.length - 1) lines.push('');
   });
   return lines.join('\n');
