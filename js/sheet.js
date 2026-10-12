@@ -153,7 +153,7 @@ export function blockSheet(b) {
   if (b.cleared) rows.push(pair('BLOCK CLEARED AT', `${b.cleared} HRS`));
   if (k.burst !== null) rows.push(pair('BLOCK BURST', k.burst > 0 ? `${k.burst} MINS` : 'NIL'));
   rows.push(spanRow(c('', 'gap', { colSpan: 6 }), 6));
-  rows.push(spanRow(c('REP DETENTION PARTICULARS', 'titleRed', { colSpan: 6 }), 6));
+  rows.push(spanRow(c('REPERCUSSIONS', 'titleRed', { colSpan: 6 }), 6));
   rows.push(['S NO', 'TR.NO', 'AT', 'FROM', 'TO', 'DETENTION'].map((v) => c(v, 'head')));
   for (const r of k.rows) {
     const z = r.n % 2 ? 'cell' : 'alt';

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toMin, gap, burstMinutes, longMins, blankBlock, blockTitle, computeBlock, blockMessage } from '../js/block.js';
+import { toMin, gap, burstMinutes, longMins, blankBlock, blockName, blockTitle, computeBlock, blockMessage } from '../js/block.js';
 
 // the example report
 const example = () => ({
@@ -52,7 +52,8 @@ test('the WhatsApp message is worded like the example', () => {
   assert.ok(lines.includes('*BLOCK TIME: 12:00 TO 14:30 HRS*'));
   assert.ok(lines.includes('*BLOCK CLEAR: 15:25 HRS*'));
   assert.ok(lines.includes('*BLOCK BURST: 55 MINS*'));
-  assert.ok(lines.includes('*REP DETENTION PARTICULARS:*'));
+  assert.ok(lines.includes('*REPERCUSSIONS:*'));
+  assert.ok(!m.includes('PARTICULARS'));
   assert.ok(lines.includes('*1. KSNK AT CT:* ARR: 11:30 HRS, DEP: 15:57 HRS, *DETENTION: 267 MINS*'));
   assert.ok(lines.includes('*2. PSNH AT CT:* ARR: 12:34 HRS, STILL NOT DEPARTED, *DETENTION: 276 MINS (UP TO 17:10 HRS)*'));
   assert.ok(lines.includes('*7. PSNH AT RMY:* ARR: 16:25 HRS, STILL NOT DEPARTED, *DETENTION: 45 MINS (UP TO 17:10 HRS)*'));
@@ -67,9 +68,20 @@ test('empty rows are left out and the numbering follows; a report with none says
   assert.match(blockMessage({ ...example(), rows: [] }), /\*NIL\*/);
 });
 
+test('BLOCK is added to the name by itself, and never twice', () => {
+  assert.equal(blockName('BCM'), 'BCM BLOCK');
+  assert.equal(blockName('bcm'), 'bcm BLOCK');
+  assert.equal(blockName('BCM BLOCK'), 'BCM BLOCK');
+  assert.equal(blockName('bcm block '), 'bcm block');
+  assert.equal(blockName('  '), '');
+  assert.equal(blockTitle({ name: 'BCM', dir: 'UP', station: 'CT - SUH' }), 'BCM BLOCK AT UP CT - SUH');
+  assert.equal(blockTitle({ name: 'BCM BLOCK', dir: 'UP', station: 'CT - SUH' }), 'BCM BLOCK AT UP CT - SUH');
+  assert.match(blockMessage({ ...blankBlock('2026-10-12'), name: 'BCM', dir: 'DN', station: 'MQR' }), /^\*SIR,\*\n\n\*BCM BLOCK AT DN MQR\*/);
+});
+
 test('a block cleared in time says burst NIL; the title copes with missing parts', () => {
   assert.match(blockMessage({ ...example(), cleared: '14:00' }), /BLOCK BURST: NIL/);
-  assert.equal(blockTitle({ name: 'bcm block', dir: 'DN', station: '' }), 'BCM BLOCK AT DN');
+  assert.equal(blockTitle({ name: 'bcm', dir: 'DN', station: '' }), 'BCM BLOCK AT DN');
   assert.equal(blockTitle({ name: '', dir: 'UP', station: 'CT' }), 'UP CT');
 });
 

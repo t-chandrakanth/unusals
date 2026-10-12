@@ -40,10 +40,16 @@ export function blankBlock(day = '') {
   return { day, station: '', dir: 'UP', name: '', from: '', to: '', cleared: '', asOn: '', rows: Array.from({ length: 6 }, blankRow) };
 }
 
+/** "BCM" or "BCM BLOCK" -> "BCM BLOCK": the word BLOCK goes at the end of the name by itself. */
+export function blockName(name) {
+  const n = String(name || '').trim().replace(/\s+/g, ' ');
+  return n && !/(^|\s)BLOCK$/i.test(n) ? `${n} BLOCK` : n;
+}
+
 /** "BCM BLOCK AT UP CT - SUH" */
 export function blockTitle(b) {
   const where = [b.dir, b.station].map((x) => String(x || '').trim()).filter(Boolean).join(' ');
-  const name = String(b.name || '').trim();
+  const name = blockName(b.name);
   return (name && where ? `${name} AT ${where}` : name || where).toUpperCase();
 }
 
@@ -76,7 +82,7 @@ export function blockMessage(b) {
   if (b.from || b.to) lines.push(`*BLOCK TIME: ${b.from || '--:--'} TO ${b.to || '--:--'} HRS*`);
   if (b.cleared) lines.push(`*BLOCK CLEAR: ${b.cleared} HRS*`);
   if (c.burst !== null) lines.push(`*BLOCK BURST: ${c.burst > 0 ? `${c.burst} MINS` : 'NIL'}*`);
-  lines.push('', '*REP DETENTION PARTICULARS:*', '');
+  lines.push('', '*REPERCUSSIONS:*', '');
   if (!c.rows.length) lines.push('*NIL*');
   c.rows.forEach((r, i) => {
     const head = `${r.n}. ${U(r.tr) || 'TRAIN'}${U(r.at) ? ` AT ${U(r.at)}` : ''}:`;
