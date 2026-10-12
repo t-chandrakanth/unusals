@@ -10,6 +10,7 @@ import { importHistory, alreadyImported } from '../js/historyimport.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
 import { readReports, tidyBatch, reportKey } from '../js/reports.js';
 import { dailySummary } from '../js/summary.js';
+import { planPaste } from '../js/paste.js';
 import { fileToText, FileError } from '../js/filetext.js';
 import { importDpwcs, dpwcsSeeded } from '../js/unusualimport.js';
 import { UNUSUAL_RECORDS } from '../js/unusual-data.js';
@@ -220,44 +221,51 @@ function exportBar(sheet, fileBase, title, getText, before) {
 
 // ---------- paste from Excel, and suggestions for the Working cell ----------
 
-// The three boxes of the table, left to right. A block copied from Excel
-// lands starting at the box it is pasted into, one row per loco going down.
-const PASTE_COLS = ['trainNo', 'location', 'working'];
+// Pasting cells copied from Excel. A block with a heading row, or rows that carry the
+// loco number (as in the report sheet), is matched to the locos by name or number, wherever
+// it is pasted; plain columns land from the box that was clicked, a row per loco.
+const isBlock = (raw) => /[\t\n]/.test(String(raw).replace(/\r/g, '').replace(/\n+$/, ''));
 
-function pasteCells(e, loco, key) {
-  const raw = (e.clipboardData || window.clipboardData).getData('text').replace(/\r/g, '');
-  const text = raw.replace(/\n+$/, '');
-  if (!/[\t\n]/.test(text)) return; // a single cell: paste as usual
-  e.preventDefault();
-  const rows = text.split('\n').map((line) => line.split('\t').map((v) => v.trim().replace(/^"(.*)"$/s, '$1')));
-  const ids = [...document.querySelectorAll('#lists .card')].map((c) => c.querySelector('.cell-input').dataset.id);
-  const row0 = ids.indexOf(loco.id);
-  const col0 = PASTE_COLS.indexOf(key);
-  const edits = new Map();
-  let cells = 0;
-  let outside = 0;
-  rows.forEach((cols, i) => {
-    const id = ids[row0 + i];
-    if (!id) { outside++; return; }
-    cols.forEach((value, j) => {
-      const field = PASTE_COLS[col0 + j];
-      if (!field) return;
-      if (!edits.has(id)) edits.set(id, {});
-      edits.get(id)[field] = value;
-      cells++;
-    });
-  });
+function applyPaste(raw, start) {
+  const order = [...document.querySelectorAll('#lists .card')].map((c) => c.querySelector('.cell-input').dataset.id);
+  const plan = planPaste({ locos: state.locos, order, start, text: raw });
+  if (!plan || plan.mode === 'none' || !plan.cells) {
+    toast(plan && plan.unmatched
+      ? `None of the ${plan.unmatched} rows matched a loco number.`
+      : 'Nothing to paste here. Click a Train No, Location or Working box first, or copy the Loco No column along with the rest.');
+    return;
+  }
   const now = new Date().toISOString();
   let next = state;
-  for (const [id, fields] of edits) {
+  for (const [id, fields] of plan.edits) {
     const current = next.locos.find((l) => l.id === id);
     if (current) next = L.reduce(next, { type: 'save', loco: { ...current, ...fields }, now, by: who() });
   }
   hideSuggest();
   commit(next);
   render();
-  toast(`Pasted ${cells} cell${cells === 1 ? '' : 's'} into ${edits.size} loco${edits.size === 1 ? '' : 's'}${outside ? `. ${outside} row${outside === 1 ? '' : 's'} went past the end of the list and were left out` : ''}`);
+  const n = plan.edits.size;
+  const how = plan.mode === 'position' ? '' : ' (matched by loco number)';
+  toast(`Pasted ${plan.cells} cell${plan.cells === 1 ? '' : 's'} into ${n} loco${n === 1 ? '' : 's'}${how}.${plan.unmatched ? ` ${plan.unmatched} row${plan.unmatched === 1 ? '' : 's'} did not match a loco.` : ''}${plan.outside ? ` ${plan.outside} row${plan.outside === 1 ? '' : 's'} went past the end of the list and were left out.` : ''}`);
 }
+
+function pasteCells(e, loco, key) {
+  const raw = (e.clipboardData || window.clipboardData).getData('text');
+  if (!isBlock(raw)) return; // a single cell: paste as usual
+  e.preventDefault();
+  applyPaste(raw, { id: loco.id, field: key });
+}
+
+// A block pasted anywhere on the Locos page, outside a box, is matched by loco number.
+document.addEventListener('paste', (e) => {
+  if (ui.view !== 'locos') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+  const raw = (e.clipboardData || window.clipboardData).getData('text');
+  if (!isBlock(raw)) return;
+  e.preventDefault();
+  applyPaste(raw, null);
+});
 
 const WORKING_OPTIONS = ['YES', 'YES/MU', 'Shed in', 'DEFICTIVE', 'P/I -PLANING'];
 let suggestBox = null;
