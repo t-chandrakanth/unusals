@@ -74,13 +74,17 @@ export function planPaste({ locos, order, start, text, fields = ['trainNo', 'loc
     return null;
   };
 
-  // 1. a heading row names the columns
-  const heads = rows[0].map(headingKey);
-  if (heads.filter(Boolean).length >= 2 && heads.includes('locoNo')) {
-    const lc = heads.indexOf('locoNo');
-    for (const r of rows.slice(1)) {
-      const loco = findLoco(r, lc);
-      if (!loco) { if (r.some(Boolean)) unmatched++; continue; }
+  // 1. heading rows name the columns. The whole report sheet can be pasted: title rows are
+  // skipped and each section (other divisions, SC division) is read by its own headings.
+  const isHead = (r) => { const hs = r.map(headingKey); return hs.filter(Boolean).length >= 2 && hs.includes('locoNo') ? hs : null; };
+  if (rows.some(isHead)) {
+    let heads = null;
+    for (const r of rows) {
+      const hs = isHead(r);
+      if (hs) { heads = hs; continue; }
+      if (!heads) continue;
+      const loco = findLoco(r, heads.indexOf('locoNo'));
+      if (!loco) { if (r.filter(Boolean).length >= 3) unmatched++; continue; }
       heads.forEach((f, j) => { if (f && f !== 'locoNo' && j < r.length) put(loco.id, f, r[j]); });
     }
     return { mode: 'headings', edits, cells, unmatched, outside };

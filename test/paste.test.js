@@ -63,3 +63,22 @@ test('with no box clicked and no loco numbers there is nothing to do', () => {
   assert.equal(p.mode, 'none');
   assert.equal(p.cells, 0);
 });
+
+test('the whole report sheet pasted at once: title rows skipped, each section read by its own headings', () => {
+  const text = [
+    'DPWS LOCOS IN OTHER DIV  DATA DT-15-10-2026',
+    'S NO\tDPWCS LOCO NO\tTR.NO\tCURRENT LOCATION\tH/O TRAIN TO OTHER DIV\tH/O POINT\tH/O- TIME\tREMARKS',
+    '1\t44323+42372\tTMU\tBGKT/JU/NWR\tCDG\tWADI\t13:05 31-07\t"FOIS message\ngiven"',
+    '',
+    'SC DIV  DPWS LOCOS  DATA DT-15-10-2026',
+    'S NO\tDPWCS LOCO NO\tTR.NO\tCURRENT LOCATION\tWORKING\tDEFECTIVE TO SHED',
+    '9\t27609(D)+28411\tTP/MU\tCT\tDEFCTIVE\tDEFECTIVE TO SHED',
+    '10\t27300+27402\tYTPV\tVNUP\tYES\tRUSG - SECTOR',
+  ].join('\n');
+  const p = planPaste({ locos, order, start: null, text });
+  assert.equal(p.mode, 'headings');
+  assert.deepEqual(p.edits.get('a'), { trainNo: 'TMU', location: 'BGKT/JU/NWR', hoTrain: 'CDG', hoPoint: 'WADI', hoTime: '13:05 31-07', remarks: 'FOIS message given' });
+  assert.deepEqual(p.edits.get('c'), { trainNo: 'TP/MU', location: 'CT', working: 'DEFCTIVE' });
+  assert.deepEqual(p.edits.get('d'), { trainNo: 'YTPV', location: 'VNUP', working: 'YES' });
+  assert.equal(p.unmatched, 0);
+});

@@ -543,10 +543,47 @@ function viewLocos() {
   });
   return h('div', null,
     h('div', { class: 'toolbar' }, search,
+      h('button', { class: 'btn', onclick: openPasteBox }, 'Paste from Excel'),
       h('button', { class: 'btn primary', onclick: () => openEditor(null) }, '+ Add loco')),
     h('p', { class: 'hint wide-only' }, 'Type in the Train No, Current location or Working box to change it, or paste a block copied from Excel. Click a loco number for all its details.'),
     h('p', { class: 'hint narrow-only' }, 'Tap a loco number to see and update its details.'),
     h('div', { id: 'lists' }, buildLists()));
+}
+
+// A box to paste the whole report sheet (or any cells copied from Excel) into: it shows which
+// locos will get which Train No and Location before anything is changed.
+function openPasteBox() {
+  const dlg = document.getElementById('editor');
+  const preview = h('div', { class: 'paste-preview' }, 'Nothing pasted yet.');
+  const apply = h('button', { type: 'button', class: 'btn primary', disabled: true }, 'Apply');
+  const area = h('textarea', {
+    rows: 8, class: 'paste-area', placeholder: 'Paste the cells copied from Excel here (Ctrl+V)',
+    oninput: () => {
+      const order = state.locos.map((l) => l.id);
+      const plan = planPaste({ locos: state.locos, order, start: null, text: area.value });
+      if (!plan || !plan.cells) {
+        preview.replaceChildren(plan && plan.unmatched ? `None of the ${plan.unmatched} rows matched a loco number.` : 'No loco numbers found. Copy the rows together with the Loco No column.');
+        apply.disabled = true;
+        return;
+      }
+      const name = { trainNo: 'Train', location: 'Location', working: 'Working', hoTrain: 'H/O train', hoPoint: 'H/O point', hoTime: 'H/O time', remarks: 'Remarks', dueDate: 'Due' };
+      preview.replaceChildren(
+        h('p', null, `${plan.edits.size} locos found${plan.unmatched ? `, ${plan.unmatched} rows not matched` : ''}.`),
+        h('ul', null, [...plan.edits].map(([id, f]) => {
+          const l = state.locos.find((x) => x.id === id);
+          return h('li', null, h('b', null, l.locoNo), ' \u2192 ', ['trainNo', 'location', 'working'].filter((k) => k in f).map((k) => `${name[k]}: ${f[k] || '-'}`).join(' | '));
+        })));
+      apply.disabled = false;
+    },
+  });
+  apply.onclick = () => { dlg.close(); applyPaste(area.value, null); };
+  dlg.replaceChildren(h('form', { method: 'dialog', class: 'editor', onsubmit: (e) => e.preventDefault() },
+    h('h2', null, 'Paste from Excel'),
+    h('p', { class: 'hint' }, 'Copy the table from Excel (with the headings or the Loco No column) and paste it here. Each loco gets its Train No, Location and Working by its loco number.'),
+    area, preview,
+    h('div', { class: 'editor-actions' }, apply, h('button', { type: 'button', class: 'btn', onclick: () => dlg.close() }, 'Cancel'))));
+  dlg.showModal();
+  area.focus();
 }
 
 function openEditor(loco) {

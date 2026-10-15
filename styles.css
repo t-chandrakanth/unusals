@@ -457,3 +457,8 @@ body.selecting .cell-input { user-select: none; caret-color: transparent; }
   .card .prev-btn, .card .dot { justify-self: start; margin: 0; }
   .card .prev-btn { width: 100%; text-align: center; padding: 7px 8px; }
 }
+
+.paste-area { width: 100%; font: 13px/1.4 ui-monospace, Consolas, monospace; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: inherit; }
+.paste-preview { max-height: 38vh; overflow: auto; margin: 10px 0; font-size: 13px; }
+.paste-preview ul { margin: 6px 0 0; padding-left: 18px; }
+.paste-preview li { margin: 2px 0; }
