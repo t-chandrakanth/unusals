@@ -1,0 +1,16 @@
+{
+  "name": "SCR TI GOODS",
+  "short_name": "SCR TI GOODS",
+  "description": "DPWCS LOCO and SCR UNUSALS in one app: loco positions, daily report, history, and the unusual, stalling and block reports.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#12263f",
+  "theme_color": "#12263f",
+  "id": "./?app=scr-ti-goods",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

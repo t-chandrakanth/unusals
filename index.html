@@ -4,33 +4,99 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12263f">
-<title>SCR apps</title>
+<title>SCR TI GOODS</title>
+<link rel="manifest" href="manifest.webmanifest?v=1">
 <link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-title" content="SCR TI GOODS">
 <style>
-  :root { --bg: #f3f4f7; --card: #fff; --ink: #17202b; --soft: #5b6878; --line: #d9dee6; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #0e1620; --card: #17222f; --ink: #e8edf3; --soft: #9aa8b8; --line: #2a3a4d; } }
+  :root { --navy: #12263f; --navy-2: #1d3a5f; --amber: #f2b705; --bg: #f3f4f7; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0e1620; } }
   * { box-sizing: border-box; }
-  body { margin: 0; min-height: 100dvh; display: grid; place-content: center; gap: 18px; padding: 24px 16px; background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
-  h1 { margin: 0; text-align: center; font-size: 20px; letter-spacing: 0.5px; }
-  p.sub { margin: -10px 0 0; text-align: center; color: var(--soft); font-size: 14px; }
-  .apps { display: grid; gap: 14px; width: min(460px, 100%); }
-  a.app { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); color: inherit; text-decoration: none; box-shadow: 0 6px 20px rgba(18, 38, 63, 0.08); }
-  a.app img { width: 64px; height: 64px; border-radius: 16px; flex: none; }
-  a.app b { display: block; font-size: 18px; }
-  a.app span { color: var(--soft); font-size: 14px; }
-  a.app:hover { border-color: #3b82d6; }
+  html, body { height: 100%; margin: 0; background: var(--bg); }
+  body { display: flex; flex-direction: column; height: 100dvh; font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+
+  /* the bar with the two apps */
+  .bar { flex: none; display: flex; align-items: stretch; background: var(--navy); color: #fff; padding-top: env(safe-area-inset-top); }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 6px 12px; font-weight: 800; letter-spacing: 0.3px; white-space: nowrap; }
+  .brand img { width: 30px; height: 30px; border-radius: 8px; background: #fff; padding: 1px; }
+  .brand small { display: block; font-size: 10px; font-weight: 600; letter-spacing: 1.2px; color: #c5d2e3; }
+  .apps { flex: 1; display: flex; }
+  .apps button { flex: 1; min-width: 0; padding: 12px 6px; border: 0; border-bottom: 4px solid transparent; background: none; color: #c5d2e3; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .apps button.on { color: #fff; border-bottom-color: var(--amber); background: var(--navy-2); }
+  .apps button:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+  .install { align-self: center; margin: 0 10px; padding: 7px 12px; border: 1px solid var(--amber); border-radius: 99px; background: none; color: var(--amber); font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .install[hidden] { display: none; }
+  @media (max-width: 520px) { .brand small, .brand span { display: none; } }
+
+  /* the two apps stay loaded, so each keeps where it was when you switch */
+  .stage { flex: 1; position: relative; min-height: 0; }
+  .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--bg); }
+  .stage iframe[hidden] { display: none; }
+  noscript { padding: 20px; }
 </style>
 </head>
 <body>
-<h1>South Central Railway</h1>
-<p class="sub">Two separate apps. Open one, then install it from there.</p>
-<div class="apps">
-  <a class="app" href="dpwcs/"><img src="icons/logo.png" alt=""><div><b>DPWCS LOCO</b><span>Loco positions, the daily report and history</span></div></a>
-  <a class="app" href="unusual/"><img src="unusual/icons/icon-192.png" alt=""><div><b>SCR UNUSALS</b><span>Loco, C&amp;W and other unusual reports, day by day</span></div></a>
+<div class="bar">
+  <div class="brand"><img src="icons/logo.png" alt=""><div><span>SCR TI GOODS</span><small>SOUTH CENTRAL RAILWAY</small></div></div>
+  <div class="apps" role="tablist" aria-label="Apps">
+    <button id="tab-dpwcs" role="tab" data-app="dpwcs" aria-controls="f-dpwcs">DPWCS LOCO</button>
+    <button id="tab-unusual" role="tab" data-app="unusual" aria-controls="f-unusual">SCR UNUSALS</button>
+  </div>
+  <button class="install" id="install" hidden>Install app</button>
 </div>
+<div class="stage">
+  <iframe id="f-dpwcs" title="DPWCS LOCO" data-src="dpwcs/?embed=1" hidden></iframe>
+  <iframe id="f-unusual" title="SCR UNUSALS" data-src="unusual/?embed=1" hidden></iframe>
+</div>
+<noscript>This app needs JavaScript turned on.</noscript>
 <script>
-  // The first DPWCS LOCO install opens this address; send it to the app itself.
-  if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) location.replace('dpwcs/');
+  // One app, two parts. Each part is the app that also lives at its own address
+  // (dpwcs/ and unusual/); here they sit side by side behind two tabs.
+  var KEY = 'scr-ti-goods-last';
+  var APPS = ['dpwcs', 'unusual'];
+
+  function show(app, remember) {
+    if (APPS.indexOf(app) < 0) app = 'dpwcs';
+    APPS.forEach(function (name) {
+      var frame = document.getElementById('f-' + name);
+      var on = name === app;
+      // a part is loaded the first time it is opened, then kept
+      if (on && !frame.getAttribute('src')) frame.setAttribute('src', frame.getAttribute('data-src'));
+      frame.hidden = !on;
+      var tab = document.getElementById('tab-' + name);
+      tab.className = on ? 'on' : '';
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.title = app === 'unusual' ? 'SCR UNUSALS' : 'DPWCS LOCO';
+    if (remember) {
+      try { localStorage.setItem(KEY, app); } catch (e) { /* private mode */ }
+      if (location.hash !== '#' + app) history.replaceState(null, '', '#' + app);
+    }
+  }
+
+  APPS.forEach(function (name) {
+    document.getElementById('tab-' + name).addEventListener('click', function () { show(name, true); });
+  });
+  window.addEventListener('hashchange', function () { show(location.hash.slice(1), false); });
+
+  var first = location.hash.slice(1);
+  if (APPS.indexOf(first) < 0) { try { first = localStorage.getItem(KEY); } catch (e) { first = ''; } }
+  show(first, false);
+
+  // install: one icon for both parts
+  var prompt = null;
+  var btn = document.getElementById('install');
+  var installed = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (!installed) btn.hidden = false;
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); prompt = e; });
+  window.addEventListener('appinstalled', function () { btn.hidden = true; prompt = null; });
+  btn.addEventListener('click', function () {
+    if (prompt) { prompt.prompt(); prompt = null; return; }
+    alert('To install: in Chrome or Edge click the install icon at the right end of the address bar, or open the three-dot menu and choose "Install SCR TI GOODS" (Install page as app). On an Android phone use the menu, then "Add to Home screen". On an iPhone use Safari: Share, then "Add to Home Screen".');
+  });
+
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
 </script>
 </body>
 </html>

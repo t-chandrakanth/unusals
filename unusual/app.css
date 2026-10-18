@@ -334,3 +334,5 @@ dialog { border-radius: 20px; }
 .mark-tune { display: flex; align-items: center; gap: 10px; margin: 6px 0 10px; }
 .mark-tune span { font-size: 13px; color: var(--soft); font-weight: 700; }
 .mark-tune input[type=range] { flex: 1; }
+
+html.embed .top .install-banner, html.embed .top .install { display: none !important; }

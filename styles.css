@@ -462,3 +462,6 @@ body.selecting .cell-input { user-select: none; caret-color: transparent; }
 .paste-preview { max-height: 38vh; overflow: auto; margin: 10px 0; font-size: 13px; }
 .paste-preview ul { margin: 6px 0 0; padding-left: 18px; }
 .paste-preview li { margin: 2px 0; }
+
+/* inside the combined app (index.html): the install strip and button are the shell's */
+html.embed .install-banner, html.embed .install { display: none !important; }

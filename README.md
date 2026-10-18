@@ -1,18 +1,34 @@
-# Two apps, one site
+# SCR TI GOODS: one app, two parts
 
-This repository publishes two separate installable apps, each in its own
-folder with its own manifest, scope and service worker, so each installs as an
-app of its own (on Windows and phones) and neither opens inside the other:
+`https://t-chandrakanth.github.io/unusals/` is one installable app with two
+tabs at the top:
 
-| App | Address | Folder |
-|---|---|---|
-| **DPWCS LOCO** | `https://t-chandrakanth.github.io/unusals/dpwcs/` | `dpwcs/` |
-| **SCR UNUSALS** | `https://t-chandrakanth.github.io/unusals/unusual/` | `unusual/` |
+| Tab | What it is | Also opens on its own at | Folder |
+|---|---|---|---|
+| **DPWCS LOCO** | Loco positions, the daily report and history | `.../unusals/dpwcs/` | `dpwcs/` |
+| **SCR UNUSALS** | Loco, stalling, C&W, other and block reports, day by day | `.../unusals/unusual/` | `unusual/` |
 
-`https://t-chandrakanth.github.io/unusals/` is only a front page with a link to
-each. Shared code (`js/`), styles and icons sit above both folders. If an older
-DPWCS LOCO install (from the front-page address) is still on a PC or phone,
-uninstall it and install again from `dpwcs/`.
+Install it once, from the front address, and both open from the one icon. The
+tab you used last is the one it opens on (`#dpwcs` or `#unusual` after the
+address picks one). Each part keeps its own copy of the data on the device and
+both read and write the same shared database, so what is entered in one is seen
+in the other and on every other phone and PC. A part is loaded the first time its
+tab is opened, then kept running, so switching tabs does not lose your place.
+
+How it is put together: the front page (`index.html`) is a thin shell with
+two frames, one for each part, opened with `?embed=1` so a part hides its own
+install strip (the shell has the one Install button). The parts are unchanged
+apps that still work at their own addresses, so older installs of either one
+keep working. Shared code (`js/`), styles and icons sit above both folders.
+
+**Stalling reports** (SCR UNUSALS > Stalling): the one-page stalling report. Enter
+the date and time of the incident, the train and stalling details, and the
+events; the detention and the relief loco's wait are worked out. Pictures of the
+load table and of the section profile are added from the phone or PC; give the
+km at the left and right edge of the profile picture and the red stall line is
+placed at the stall km by itself. The report is shown on screen and sent as PDF,
+image or WhatsApp text. A loco failure card has a "Stalling report" button that
+starts one from it.
 
 **Attaching reports to SCR UNUSALS**: photos (read in the browser), Word (.docx),
 PDF and Excel (.xlsx) files, many at a time. Any layout with labels such as Train No,
