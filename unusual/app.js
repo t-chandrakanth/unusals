@@ -10,6 +10,8 @@ import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
 import { unusualSheet, blockSheet } from '../js/sheet.js';
 import { blankBlock, blankRow, computeBlock, blockMessage, blockTitle, rowDetention, longMins } from '../js/block.js';
 import { buildPdf } from '../js/pdf.js';
+import { blankStalling, readStalling, detShort, whatsappText, reportTitle, detentionText, hasContent, remarksText, markPosition } from '../js/stalling.js';
+import { drawStalling } from '../js/stallingcanvas.js';
 import { sheetToCanvas, canvasToBlob } from '../js/canvas.js';
 import { sheetToXlsx } from '../js/xlsx.js';
 import { readReports, tidyBatch, reportKey } from '../js/reports.js';
@@ -47,7 +49,7 @@ const HINT = {
 const WIDE = new Set(['title', 'locoNo', 'wagonNo', 'bpcNo', 'reason']);
 const FILE_TYPES = 'image/*,.docx,.pdf,.xlsx,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 // The DPWCS LOCO app keeps a list of its own (app = 'dpwcs'); it is not part of this register.
-const rows = () => state.unusuals.filter((u) => u.app !== 'dpwcs' && u.type !== 'block');
+const rows = () => state.unusuals.filter((u) => u.app !== 'dpwcs' && u.type !== 'block' && u.type !== 'stalling');
 const kindOf = (u) => (TYPES[u.type] ? u.type : 'loco');
 
 // ---------- storage on this device ----------
@@ -408,6 +410,7 @@ function card(u, showTag) {
         await shareOrDownload(await canvasToBlob(sheetToCanvas(unusualSheet([u]))), `Unusal-${L.fmtDay(u.day)}-${(u.trainNo || 'report').replace(/[^0-9A-Za-z]+/g, '-')}.png`, `UNUSALS-DATE-${L.fmtDay(u.day)}`);
       }) }, 'Share image'),
       h('button', { class: 'link', onclick: run(() => copyText(L.unusualText([u]))) }, 'Copy as text'),
+      kind === 'loco' && h('button', { class: 'link', onclick: () => openStallingForm(null, u) }, 'Stalling report'),
       h('button', {
         class: 'link danger',
         onclick: () => {
@@ -720,6 +723,263 @@ function viewList() {
     h('div', { id: 'ulist' }, buildList().flat()));
 }
 
+// ---------- stalling reports ----------
+
+const stallings = () => state.unusuals.filter((u) => u.type === 'stalling');
+const readStallingOf = (u) => readStalling(u.stalling, u.day);
+const stallingFile = (s, ext) => `Stalling-${L.fmtDay(s.day)}-${String(s.trainNo || 'report').replace(/[^0-9A-Za-z]+/g, '-')}.${ext}`;
+
+/** A picture chosen on this device, made small enough to be kept with the report. */
+async function pictureData(file, maxW = 1100) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    let width = Math.min(maxW, img.width);
+    let out = '';
+    for (const q of [0.6, 0.5, 0.4]) {
+      const c = document.createElement('canvas');
+      c.width = Math.round(width);
+      c.height = Math.round(img.height * (width / img.width));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      out = c.toDataURL('image/jpeg', q);
+      if (out.length < 220000) break;
+      width *= 0.8;
+    }
+    return out;
+  } finally { URL.revokeObjectURL(url); }
+}
+
+async function stallingBlob(s, type) {
+  const canvas = await drawStalling(s, 1);
+  if (type === 'png') return canvasToBlob(canvas);
+  const jpeg = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.92));
+  return new Blob([buildPdf(new Uint8Array(await jpeg.arrayBuffer()), canvas.width, canvas.height)], { type: 'application/pdf' });
+}
+
+/** The saved record for a stalling report. The whole report is kept as text in the "stalling" box. */
+function stallingRecord(existing, s) {
+  return {
+    ...(existing || L.blankUnusual(s.day)), day: s.day, type: 'stalling', title: reportTitle(s), trainNo: s.trainNo, locoNo: s.locoNo,
+    load: s.load, location: s.section, reason: s.cause, det: detShort(s), stalling: JSON.stringify(s),
+  };
+}
+
+/** The report on screen, with the ways to send it. */
+async function openStallingReport(u) {
+  const dlg = document.getElementById('editor');
+  const s = readStallingOf(u);
+  const run = (fn) => async () => { try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); } };
+  dlg.replaceChildren(h('div', { class: 'editor wide' }, h('p', { class: 'loading' }, 'Drawing the report...')));
+  dlg.showModal();
+  const canvas = await drawStalling(s, 1);
+  canvas.className = 'spage';
+  dlg.replaceChildren(h('div', { class: 'editor wide' },
+    h('div', { class: 'dlg-head stalling' }, reportTitle(s)),
+    h('div', { class: 'spage-wrap' }, canvas),
+    h('div', { class: 'actions' },
+      h('button', { class: 'btn primary', onclick: run(async () => shareOrDownload(await stallingBlob(s, 'pdf'), stallingFile(s, 'pdf'), reportTitle(s))) }, 'PDF'),
+      h('button', { class: 'btn', onclick: run(async () => shareOrDownload(await stallingBlob(s, 'png'), stallingFile(s, 'png'), reportTitle(s))) }, 'Image'),
+      h('button', { class: 'btn whatsapp', onclick: () => sendWhatsApp(whatsappText(s)) }, 'Send on WhatsApp'),
+      h('button', { class: 'btn', onclick: run(() => copyText(whatsappText(s))) }, 'Copy text'),
+      h('button', { class: 'btn', onclick: () => { dlg.close(); openStallingForm(u); } }, 'Edit'),
+      h('button', { class: 'btn', onclick: () => dlg.close() }, 'Close'))));
+}
+
+function stallingCard(u) {
+  const s = readStallingOf(u);
+  const [, m, d] = u.day.split('-');
+  const chip = (label, value, red) => value && h('span', { class: `chip ${red ? 'red' : ''}` }, h('small', null, label), value);
+  const run = (fn) => async () => { try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); } };
+  return h('article', { class: 'ucard k-stall' },
+    h('div', { class: 'ucard-top' },
+      h('div', { class: 'udate' }, h('b', null, d), h('span', null, `${MONTHS[Number(m) - 1]} ${u.day.slice(0, 4)}`)),
+      h('div', { class: 'utitle' },
+        h('strong', null, reportTitle(s)),
+        h('div', { class: 'chips' },
+          chip('SECTION', s.section), chip('KM', s.km), chip('LOCO', s.locoNo), chip('LOAD', s.load), chip('CAUSE', s.cause, true))),
+      u.det && h('span', { class: 'det' }, h('small', null, 'DET'), u.det)),
+    detentionText(s) && h('p', { class: 'ucard-rep' }, detentionText(s)),
+    h('div', { class: 'ucard-actions' },
+      h('button', { class: 'link', onclick: () => openStallingReport(u) }, 'Open report'),
+      h('button', { class: 'link', onclick: () => openStallingForm(u) }, 'Edit'),
+      h('button', { class: 'link', onclick: () => sendWhatsApp(whatsappText(s)) }, 'Send on WhatsApp'),
+      h('button', { class: 'link', onclick: run(async () => shareOrDownload(await stallingBlob(s, 'pdf'), stallingFile(s, 'pdf'), reportTitle(s))) }, 'PDF'),
+      h('button', { class: 'link', onclick: run(async () => shareOrDownload(await stallingBlob(s, 'png'), stallingFile(s, 'png'), reportTitle(s))) }, 'Image'),
+      h('button', {
+        class: 'link danger',
+        onclick: () => {
+          if (!confirm(`Delete the stalling report of ${L.fmtDay(u.day)} (train ${s.trainNo || ''})?`)) return;
+          commit(L.reduce(state, { type: 'removeUnusual', id: u.id }));
+          toast('Deleted');
+          render();
+        },
+      }, 'Delete')));
+}
+
+/**
+ * The form, with the boxes of the stalling report in its own order: when it happened, the train
+ * and stalling details, the sequence of events, remarks, repercussions, then the two pictures.
+ * existing: a saved stalling report to edit. from: a loco failure to start from (its train, loco,
+ * load, section and what it says happened are carried over).
+ */
+function openStallingForm(existing, from) {
+  const dlg = document.getElementById('editor');
+  const s = existing ? readStallingOf(existing) : blankStalling(from ? from.day : today());
+  if (!existing && from) {
+    Object.assign(s, { trainNo: from.trainNo || '', locoNo: from.locoNo || '', load: from.load || '', section: from.location || '', remarks: from.reason || '' });
+  }
+  let autoEl;
+  let markEl;
+  const locos = [...new Set(state.locos.map((l) => l.locoNo).filter(Boolean))];
+  const refresh = () => {
+    if (autoEl) autoEl.textContent = detentionText(s) || 'The detention is worked out by itself from the time of the incident and the spot departure.';
+    if (markEl) {
+      const p = markPosition(s);
+      markEl.textContent = s.markOff ? 'The stall is not marked on the profile.'
+        : p === null ? 'Give the km at the left and right edge of the profile picture and the stall is marked at its km by itself.'
+          : `The stall (km ${s.km}) is marked ${Math.round(p)}% along the picture${String(s.markX) !== '' ? ' (set by hand)' : ''}.`;
+    }
+  };
+
+  const box = (key, label, type = 'text', placeholder = '', wide = false, list = '') => {
+    const el = h('input', { type, value: s[key], placeholder, autocomplete: 'off', autocapitalize: type === 'text' ? 'characters' : null });
+    if (list) el.setAttribute('list', list);
+    el.addEventListener('input', (e) => { s[key] = e.target.value; refresh(); });
+    return h('label', { class: `field ${wide ? 'wide' : ''}` }, h('span', null, label), el);
+  };
+  const bare = (get, set, label, placeholder, type = 'text') => {
+    const el = h('input', { type, value: get(), placeholder, 'aria-label': label, autocomplete: 'off' });
+    el.addEventListener('input', (e) => { set(e.target.value); refresh(); });
+    return el;
+  };
+
+  const picture = (imgKey, label) => {
+    const holder = h('div', { class: 'pic-holder' });
+    const chooser = h('input', {
+      type: 'file', accept: 'image/*', style: 'display:none',
+      onchange: async (e) => {
+        const f = e.target.files[0];
+        e.target.value = '';
+        if (!f) return;
+        try { s[imgKey] = await pictureData(f); show(); } catch { toast('That picture could not be read.'); }
+      },
+    });
+    const show = () => holder.replaceChildren(
+      s[imgKey] ? h('img', { src: s[imgKey], alt: label, class: 'pic-thumb' }) : h('span', { class: 'nothing' }, 'No picture yet. Take a photo of the page or choose one.'),
+      h('div', { class: 'pic-actions' },
+        h('button', { type: 'button', class: 'btn small', onclick: () => chooser.click() }, s[imgKey] ? 'Change picture' : 'Add picture'),
+        s[imgKey] && h('button', { type: 'button', class: 'btn small', onclick: () => { s[imgKey] = ''; show(); } }, 'Remove')));
+    show();
+    return h('div', null, holder, chooser);
+  };
+
+  const build = () => {
+    const eventRows = h('div', { class: 'ev-rows' },
+      s.events.map((e, i) => h('div', { class: 'ev-row' },
+        bare(() => e.t, (v) => { e.t = v; }, 'Time', '19:06–19:27'),
+        bare(() => e.text, (v) => { e.text = v; }, 'What happened', 'Backed up to km 479/01, but did not start'),
+        h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.events.splice(i, 1); if (!s.events.length) s.events.push({ t: '', text: '' }); build(); } }, '×'))));
+    const repRows = h('div', { class: 'ev-rows' },
+      s.repercussions.map((r, i) => h('div', { class: 'ev-row rep' },
+        h('span', { class: 'rn' }, String(i + 1)),
+        bare(() => r, (v) => { s.repercussions[i] = v; }, 'Repercussion', 'MLSW – KMT ARR 19:33'),
+        h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.repercussions.splice(i, 1); if (!s.repercussions.length) s.repercussions.push(''); build(); } }, '×'))));
+    const remarks = h('textarea', { rows: 4, value: s.remarks, placeholder: 'Left empty, the remarks are written from the train timings and the events.' });
+    remarks.addEventListener('input', (e) => { s.remarks = e.target.value; });
+    const slider = h('input', {
+      type: 'range', min: 0, max: 100, value: String(s.markX) !== '' ? s.markX : (markPosition(s) ?? 95), 'aria-label': 'Move the red line along the picture',
+      oninput: (e) => { s.markX = e.target.value; refresh(); },
+    });
+
+    dlg.replaceChildren(h('div', { class: 'editor' },
+      h('div', { class: 'dlg-head stalling' }, existing ? 'Edit stalling report' : 'New stalling report'),
+      h('form', {
+        class: 'u-form',
+        onsubmit: (e) => {
+          e.preventDefault();
+          if (!s.day) { toast('Pick the date of the incident'); return; }
+          if (!hasContent(s)) { toast('Write at least the train and what happened'); return; }
+          s.trainNo = s.trainNo.trim().toUpperCase();
+          const rec = stallingRecord(existing, s);
+          dlg.close();
+          save(rec);
+          toast('Stalling report saved');
+          render();
+          const saved = state.unusuals.find((u) => u.id === rec.id);
+          if (saved) openStallingReport(saved);
+        },
+      },
+      h('div', { class: 'grid' }, box('day', 'Date of incident', 'date'), box('stallAt', 'Time of incident', 'time')),
+      h('h3', { class: 'rep-title' }, 'Train and stalling details'),
+      h('div', { class: 'grid' },
+        box('trainNo', 'Train No', 'text', 'DRTA'),
+        box('locoNo', 'Loco No', 'text', '44022 / G-9 / BRC / 28/10', false, 'st-locos'),
+        box('load', 'Load', 'text', '47 / 47 / 4104 T (BLC wagons)'),
+        box('section', 'Section', 'text', 'KMT – MLMG'),
+        box('km', 'Stalled at KM', 'text', '478/01'),
+        box('gradient', 'Gradient', 'text', '1 in 106 (rising for UP train)'),
+        box('speed', 'Loco speed at stalling point', 'text', 'Normal'),
+        box('signals', 'Signal aspects', 'text', 'Through'),
+        box('cause', 'Cause of stalling', 'text', 'Drizzling weather', true)),
+      h('h3', { class: 'rep-title' }, 'Sequence of events'),
+      h('div', { class: 'grid three' }, box('station', 'Station and line', 'text', 'KMT main line'), box('arr', 'Arr', 'time'), box('dep', 'Dep', 'time')),
+      eventRows,
+      h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.events.push({ t: '', text: '' }); build(); } }, '+ Add a row')),
+      h('p', { class: 'rep-note' }, 'The time of the incident becomes the first row ("Loco stalled at km ...") by itself. Write the rest: backed up, relief loco asked, relief loco arrived, EOT, spot departure, and so on.'),
+      h('div', { class: 'auto-det' }, (autoEl = h('b'))),
+      h('details', { class: 'o-panel' },
+        h('summary', null, 'Relief loco arrived / spot departure times, if they are not written in the events'),
+        h('div', { class: 'grid' }, box('reliefAt', 'Relief loco arrived', 'time'), box('spotDep', 'Spot departure', 'time'))),
+      h('h3', { class: 'rep-title' }, 'Remarks'),
+      remarks,
+      h('div', { class: 'rep-foot' }, h('button', {
+        type: 'button', class: 'btn small',
+        onclick: () => { const keep = s.remarks; s.remarks = ''; const text = remarksText(s); s.remarks = keep; remarks.value = text; s.remarks = text; },
+      }, 'Write the remarks from the events')),
+      h('h3', { class: 'rep-title' }, 'Repercussions'),
+      repRows,
+      h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.repercussions.push(''); build(); } }, '+ Add a row')),
+      h('h3', { class: 'rep-title' }, 'Load table'),
+      picture('loadImg', 'Load table'),
+      h('details', { class: 'o-panel' }, h('summary', null, 'Heading and note under the load table (optional)'),
+        h('div', { class: 'grid' }, box('loadHead', 'Heading', 'text', 'Load table (BZA–KZJ: 220 km, ruling gradient 1 in 150)', true), box('loadNote', 'Note', 'text', 'Single WAG-9 is P* for 45 BLC. The train had 47 BLC, 2 wagons above.', true))),
+      h('h3', { class: 'rep-title' }, 'Section profile at the stalling point'),
+      picture('profileImg', 'Section profile'),
+      h('div', { class: 'grid' },
+        box('profFrom', 'Km at the left edge of the picture', 'text', '465'),
+        box('profTo', 'Km at the right edge of the picture', 'text', '479')),
+      h('div', { class: 'auto-det' }, (markEl = h('b'))),
+      h('label', { class: 'check' }, h('input', {
+        type: 'checkbox', checked: !s.markOff,
+        onchange: (e) => { s.markOff = !e.target.checked; refresh(); },
+      }), 'Mark the stall km on the profile with a red line'),
+      h('div', { class: 'mark-tune' },
+        h('span', null, 'Fine-tune'), slider,
+        h('button', { type: 'button', class: 'btn small', onclick: () => { s.markX = ''; build(); } }, 'Place by km')),
+      h('details', { class: 'o-panel' }, h('summary', null, 'Heading and note under the profile (optional)'),
+        h('div', { class: 'grid' }, box('profileHead', 'Heading', 'text', 'Section profile at the stalling point (UP line, Warangal–Vijayawada)', true), box('profileNote', 'Note', 'text', 'At km 478/01 the profile is F 106 (1 in 106), steeper than 1 in 150.', true))),
+      h('datalist', { id: 'st-locos' }, locos.map((t) => h('option', { value: t }))),
+      h('div', { class: 'editor-actions' },
+        h('button', { type: 'submit', class: 'btn primary' }, 'Save and show the report'),
+        h('button', { type: 'button', class: 'btn', onclick: () => dlg.close() }, 'Cancel')))));
+    refresh();
+  };
+  build();
+  dlg.showModal();
+}
+
+function viewStalling() {
+  const list = stallings();
+  return h('div', null,
+    SHARED && status.unusualsMissing && h('p', { class: 'notice' }, 'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase.'),
+    h('div', { class: 'uhead' }, h('button', { class: 'btn new stalling', onclick: () => openStallingForm() }, 'New stalling report')),
+    list.length
+      ? L.unusualsByDay(list).map(([day, items]) => h('section', null,
+        h('h2', { class: 'section-title' }, officialDay(day), h('span', { class: 'count' }, items.length)),
+        h('div', { class: 'ucards' }, items.map(stallingCard))))
+      : h('p', { class: 'empty-big' }, 'No stalling reports yet. Press the button above to write the first one. A loco failure card also has a "Stalling report" button that starts one from it.'));
+}
+
 // ---------- install as an app ----------
 // Chrome and Edge (Windows and Android) hand us an install prompt; other
 // browsers get short instructions. A strip at the top offers it in one tap.
@@ -768,8 +1028,8 @@ function statusText() {
 
 function render() {
   const count = (t) => rows().filter((u) => kindOf(u) === t).length;
-  const tabs = [['overview', 'Overview', null], ['loco', 'Loco failures', count('loco')], ['cw', 'C&W failures', count('cw')], ['other', 'Others', count('other')], ['all', 'All', rows().length], ['block', 'Block detention', blocks().length]];
-  const dots = { loco: 'var(--k-fail)', cw: 'var(--k-other)', other: 'var(--k-dpwcs)', all: 'var(--navy)', overview: 'var(--navy)', block: '#6f8bff' };
+  const tabs = [['overview', 'Overview', null], ['loco', 'Loco failures', count('loco')], ['stalling', 'Stalling', stallings().length], ['cw', 'C&W failures', count('cw')], ['other', 'Others', count('other')], ['all', 'All', rows().length], ['block', 'Block detention', blocks().length]];
+  const dots = { stalling: 'var(--k-stall)', loco: 'var(--k-fail)', cw: 'var(--k-other)', other: 'var(--k-dpwcs)', all: 'var(--navy)', overview: 'var(--navy)', block: '#6f8bff' };
   repeatMap = new Map(repeatLocos(rows(), addDays(today(), -90)).map((r) => [r.loco, r.count]));
   document.getElementById('app').replaceChildren(
     h('header', { class: `top ${!isInstalled() && !bannerClosed() ? 'has-banner' : ''}` },
@@ -796,7 +1056,7 @@ function render() {
       class: ui.view === id ? 'on' : '',
       onclick: () => { ui.view = id; ui.month = 'all'; ui.search = ''; ui.range = 'all'; ui.from = ''; ui.to = ''; render(); window.scrollTo(0, 0); },
     }, h('i', { class: 'dot-k', style: `--c:${dots[id]}` }), text, n != null && h('span', { class: 'n' }, String(n))))),
-    h('main', null, ui.view === 'overview' ? viewOverview() : ui.view === 'block' ? viewBlocks() : viewList()));
+    h('main', null, ui.view === 'overview' ? viewOverview() : ui.view === 'block' ? viewBlocks() : ui.view === 'stalling' ? viewStalling() : viewList()));
 }
 
 function onSyncStatus(next) {
