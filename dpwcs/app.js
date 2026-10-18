@@ -114,7 +114,10 @@ function sendWhatsApp(text) {
   const max = 5500; // a longer message does not fit in a WhatsApp link
   const cut = text.length > max;
   const body = cut ? `${text.slice(0, max).replace(/\n[^\n]*$/, '')}\n...` : text;
-  window.open(`https://wa.me/?text=${encodeURIComponent(body)}`, '_blank', 'noopener');
+  // One named tab for every send: the WhatsApp Web already opened is used again, not a new tab each time.
+  // (A phone has no WhatsApp Web, so it goes to the WhatsApp app.)
+  const link = window.matchMedia('(pointer: coarse)').matches ? 'https://wa.me/' : 'https://web.whatsapp.com/send';
+  window.open(`${link}?text=${encodeURIComponent(body)}`, 'scr-whatsapp-web');
   if (cut) toast('A long list is cut for WhatsApp. Use Share image or Excel file to send all of it.');
 }
 

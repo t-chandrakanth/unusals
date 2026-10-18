@@ -80,12 +80,22 @@ async function saveState(s) {
 
 // ---------- state ----------
 
+// A redraw (from the shared database) waits while a cell is being typed in, then happens.
+let pendingRender = false;
+function renderSafe() {
+  const a = document.activeElement;
+  if (a && a.closest && a.closest('table.cells')) { pendingRender = true; return; }
+  render();
+}
+document.addEventListener('focusout', () => { if (pendingRender) { pendingRender = false; setTimeout(render, 0); } });
+
+
 const SHARED = !!(SUPABASE_URL && SUPABASE_KEY) && !REQUIRE_LOGIN;
 const NO_SYNC = { outbox: [], cursor: {}, linked: false };
 let state = L.emptyState();
 let sync = null;
 let status = { phase: SHARED ? 'syncing' : 'local', pending: 0, email: '', error: '', unusualsMissing: false };
-const ui = { view: 'overview', search: '', month: 'all', range: 'all', from: '', to: '', sumDay: '' };
+const ui = { view: 'overview', search: '', month: 'all', range: 'all', from: '', to: '', sumDay: '', dayOf: {}, focusNew: false };
 let repeatMap = new Map(); // loco number -> reports in the last 90 days, when more than one
 
 const who = () => (sync && sync.email ? sync.email.split('@')[0] : '');
@@ -441,7 +451,10 @@ function sendWhatsApp(text) {
   const max = 5500; // a longer message does not fit in a WhatsApp link
   const cut = text.length > max;
   const body = cut ? `${text.slice(0, max).replace(/\n[^\n]*$/, '')}\n...` : text;
-  window.open(`https://wa.me/?text=${encodeURIComponent(body)}`, '_blank', 'noopener');
+  // One named tab for every send: the WhatsApp Web already opened is used again, not a new tab each time.
+  // (A phone has no WhatsApp Web, so it goes to the WhatsApp app.)
+  const link = window.matchMedia('(pointer: coarse)').matches ? 'https://wa.me/' : 'https://web.whatsapp.com/send';
+  window.open(`${link}?text=${encodeURIComponent(body)}`, 'scr-whatsapp-web');
   if (cut) toast('A long list is cut for WhatsApp. Use Share image or Excel file to send all of it.');
 }
 
@@ -587,11 +600,7 @@ function viewBlocks() {
   const list = blocks();
   return h('div', null,
     h('div', { class: 'uhead' }, h('button', { class: 'btn new block', onclick: () => openBlockForm() }, 'New block detention report')),
-    list.length
-      ? L.unusualsByDay(list).map(([day, items]) => h('section', null,
-        h('h2', { class: 'section-title' }, officialDay(day), h('span', { class: 'count' }, items.length)),
-        h('div', { class: 'ucards' }, items.map(blockCard))))
-      : h('p', { class: 'empty-big' }, 'No block detention reports yet. Press the button above to write the first one.'));
+    dayShell('block', list, (day, items) => (items.length ? h('div', { class: 'ucards' }, items.map(blockCard)) : h('p', { class: 'empty-big' }, 'No block detention report on this date.'))));
 }
 
 function viewOverview() {
@@ -619,8 +628,8 @@ function viewOverview() {
       h('div', { class: 'hero-top' },
         h('div', null, h('div', { class: 'big' }, String(list.length)), h('small', null, 'unusual reports on record')),
         h('div', { class: 'when' }, h('b', null, String(list.filter((u) => u.day.startsWith(month)).length)), ' this month', h('br'), h('b', null, String(list.filter((u) => u.day >= week).length)), ' in the last 7 days')),
-      h('div', { class: 'hero-actions' }, [...Object.entries(TYPES).map(([k, ty]) => h('button', { class: `btn hero-new ${k}`, onclick: () => openForm(k) }, `+ ${ty.name.replace(/s$/, '')}`)), h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files')])),
-    h('div', { class: 'kpis' }, kpi('loco', 'Loco failures', count('loco')), kpi('cw', 'C&W failures', count('cw')), kpi('other', 'Others', count('other')), kpi('all', 'All reports', list.length)),
+      h('div', { class: 'hero-actions' }, [h('button', { class: 'btn hero-new loco', onclick: () => openStallingForm() }, '+ Stalling report'), h('button', { class: 'btn hero-new block', onclick: () => openBlockForm() }, '+ Block detention'), h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files')])),
+    h('div', { class: 'kpis' }, kpi('loco', 'Loco failures', count('loco')), kpi('cw', 'C&W failures', count('cw')), kpi('all', 'All reports', list.length)),
     h('section', { class: 'card-box' },
       h('h2', null, 'Daily WhatsApp summary'),
       h('p', { class: 'nothing', style: 'margin-bottom:10px' }, 'The counts and a short line for each report of one day, ready to paste into the group.'),
@@ -653,74 +662,134 @@ function viewOverview() {
             h('div', { class: 'meter' }, h('i', { style: `width:${Math.round((x.min / longest[0].min) * 100)}%` })),
             h('div', { class: 'sub' }, `${L.fmtDay(x.u.day)}  |  ${x.u.location || ''}  |  ${x.u.trainNo || ''}`))))
           : h('p', { class: 'nothing' }, 'No detention times written in the last 90 days.'))),
-    h('h2', { class: 'section-title' }, 'Latest reports'),
-    h('div', { class: 'ucards' }, latest.map((u) => card(u, true))));
+    h('p', { class: 'hint' }, 'Open a tab and click a date to see its reports.'));
+}
+
+// ---------- by date ----------
+// Nothing from the past is shown until a date is clicked. The dates are listed at the
+// side; the reports of the clicked day are shown on their own.
+
+/** A list of dates with the number of reports on each, and the chosen day's content beside it. */
+function dayShell(view, items, content) {
+  const counts = new Map();
+  for (const u of items) counts.set(u.day, (counts.get(u.day) || 0) + 1);
+  const days = [...counts.keys()].sort().reverse();
+  const sel = ui.dayOf[view] || '';
+  const pick = (d) => { ui.dayOf[view] = d; render(); };
+  const chip = (d, label) => h('button', { class: `dchip ${d === sel ? 'on' : ''}`, onclick: () => pick(d) },
+    h('b', null, label || L.fmtDay(d)), counts.get(d) ? h('span', null, String(counts.get(d))) : null);
+  const goTo = h('input', { type: 'date', value: sel, 'aria-label': 'Go to a date', onchange: (e) => { if (e.target.value) pick(e.target.value); } });
+  return h('div', { class: 'dayview' },
+    h('aside', { class: 'daylist' },
+      h('label', { class: 'dfield' }, 'Go to date', goTo),
+      chip(today(), 'Today'),
+      days.filter((d) => d !== today()).map((d) => chip(d))),
+    h('div', { class: 'daymain' }, sel
+      ? [h('h2', { class: 'section-title' }, officialDay(sel), h('span', { class: 'count' }, String(counts.get(sel) || 0))), content(sel, items.filter((u) => u.day === sel))]
+      : h('p', { class: 'empty-big' }, 'Click a date on the left to see its reports.')));
+}
+
+// The boxes of each kind, as the columns of the table. Each box can be typed in.
+const CELLS = {
+  loco: [['title', 'Train details (heading)', 'c-title'], ['location', 'Location'], ['trainNo', 'Train no'], ['locoNo', 'Loco no'], ['load', 'Load'], ['det', 'DET'], ['reason', 'Reason', 'c-reason']],
+  cw: [['title', 'Train details (heading)', 'c-title'], ['location', 'Location'], ['trainNo', 'Train no'], ['locoNo', 'Loco no'], ['load', 'Load'], ['wagonNo', 'Wagon no'], ['bpcNo', 'BPC no'], ['det', 'DET'], ['reason', 'Reason', 'c-reason']],
+};
+CELLS.all = CELLS.cw;
+const KIND_NAME = { loco: 'Loco', cw: 'C&W', other: 'Other' };
+
+/** One day's reports as cells: click a cell to change it, the empty row at the end is for a new report. */
+function dayCells(view, day, items) {
+  const cols = CELLS[view];
+  const sorted = [...items].sort((a, b) => (a.updatedAt || '').localeCompare(b.updatedAt || ''));
+  const grow = (el) => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; };
+  const box = (key, label, value, wide) => {
+    const el = h('textarea', { rows: 1, class: `cell ${wide || ''}`, 'aria-label': label, autocapitalize: key === 'reason' ? null : 'characters', autocomplete: 'off' });
+    el.value = value || '';
+    el.addEventListener('input', () => grow(el));
+    requestAnimationFrame(() => grow(el));
+    return el;
+  };
+  const typeBox = (value) => {
+    const el = h('select', { class: 'cell kind', 'aria-label': 'Kind' }, Object.entries(KIND_NAME).map(([k, n]) => h('option', { value: k, selected: k === value }, n)));
+    return el;
+  };
+  const run = (fn) => async () => { try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); } };
+
+  const body = h('tbody');
+  sorted.forEach((u, i) => {
+    const current = () => state.unusuals.find((x) => x.id === u.id) || u;
+    const tr = h('tr', null, h('td', { class: 'sr' }, String(i + 1)));
+    for (const [key, label, wide] of cols) {
+      const el = box(key, label, u[key], wide);
+      el.addEventListener('change', () => {
+        const cur = current();
+        if (el.value.trim() === String(cur[key] || '').trim()) return;
+        save({ ...cur, [key]: el.value });
+        toast('Saved');
+      });
+      tr.append(h('td', null, el));
+    }
+    if (view === 'all') {
+      const sel = typeBox(kindOf(u));
+      sel.addEventListener('change', () => { save({ ...current(), type: sel.value }); toast('Saved'); render(); });
+      tr.append(h('td', null, sel));
+    }
+    tr.append(h('td', { class: 'act' },
+      h('button', { class: 'ibtn', title: 'Open in the form (attach a file, or paste a report)', 'aria-label': 'Open in the form', onclick: () => openForm(kindOf(u), current()) }, '✎'),
+      h('button', { class: 'ibtn danger', title: 'Delete this report', 'aria-label': 'Delete this report', onclick: () => {
+        if (!confirm(`Delete the report of ${L.fmtDay(u.day)} (${u.title || 'no heading'})?`)) return;
+        commit(L.reduce(state, { type: 'removeUnusual', id: u.id }));
+        toast('Deleted');
+        render();
+      } }, '×')));
+    body.append(tr);
+  });
+
+  // the empty row: typing anything in it and leaving the box saves it as a new report on this day
+  const fresh = h('tr', { class: 'newrow' }, h('td', { class: 'sr' }, '+'));
+  const freshBoxes = new Map();
+  for (const [key, label, wide] of cols) {
+    const el = box(key, `New: ${label}`, '', wide);
+    el.placeholder = key === 'title' ? 'Type a new report here' : '';
+    freshBoxes.set(key, el);
+    fresh.append(h('td', null, el));
+  }
+  let kindBox = null;
+  if (view === 'all') { kindBox = typeBox('loco'); fresh.append(h('td', null, kindBox)); }
+  fresh.append(h('td', { class: 'act' }));
+  const addNew = () => {
+    const values = {};
+    let any = false;
+    for (const [key, el] of freshBoxes) { values[key] = el.value; if (el.value.trim()) any = true; }
+    if (!any) return;
+    save({ ...L.blankUnusual(day), type: view === 'all' ? kindBox.value : view, ...values });
+    toast('Report saved');
+    ui.focusNew = true;
+    render();
+  };
+  // saved when focus leaves the whole row, so moving from box to box does not cut a report in two
+  fresh.addEventListener('focusout', (e) => { if (!fresh.contains(e.relatedTarget)) addNew(); });
+  body.append(fresh);
+
+  const head = h('thead', null, h('tr', null,
+    h('th', { class: 'sr' }, '#'), cols.map(([, label, wide]) => h('th', { class: wide || '' }, label)),
+    view === 'all' && h('th', null, 'Kind'), h('th', { class: 'act' }, '')));
+
+  return h('div', null,
+    items.length > 0 && exportBar(unusualSheet(items, 'Unusals'), `Unusals-${day}`, `SCR UNUSALS ${L.fmtDay(day)}`,
+      () => `*SCR UNUSALS ${L.fmtDay(day)}*\n\n${L.unusualText(items)}`),
+    h('div', { class: 'cells-wrap' }, h('table', { class: 'cells' }, head, body)),
+    h('p', { class: 'hint' }, 'Click a cell to change it: it is saved when you click away. Type in the last row to add a report to this day.'));
 }
 
 function viewList() {
-  const type = ui.view;
-  const pool = type === 'all' ? rows() : rows().filter((u) => kindOf(u) === type);
-  const months = [...new Set(pool.map((u) => u.day.slice(0, 7)))].sort().reverse();
-  if (ui.month !== 'all' && !months.includes(ui.month)) ui.month = 'all';
-
-  const buildList = () => {
-    const q = ui.search.trim().toLowerCase();
-    // the quick chips, or the From and To dates typed in
-    let since = ui.range === 'all' || ui.range === 'custom' ? '' : addDays(today(), -(Number(ui.range) - 1));
-    let until = '';
-    if (ui.range === 'custom') { since = ui.from || ''; until = ui.to || ''; }
-    const visible = pool.filter((u) => (ui.month === 'all' || u.day.startsWith(ui.month)) && u.day >= since && (!until || u.day <= until) &&
-      (!q || [u.title, u.location, u.trainNo, u.locoNo, u.reason, u.load, u.wagonNo, u.bpcNo, u.incident, L.fmtDay(u.day)].some((v) => (v || '').toLowerCase().includes(q))));
-    if (!visible.length) return [h('p', { class: 'empty-big' }, pool.length ? 'No report matches.' : 'No reports yet. Press the button above to write the first one.')];
-    const name = type === 'all' ? 'All' : TYPES[type].name.replace(/\W+/g, '-');
-    const span = since || until ? `${since ? L.fmtDay(since) : 'the start'} to ${until ? L.fmtDay(until) : L.fmtDay(today())}` : '';
-    const heading = `SCR UNUSALS ${TYPES[type] ? TYPES[type].name : 'all reports'}${span ? ` ${span}` : ''}`;
-    return [
-      h('p', { class: 'hint' }, `${visible.length} report${visible.length === 1 ? '' : 's'}${span ? `, ${span}` : ''}, day by day. Share them all as one sheet, oldest first.`),
-      exportBar(unusualSheet(visible, 'Unusals'),
-        `Unusals-${name}${ui.month === 'all' ? '' : `-${monthLabel(ui.month).replace(' ', '-')}`}${span ? `-${(since || 'start')}_to_${until || today()}` : ''}`,
-        heading, () => `*${heading}*\n\n${L.unusualText(visible)}`),
-      L.unusualsByDay(visible).map(([day, items]) => h('section', null,
-        h('h2', { class: 'section-title' }, officialDay(day), h('span', { class: 'count' }, items.length)),
-        h('div', { class: 'ucards' }, items.map((u) => card(u, type === 'all'))))),
-    ];
-  };
-
-  const refresh = () => document.getElementById('ulist').replaceChildren(...buildList().flat());
-  const search = h('input', {
-    type: 'search', class: 'search', placeholder: 'Search train, loco, wagon, location or reason', value: ui.search,
-    oninput: (e) => { ui.search = e.target.value; refresh(); },
-  });
-  const month = h('select', { 'aria-label': 'Month', onchange: (e) => { ui.month = e.target.value; refresh(); } },
-    h('option', { value: 'all', selected: ui.month === 'all' }, 'All months'),
-    months.map((m) => h('option', { value: m, selected: m === ui.month }, monthLabel(m))));
-  const newButtons = TYPES[type]
-    ? [h('button', { class: `btn new ${type}`, onclick: () => openForm(type) }, `New ${({ loco: 'loco failure', cw: 'C&W failure', other: 'other' })[type]} report`)]
-    : Object.entries(TYPES).map(([k, t]) => h('button', { class: `btn new ${k}`, onclick: () => openForm(k) }, `+ ${t.name}`));
-  newButtons.push(h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files'));
-  newButtons.push(h('button', { class: 'btn whatsapp', onclick: () => sendWhatsApp(daySummaryText(today())) }, "Today's reports on WhatsApp"));
+  const view = CELLS[ui.view] ? ui.view : 'all';
+  const pool = view === 'all' ? rows() : rows().filter((u) => kindOf(u) === view);
   return h('div', null,
     SHARED && status.unusualsMissing && h('p', { class: 'notice' },
       'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase (steps are in the README). Nothing is lost meanwhile.'),
-    h('div', { class: 'uhead' }, newButtons),
-    h('div', { class: 'uhead' }, search, month),
-    h('div', { class: 'chips-row' },
-      [['all', 'All time'], ['30', 'Last 30 days'], ['7', 'Last 7 days'], ['1', 'Today']].map(([v, text]) => h('button', {
-        class: `rchip ${ui.range === v ? 'on' : ''}`,
-        onclick: () => { ui.range = v; ui.from = ''; ui.to = ''; render(); },
-      }, text)),
-      ...['from', 'to'].map((k) => h('label', { class: 'dfield' }, k === 'from' ? 'From' : 'To', h('input', {
-        type: 'date', value: ui[k], 'aria-label': k === 'from' ? 'From date' : 'To date',
-        onchange: (e) => {
-          ui[k] = e.target.value;
-          ui.range = ui.from || ui.to ? 'custom' : 'all';
-          // swap them if they were typed the wrong way round
-          if (ui.from && ui.to && ui.from > ui.to) { [ui.from, ui.to] = [ui.to, ui.from]; }
-          render();
-        },
-      }))),
-      (ui.from || ui.to) && h('button', { class: 'rchip', onclick: () => { ui.range = 'all'; ui.from = ''; ui.to = ''; render(); } }, 'Clear dates')),
-    h('div', { id: 'ulist' }, buildList().flat()));
+    h('div', { class: 'uhead' }, h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files')),
+    dayShell(view, pool, (day, items) => dayCells(view, day, items)));
 }
 
 // ---------- stalling reports ----------
@@ -973,11 +1042,7 @@ function viewStalling() {
   return h('div', null,
     SHARED && status.unusualsMissing && h('p', { class: 'notice' }, 'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase.'),
     h('div', { class: 'uhead' }, h('button', { class: 'btn new stalling', onclick: () => openStallingForm() }, 'New stalling report')),
-    list.length
-      ? L.unusualsByDay(list).map(([day, items]) => h('section', null,
-        h('h2', { class: 'section-title' }, officialDay(day), h('span', { class: 'count' }, items.length)),
-        h('div', { class: 'ucards' }, items.map(stallingCard))))
-      : h('p', { class: 'empty-big' }, 'No stalling reports yet. Press the button above to write the first one. A loco failure card also has a "Stalling report" button that starts one from it.'));
+    dayShell('stalling', list, (day, items) => (items.length ? h('div', { class: 'ucards' }, items.map(stallingCard)) : h('p', { class: 'empty-big' }, 'No stalling report on this date.'))));
 }
 
 // ---------- install as an app ----------
@@ -1028,7 +1093,7 @@ function statusText() {
 
 function render() {
   const count = (t) => rows().filter((u) => kindOf(u) === t).length;
-  const tabs = [['overview', 'Overview', null], ['loco', 'Loco failures', count('loco')], ['stalling', 'Stalling', stallings().length], ['cw', 'C&W failures', count('cw')], ['other', 'Others', count('other')], ['all', 'All', rows().length], ['block', 'Block detention', blocks().length]];
+  const tabs = [['overview', 'Overview', null], ['loco', 'Loco failures', count('loco')], ['stalling', 'Stalling', stallings().length], ['cw', 'C&W failures', count('cw')], ['all', 'All', rows().length], ['block', 'Block detention', blocks().length]];
   const dots = { stalling: 'var(--k-stall)', loco: 'var(--k-fail)', cw: 'var(--k-other)', other: 'var(--k-dpwcs)', all: 'var(--navy)', overview: 'var(--navy)', block: '#6f8bff' };
   repeatMap = new Map(repeatLocos(rows(), addDays(today(), -90)).map((r) => [r.loco, r.count]));
   document.getElementById('app').replaceChildren(
@@ -1057,13 +1122,14 @@ function render() {
       onclick: () => { ui.view = id; ui.month = 'all'; ui.search = ''; ui.range = 'all'; ui.from = ''; ui.to = ''; render(); window.scrollTo(0, 0); },
     }, h('i', { class: 'dot-k', style: `--c:${dots[id]}` }), text, n != null && h('span', { class: 'n' }, String(n))))),
     h('main', null, ui.view === 'overview' ? viewOverview() : ui.view === 'block' ? viewBlocks() : ui.view === 'stalling' ? viewStalling() : viewList()));
+  if (ui.focusNew) { ui.focusNew = false; const first = document.querySelector('tr.newrow textarea'); if (first) first.focus(); }
 }
 
 function onSyncStatus(next) {
   const was = status;
   status = next;
   if (status.phase === 'synced') seed();
-  if (next.unusualsMissing !== was.unusualsMissing) { render(); return; }
+  if (next.unusualsMissing !== was.unusualsMissing) { renderSafe(); return; }
   const line = document.getElementById('sync-status');
   if (line) { line.textContent = statusText(); line.className = `sync ${status.phase}`; }
 }
@@ -1077,7 +1143,7 @@ async function start() {
     sync = createSync({
       url: SUPABASE_URL, key: SUPABASE_KEY, login: false,
       getState: () => state,
-      setState: (next, redraw) => { state = next; persist(); if (redraw) render(); },
+      setState: (next, redraw) => { state = next; persist(); if (redraw) renderSafe(); },
       onStatus: onSyncStatus,
     });
     status = { ...status, email: sync.email };
