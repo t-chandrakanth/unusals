@@ -84,7 +84,7 @@ async function saveState(s) {
 let pendingRender = false;
 function renderSafe() {
   const a = document.activeElement;
-  if (a && a.closest && a.closest('table.cells')) { pendingRender = true; return; }
+  if (a && a.closest && a.closest('table.cells, .newcard')) { pendingRender = true; return; }
   render();
 }
 document.addEventListener('focusout', () => { if (pendingRender) { pendingRender = false; setTimeout(render, 0); } });
@@ -95,7 +95,7 @@ const NO_SYNC = { outbox: [], cursor: {}, linked: false };
 let state = L.emptyState();
 let sync = null;
 let status = { phase: SHARED ? 'syncing' : 'local', pending: 0, email: '', error: '', unusualsMissing: false };
-const ui = { view: 'overview', search: '', month: 'all', range: 'all', from: '', to: '', sumDay: '', dayOf: {}, focusNew: false };
+const ui = { view: 'overview', search: '', month: 'all', range: 'all', from: '', to: '', sumDay: '', dayOf: {}, focusNew: false, drafts: {}, edit: null };
 let repeatMap = new Map(); // loco number -> reports in the last 90 days, when more than one
 
 const who = () => (sync && sync.email ? sync.email.split('@')[0] : '');
@@ -689,107 +689,182 @@ function dayShell(view, items, content) {
       : h('p', { class: 'empty-big' }, 'Click a date on the left to see its reports.')));
 }
 
-// The boxes of each kind, as the columns of the table. Each box can be typed in.
-const CELLS = {
-  loco: [['title', 'Train details (heading)', 'c-title'], ['location', 'Location'], ['trainNo', 'Train no'], ['locoNo', 'Loco no'], ['load', 'Load'], ['det', 'DET'], ['reason', 'Reason', 'c-reason']],
-  cw: [['title', 'Train details (heading)', 'c-title'], ['location', 'Location'], ['trainNo', 'Train no'], ['locoNo', 'Loco no'], ['load', 'Load'], ['wagonNo', 'Wagon no'], ['bpcNo', 'BPC no'], ['det', 'DET'], ['reason', 'Reason', 'c-reason']],
-};
-CELLS.all = CELLS.cw;
-const KIND_NAME = { loco: 'Loco', cw: 'C&W', other: 'Other' };
+// ---------- loco, C&W and all failures ----------
+// The tab opens with a new report ready to fill in, cells with Save and Clear. The
+// reports already saved are not listed: they appear when a date is clicked, one
+// row each, with Edit and Delete.
 
-/** One day's reports as cells: click a cell to change it, the empty row at the end is for a new report. */
-function dayCells(view, day, items) {
-  const cols = CELLS[view];
+const KIND_NAME = { loco: 'Loco', cw: 'C&W', other: 'Other' };
+const REPORT_BOXES = ['title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'detFrom', 'detTo', 'reason'];
+const isBlankDraft = (d) => !REPORT_BOXES.some((k) => String(d[k] || '').trim());
+const boxesOf = (kind) => FORM[kind].filter((k) => k !== 'day');
+
+function draftFor(view) {
+  if (!ui.drafts[view]) ui.drafts[view] = { ...L.blankUnusual(today()), type: view === 'all' ? 'loco' : view };
+  return ui.drafts[view];
+}
+
+/** The report as it is typed: the cells, Save, Clear, and a way to read a file or a pasted report into them. */
+function newReportCard(view) {
+  const draft = draftFor(view);
+  const kind = view === 'all' ? draft.type : view;
+  const titles = [...new Set([...TYPES[kind === 'other' ? 'other' : kind].titles, ...rows().filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])].filter((t) => t.length <= 32).slice(0, 6);
+  const locos = [...new Set(state.locos.map((l) => l.locoNo).filter(Boolean))];
+  let hintEl;
+
+  const showRepeat = () => {
+    if (!hintEl) return;
+    const since = addDays(today(), -90);
+    const seen = locoNumbers(draft.locoNo).map((n) => ({ n, items: rows().filter((u) => u.day >= since && locoNumbers(u.locoNo).includes(n)) })).filter((x) => x.items.length);
+    hintEl.style.display = seen.length ? 'block' : 'none';
+    hintEl.textContent = seen.map((x) => `Loco ${x.n} already has ${x.items.length} report${x.items.length === 1 ? '' : 's'} in the last 90 days (latest ${L.fmtDay(x.items.map((u) => u.day).sort().pop())})`).join('. ');
+  };
+
+  const cell = (key) => {
+    const isText = key === 'reason';
+    const el = isText
+      ? h('textarea', { rows: 3, placeholder: HINT[key] ? `e.g. ${HINT[key]}` : '' })
+      : h('input', {
+        type: key === 'detFrom' || key === 'detTo' ? 'time' : 'text', placeholder: HINT[key] && key !== 'detFrom' && key !== 'detTo' ? `e.g. ${HINT[key]}` : '',
+        autocapitalize: key === 'detFrom' || key === 'detTo' ? null : 'characters', autocomplete: 'off',
+      });
+    el.value = draft[key] || '';
+    el.setAttribute('data-box', key);
+    if (key === 'title') el.setAttribute('list', 'u-titles');
+    if (key === 'locoNo') el.setAttribute('list', 'u-locos');
+    el.addEventListener('input', (e) => {
+      draft[key] = e.target.value;
+      if (key === 'locoNo') showRepeat();
+      if (key === 'detFrom' || key === 'detTo') {
+        const d = L.detentionBetween(draft.detFrom, draft.detTo);
+        if (d) { draft.det = d; const box = card.querySelector('[data-box="det"]'); if (box) box.value = d; }
+      }
+    });
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doSave(); } });
+    return h('label', { class: `ncell ${key === 'reason' ? 's4' : WIDE.has(key) ? 's2' : ''}` }, h('span', null, LABEL[key]), el);
+  };
+
+  const doSave = () => {
+    if (!draft.day) { toast('Pick the date'); return; }
+    if (isBlankDraft(draft)) { toast('Type the report first'); return; }
+    if (!String(draft.title || '').trim()) { toast('Enter the train details (the heading)'); const t = card.querySelector('[data-box="title"]'); if (t) t.focus(); return; }
+    save({ ...draft, type: kind });
+    const day = draft.day;
+    ui.drafts[view] = null;
+    draftFor(view).day = day; // the next report is usually of the same day
+    ui.dayOf[view] = day;     // and the saved one is shown below
+    toast('Report saved');
+    render();
+  };
+  const doClear = () => { const day = draft.day; ui.drafts[view] = null; draftFor(view).day = day; render(); };
+
+  const take = (list) => readFiles(list, { draft, rebuild: render, close: () => {} });
+  const chooser = h('input', {
+    type: 'file', multiple: true, accept: FILE_TYPES, style: 'display:none',
+    onchange: (e) => { const list = [...e.target.files]; e.target.value = ''; take(list); },
+  });
+
+  const segs = view === 'all' && h('div', { class: 'segs kind-segs' }, Object.entries(KIND_NAME).map(([k, n]) => h('button', {
+    type: 'button', class: `seg ${draft.type === k ? 'on' : ''}`, onclick: () => { draft.type = k; render(); },
+  }, n)));
+
+  const grid = h('div', { class: 'ngrid' }, boxesOf(kind).map((k) => (k === 'det'
+    ? h('div', { class: 'ncell s4 det3' }, h('label', { class: 'ncell' }, h('span', null, LABEL.detFrom), cell('detFrom').querySelector('input')),
+      h('label', { class: 'ncell' }, h('span', null, LABEL.detTo), cell('detTo').querySelector('input')), cell('det'))
+    : cell(k))));
+
+  const card = h('section', { class: `newcard ${kind}` },
+    h('div', { class: 'newhead' },
+      h('h2', null, `New ${view === 'all' ? '' : `${KIND_NAME[kind].toLowerCase()} failure `}report`.replace('  ', ' ')),
+      segs,
+      h('label', { class: 'ndate' }, h('span', null, 'Date'), h('input', {
+        type: 'date', value: draft.day, 'aria-label': 'Date of the report',
+        onchange: (e) => { draft.day = e.target.value; ui.dayOf[view] = draft.day; render(); },
+      }))),
+    grid,
+    titles.length > 0 && h('div', { class: 'quick' }, h('span', null, 'Quick heading:'), titles.map((t) => h('button', {
+      type: 'button', class: 'qchip', onclick: () => { draft.title = t; const el = card.querySelector('[data-box="title"]'); if (el) { el.value = t; el.focus(); } },
+    }, t))),
+    (hintEl = h('div', { class: 'repeat-hint', style: 'display:none' })),
+    h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
+    h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),
+    h('div', { class: 'newactions' },
+      h('button', { type: 'button', class: 'btn primary', onclick: doSave }, 'Save report'),
+      h('button', { type: 'button', class: 'btn', onclick: doClear }, 'Clear'),
+      h('span', { class: 'grow' }),
+      h('button', { type: 'button', class: 'btn', onclick: () => chooser.click() }, 'Attach a file or photo'),
+      chooser),
+    h('p', { class: 'hint' }, 'You can also paste a whole report anywhere in this box, or attach Word, PDF, Excel files or photos: the cells are filled for you. Ctrl+Enter saves.'));
+
+  card.addEventListener('paste', (e) => {
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (!/DETENTION\s+PARTICULARS|ASSET\s+FAILURE|FIRST\s+INFORMATION\s+REPORT|BRIEF\s+HISTORY|Failure Report|Incident ID|TRAIN\s+DETAILS/i.test(text)) return;
+    e.preventDefault();
+    takeText(draft, text, render, () => {});
+  });
+  showRepeat();
+  return card;
+}
+
+/** A day's saved reports: one row each. Edit turns a row into cells with Save and Cancel. */
+function dayRecords(view, day, items) {
+  const order = boxesOf(view === 'loco' ? 'loco' : 'cw');
   const sorted = [...items].sort((a, b) => (a.updatedAt || '').localeCompare(b.updatedAt || ''));
   const grow = (el) => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; };
-  const box = (key, label, value, wide) => {
-    const el = h('textarea', { rows: 1, class: `cell ${wide || ''}`, 'aria-label': label, autocapitalize: key === 'reason' ? null : 'characters', autocomplete: 'off' });
-    el.value = value || '';
-    el.addEventListener('input', () => grow(el));
-    requestAnimationFrame(() => grow(el));
-    return el;
-  };
-  const typeBox = (value) => {
-    const el = h('select', { class: 'cell kind', 'aria-label': 'Kind' }, Object.entries(KIND_NAME).map(([k, n]) => h('option', { value: k, selected: k === value }, n)));
-    return el;
-  };
-  const run = (fn) => async () => { try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); } };
+  const sub = (u) => { const o = officialDetails(u); return o ? h('tr', { class: 'subrow' }, h('td', { colspan: order.length + 2 }, o)) : null; };
 
   const body = h('tbody');
   sorted.forEach((u, i) => {
-    const current = () => state.unusuals.find((x) => x.id === u.id) || u;
+    if (ui.edit && ui.edit.id === u.id) {
+      const buf = ui.edit.buf;
+      const tr = h('tr', { class: 'editing' }, h('td', { class: 'sr' }, String(i + 1)));
+      for (const key of order) {
+        const el = h('textarea', { rows: 1, class: 'cell', 'aria-label': LABEL[key], autocapitalize: key === 'reason' ? null : 'characters' });
+        el.value = buf[key] || '';
+        el.addEventListener('input', () => { buf[key] = el.value; grow(el); });
+        requestAnimationFrame(() => grow(el));
+        tr.append(h('td', { class: key === 'title' ? 'c-title' : key === 'reason' ? 'c-reason' : '' }, el));
+      }
+      tr.append(h('td', { class: 'act' },
+        h('button', { class: 'btn small primary', onclick: () => { save({ ...u, ...buf }); ui.edit = null; toast('Saved'); render(); } }, 'Save'),
+        h('button', { class: 'btn small', onclick: () => { ui.edit = null; render(); } }, 'Cancel')));
+      body.append(tr);
+      return;
+    }
     const tr = h('tr', null, h('td', { class: 'sr' }, String(i + 1)));
-    for (const [key, label, wide] of cols) {
-      const el = box(key, label, u[key], wide);
-      el.addEventListener('change', () => {
-        const cur = current();
-        if (el.value.trim() === String(cur[key] || '').trim()) return;
-        save({ ...cur, [key]: el.value });
-        toast('Saved');
-      });
-      tr.append(h('td', null, el));
-    }
-    if (view === 'all') {
-      const sel = typeBox(kindOf(u));
-      sel.addEventListener('change', () => { save({ ...current(), type: sel.value }); toast('Saved'); render(); });
-      tr.append(h('td', null, sel));
-    }
+    for (const key of order) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' ? 'c-reason' : ''}` }, String(u[key] || '')));
     tr.append(h('td', { class: 'act' },
-      h('button', { class: 'ibtn', title: 'Open in the form (attach a file, or paste a report)', 'aria-label': 'Open in the form', onclick: () => openForm(kindOf(u), current()) }, '✎'),
-      h('button', { class: 'ibtn danger', title: 'Delete this report', 'aria-label': 'Delete this report', onclick: () => {
+      h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: Object.fromEntries(order.map((k) => [k, u[k] || ''])) }; render(); } }, 'Edit'),
+      kindOf(u) === 'loco' && h('button', { class: 'link', onclick: () => openStallingForm(null, u) }, 'Stalling'),
+      h('button', { class: 'link danger', onclick: () => {
         if (!confirm(`Delete the report of ${L.fmtDay(u.day)} (${u.title || 'no heading'})?`)) return;
         commit(L.reduce(state, { type: 'removeUnusual', id: u.id }));
         toast('Deleted');
         render();
-      } }, '×')));
+      } }, 'Delete')));
     body.append(tr);
+    const extra = sub(u);
+    if (extra) body.append(extra);
   });
 
-  // the empty row: typing anything in it and leaving the box saves it as a new report on this day
-  const fresh = h('tr', { class: 'newrow' }, h('td', { class: 'sr' }, '+'));
-  const freshBoxes = new Map();
-  for (const [key, label, wide] of cols) {
-    const el = box(key, `New: ${label}`, '', wide);
-    el.placeholder = key === 'title' ? 'Type a new report here' : '';
-    freshBoxes.set(key, el);
-    fresh.append(h('td', null, el));
-  }
-  let kindBox = null;
-  if (view === 'all') { kindBox = typeBox('loco'); fresh.append(h('td', null, kindBox)); }
-  fresh.append(h('td', { class: 'act' }));
-  const addNew = () => {
-    const values = {};
-    let any = false;
-    for (const [key, el] of freshBoxes) { values[key] = el.value; if (el.value.trim()) any = true; }
-    if (!any) return;
-    save({ ...L.blankUnusual(day), type: view === 'all' ? kindBox.value : view, ...values });
-    toast('Report saved');
-    ui.focusNew = true;
-    render();
-  };
-  // saved when focus leaves the whole row, so moving from box to box does not cut a report in two
-  fresh.addEventListener('focusout', (e) => { if (!fresh.contains(e.relatedTarget)) addNew(); });
-  body.append(fresh);
-
-  const head = h('thead', null, h('tr', null,
-    h('th', { class: 'sr' }, '#'), cols.map(([, label, wide]) => h('th', { class: wide || '' }, label)),
-    view === 'all' && h('th', null, 'Kind'), h('th', { class: 'act' }, '')));
-
+  const head = h('thead', null, h('tr', null, h('th', { class: 'sr' }, '#'), order.map((k) => h('th', null, LABEL[k])), h('th', { class: 'act' }, '')));
   return h('div', null,
     items.length > 0 && exportBar(unusualSheet(items, 'Unusals'), `Unusals-${day}`, `SCR UNUSALS ${L.fmtDay(day)}`,
       () => `*SCR UNUSALS ${L.fmtDay(day)}*\n\n${L.unusualText(items)}`),
-    h('div', { class: 'cells-wrap' }, h('table', { class: 'cells' }, head, body)),
-    h('p', { class: 'hint' }, 'Click a cell to change it: it is saved when you click away. Type in the last row to add a report to this day.'));
+    items.length
+      ? h('div', { class: 'cells-wrap' }, h('table', { class: 'cells' }, head, body))
+      : h('p', { class: 'empty-big' }, 'No report on this date yet. Write one in the box above: it is saved on the date shown there.'));
 }
 
 function viewList() {
-  const view = CELLS[ui.view] ? ui.view : 'all';
+  const view = ['loco', 'cw', 'all'].includes(ui.view) ? ui.view : 'all';
   const pool = view === 'all' ? rows() : rows().filter((u) => kindOf(u) === view);
-  return h('div', null,
+  return h('div', { class: 'failures' },
     SHARED && status.unusualsMissing && h('p', { class: 'notice' },
       'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase (steps are in the README). Nothing is lost meanwhile.'),
-    h('div', { class: 'uhead' }, h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files')),
-    dayShell(view, pool, (day, items) => dayCells(view, day, items)));
+    newReportCard(view),
+    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'click a date')),
+    dayShell(view, pool, (day, items) => dayRecords(view, day, items)));
 }
 
 // ---------- stalling reports ----------
