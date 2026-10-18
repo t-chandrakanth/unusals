@@ -95,7 +95,7 @@ const NO_SYNC = { outbox: [], cursor: {}, linked: false };
 let state = L.emptyState();
 let sync = null;
 let status = { phase: SHARED ? 'syncing' : 'local', pending: 0, email: '', error: '', unusualsMissing: false };
-const ui = { view: 'overview', search: '', month: 'all', range: 'all', from: '', to: '', sumDay: '', dayOf: {}, focusNew: false, drafts: {}, edit: null };
+const ui = { view: 'overview', search: '', month: 'all', range: 'all', from: '', to: '', sumDay: '', span: {}, focusNew: false, drafts: {}, edit: null };
 let repeatMap = new Map(); // loco number -> reports in the last 90 days, when more than one
 
 const who = () => (sync && sync.email ? sync.email.split('@')[0] : '');
@@ -508,9 +508,9 @@ function blockCard(u) {
 }
 
 /** The form: the block, then the trains held up. Durations, burst and detentions come by themselves. */
-function openBlockForm(existing) {
-  const dlg = document.getElementById('editor');
-  const b = existing ? readBlock(existing) : blankBlock(today());
+function openBlockForm(existing, inline) {
+  const dlg = inline ? inline.host : document.getElementById('editor');
+  const b = inline ? inline.b : (existing ? readBlock(existing) : blankBlock(today()));
   const detEls = [];
   let durEl;
   let burstEl;
@@ -553,8 +553,8 @@ function openBlockForm(existing) {
         h('div', { class: 'autochip', title: 'Detention in minutes, worked out by itself' }, (detEls[i] = h('b'))))),
       h('p', { class: 'rep-note' }, 'Leave To empty if the train has not left: its detention then runs up to the "As on" time (marked *). For a train kept at the home signal or in the section, write the place yourself, for example CT HOME or CT-SUH SEC: STN is added only to a plain station name.'));
 
-    dlg.replaceChildren(h('div', { class: 'editor' },
-      h('div', { class: 'dlg-head block' }, existing ? 'Edit block detention report' : 'New block detention report'),
+    dlg.replaceChildren(h('div', { class: inline ? 'editor inline-form' : 'editor' },
+      !inline && h('div', { class: 'dlg-head block' }, existing ? 'Edit block detention report' : 'New block detention report'),
       h('form', {
         class: 'u-form',
         onsubmit: (e) => {
@@ -563,9 +563,10 @@ function openBlockForm(existing) {
           if (!String(b.name).trim() && !String(b.station).trim()) { toast('Enter the name of the block or the station'); return; }
           b.name = String(b.name).trim().toUpperCase();
           b.station = String(b.station).trim().toUpperCase();
-          dlg.close();
+          if (!inline) dlg.close();
           save({ ...(existing || L.blankUnusual(b.day)), day: b.day, type: 'block', title: blockTitle(b), location: b.station, block: JSON.stringify(b) });
           toast('Block report saved');
+          if (inline) inline.saved(b.day);
           render();
         },
       },
@@ -589,18 +590,53 @@ function openBlockForm(existing) {
         (totalEl = h('span', { class: 'total' }))),
       h('div', { class: 'editor-actions' },
         h('button', { type: 'submit', class: 'btn primary' }, 'Save report'),
-        h('button', { type: 'button', class: 'btn', onclick: () => dlg.close() }, 'Cancel')))));
+        h('button', { type: 'button', class: 'btn', onclick: inline ? inline.clear : () => dlg.close() }, inline ? 'Clear' : 'Cancel')))));
     refresh();
   };
   build();
-  dlg.showModal();
+  if (!inline) dlg.showModal();
+}
+
+/** The reports of the chosen days, a heading for each day, newest day first. */
+const groupedCards = (items, card) => (items.length
+  ? L.unusualsByDay(items).map(([day, list]) => h('section', null,
+    h('h2', { class: 'section-title' }, officialDay(day), h('span', { class: 'count' }, String(list.length))),
+    h('div', { class: 'ucards' }, list.map(card))))
+  : h('p', { class: 'empty-big' }, 'No report in these dates.'));
+
+/** Send or copy all the reports of the chosen days as one message. */
+function messageBar(items, textOf) {
+  if (!items.length) return null;
+  const text = () => L.unusualsInOrder(items).map(textOf).join('\n\n----------\n\n');
+  return h('div', { class: 'actions' },
+    h('button', { class: 'btn whatsapp', onclick: () => sendWhatsApp(text()) }, 'Send on WhatsApp'),
+    h('button', { class: 'btn', onclick: () => copyText(text()) }, 'Copy text'));
+}
+
+/** A new report on the page: a card with the form in it, kept in ui so a redraw loses nothing. */
+function entryCard(kind, title, fill) {
+  const host = h('div');
+  const fresh = (day) => { ui.drafts[kind] = null; fill(day); };
+  const draft = ui.drafts[kind];
+  fill(draft.day, host, {
+    saved: (day) => { ui.drafts[kind] = null; ui.span[kind] = { from: day, to: day }; },
+    clear: () => { const day = draft.day; fresh(day); render(); },
+  });
+  return h('section', { class: `newcard ${kind}` }, h('div', { class: 'newhead' }, h('h2', null, title)), host);
 }
 
 function viewBlocks() {
   const list = blocks();
-  return h('div', null,
-    h('div', { class: 'uhead' }, h('button', { class: 'btn new block', onclick: () => openBlockForm() }, 'New block detention report')),
-    dayShell('block', list, (day, items) => (items.length ? h('div', { class: 'ucards' }, items.map(blockCard)) : h('p', { class: 'empty-big' }, 'No block detention report on this date.'))));
+  if (!ui.drafts.block) ui.drafts.block = blankBlock(today());
+  const card = entryCard('block', 'New block detention report', (day, host, inline) => {
+    if (!host) { ui.drafts.block = blankBlock(day); return; }
+    openBlockForm(null, { ...inline, host, b: ui.drafts.block });
+  });
+  return h('div', { class: 'failures' },
+    SHARED && status.unusualsMissing && h('p', { class: 'notice' }, 'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase.'),
+    card,
+    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'choose From and To dates')),
+    dayShell('block', list, (items) => [messageBar(items, (u) => blockMessage(readBlock(u))), groupedCards(items, blockCard)]));
 }
 
 function viewOverview() {
@@ -669,24 +705,40 @@ function viewOverview() {
 // Nothing from the past is shown until a date is clicked. The dates are listed at the
 // side; the reports of the clicked day are shown on their own.
 
-/** A list of dates with the number of reports on each, and the chosen day's content beside it. */
+/**
+ * The saved reports of a tab: From and To dates and the dates that have reports, at the side;
+ * the reports between the two dates beside them, and nothing until a date is chosen.
+ * content(items, label): what to show for the reports in the chosen days.
+ */
 function dayShell(view, items, content) {
   const counts = new Map();
   for (const u of items) counts.set(u.day, (counts.get(u.day) || 0) + 1);
   const days = [...counts.keys()].sort().reverse();
-  const sel = ui.dayOf[view] || '';
-  const pick = (d) => { ui.dayOf[view] = d; render(); };
-  const chip = (d, label) => h('button', { class: `dchip ${d === sel ? 'on' : ''}`, onclick: () => pick(d) },
+  const r = ui.span[view] || { from: '', to: '' };
+  const set = (from, to) => {
+    if (from && to && from > to) [from, to] = [to, from]; // typed the wrong way round
+    ui.span[view] = { from, to };
+    render();
+  };
+  const chip = (d, label) => h('button', { class: `dchip ${r.from === d && r.to === d ? 'on' : ''}`, onclick: () => set(d, d) },
     h('b', null, label || L.fmtDay(d)), counts.get(d) ? h('span', null, String(counts.get(d))) : null);
-  const goTo = h('input', { type: 'date', value: sel, 'aria-label': 'Go to a date', onchange: (e) => { if (e.target.value) pick(e.target.value); } });
+  const box = (key, label) => h('label', { class: 'dfield' }, label, h('input', {
+    type: 'date', value: r[key], 'aria-label': `${label} date`,
+    onchange: (e) => set(key === 'from' ? e.target.value : r.from, key === 'to' ? e.target.value : r.to),
+  }));
+  const picked = !!(r.from || r.to);
+  const inRange = picked ? items.filter((u) => (!r.from || u.day >= r.from) && (!r.to || u.day <= r.to)) : [];
+  const label = r.from && r.to && r.from === r.to ? officialDay(r.from)
+    : `${r.from ? L.fmtDay(r.from) : 'the start'} to ${r.to ? L.fmtDay(r.to) : L.fmtDay(today())}`;
   return h('div', { class: 'dayview' },
     h('aside', { class: 'daylist' },
-      h('label', { class: 'dfield' }, 'Go to date', goTo),
+      box('from', 'From'), box('to', 'To'),
+      picked && h('button', { class: 'btn small', onclick: () => set('', '') }, 'Clear dates'),
       chip(today(), 'Today'),
       days.filter((d) => d !== today()).map((d) => chip(d))),
-    h('div', { class: 'daymain' }, sel
-      ? [h('h2', { class: 'section-title' }, officialDay(sel), h('span', { class: 'count' }, String(counts.get(sel) || 0))), content(sel, items.filter((u) => u.day === sel))]
-      : h('p', { class: 'empty-big' }, 'Click a date on the left to see its reports.')));
+    h('div', { class: 'daymain' }, picked
+      ? [h('h2', { class: 'section-title' }, label, h('span', { class: 'count' }, String(inRange.length))), content(inRange, label)]
+      : h('p', { class: 'empty-big' }, 'Choose From and To dates, or click a date on the left, to see the reports of those days and share them.')));
 }
 
 // ---------- loco, C&W and all failures ----------
@@ -752,7 +804,7 @@ function newReportCard(view) {
     const day = draft.day;
     ui.drafts[view] = null;
     draftFor(view).day = day; // the next report is usually of the same day
-    ui.dayOf[view] = day;     // and the saved one is shown below
+    ui.span[view] = { from: day, to: day }; // and the saved one is shown below
     toast('Report saved');
     render();
   };
@@ -779,7 +831,7 @@ function newReportCard(view) {
       segs,
       h('label', { class: 'ndate' }, h('span', null, 'Date'), h('input', {
         type: 'date', value: draft.day, 'aria-label': 'Date of the report',
-        onchange: (e) => { draft.day = e.target.value; ui.dayOf[view] = draft.day; render(); },
+        onchange: (e) => { draft.day = e.target.value; if (draft.day) ui.span[view] = { from: draft.day, to: draft.day }; render(); },
       }))),
     grid,
     titles.length > 0 && h('div', { class: 'quick' }, h('span', null, 'Quick heading:'), titles.map((t) => h('button', {
@@ -806,54 +858,56 @@ function newReportCard(view) {
   return card;
 }
 
-/** A day's saved reports: one row each. Edit turns a row into cells with Save and Cancel. */
-function dayRecords(view, day, items) {
+/** The saved reports of the chosen days: one row each, a heading row for each day. Edit turns a row into cells with Save and Cancel. */
+function dayRecords(view, items, label) {
   const order = boxesOf(view === 'loco' ? 'loco' : 'cw');
-  const sorted = [...items].sort((a, b) => (a.updatedAt || '').localeCompare(b.updatedAt || ''));
   const grow = (el) => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; };
-  const sub = (u) => { const o = officialDetails(u); return o ? h('tr', { class: 'subrow' }, h('td', { colspan: order.length + 2 }, o)) : null; };
-
+  const span = order.length + 2;
   const body = h('tbody');
-  sorted.forEach((u, i) => {
-    if (ui.edit && ui.edit.id === u.id) {
-      const buf = ui.edit.buf;
-      const tr = h('tr', { class: 'editing' }, h('td', { class: 'sr' }, String(i + 1)));
-      for (const key of order) {
-        const el = h('textarea', { rows: 1, class: 'cell', 'aria-label': LABEL[key], autocapitalize: key === 'reason' ? null : 'characters' });
-        el.value = buf[key] || '';
-        el.addEventListener('input', () => { buf[key] = el.value; grow(el); });
-        requestAnimationFrame(() => grow(el));
-        tr.append(h('td', { class: key === 'title' ? 'c-title' : key === 'reason' ? 'c-reason' : '' }, el));
+  let n = 0;
+  for (const [day, list] of L.unusualsByDay(items).reverse()) { // oldest day first, like the shared sheet
+    body.append(h('tr', { class: 'dayrow' }, h('td', { colspan: span }, officialDay(day), h('span', { class: 'count' }, String(list.length)))));
+    for (const u of list) {
+      n++;
+      if (ui.edit && ui.edit.id === u.id) {
+        const buf = ui.edit.buf;
+        const tr = h('tr', { class: 'editing' }, h('td', { class: 'sr' }, String(n)));
+        for (const key of order) {
+          const el = h('textarea', { rows: 1, class: 'cell', 'aria-label': LABEL[key], autocapitalize: key === 'reason' ? null : 'characters' });
+          el.value = buf[key] || '';
+          el.addEventListener('input', () => { buf[key] = el.value; grow(el); });
+          requestAnimationFrame(() => grow(el));
+          tr.append(h('td', { class: key === 'title' ? 'c-title' : key === 'reason' ? 'c-reason' : '' }, el));
+        }
+        tr.append(h('td', { class: 'act' },
+          h('button', { class: 'btn small primary', onclick: () => { save({ ...u, ...buf }); ui.edit = null; toast('Saved'); render(); } }, 'Save'),
+          h('button', { class: 'btn small', onclick: () => { ui.edit = null; render(); } }, 'Cancel')));
+        body.append(tr);
+        continue;
       }
+      const tr = h('tr', null, h('td', { class: 'sr' }, String(n)));
+      for (const key of order) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' ? 'c-reason' : ''}` }, String(u[key] || '')));
       tr.append(h('td', { class: 'act' },
-        h('button', { class: 'btn small primary', onclick: () => { save({ ...u, ...buf }); ui.edit = null; toast('Saved'); render(); } }, 'Save'),
-        h('button', { class: 'btn small', onclick: () => { ui.edit = null; render(); } }, 'Cancel')));
+        h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: Object.fromEntries(order.map((k) => [k, u[k] || ''])) }; render(); } }, 'Edit'),
+        kindOf(u) === 'loco' && h('button', { class: 'link', onclick: () => openStallingForm(null, u) }, 'Stalling'),
+        h('button', { class: 'link danger', onclick: () => {
+          if (!confirm(`Delete the report of ${L.fmtDay(u.day)} (${u.title || 'no heading'})?`)) return;
+          commit(L.reduce(state, { type: 'removeUnusual', id: u.id }));
+          toast('Deleted');
+          render();
+        } }, 'Delete')));
       body.append(tr);
-      return;
+      const extra = officialDetails(u);
+      if (extra) body.append(h('tr', { class: 'subrow' }, h('td', { colspan: span }, extra)));
     }
-    const tr = h('tr', null, h('td', { class: 'sr' }, String(i + 1)));
-    for (const key of order) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' ? 'c-reason' : ''}` }, String(u[key] || '')));
-    tr.append(h('td', { class: 'act' },
-      h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: Object.fromEntries(order.map((k) => [k, u[k] || ''])) }; render(); } }, 'Edit'),
-      kindOf(u) === 'loco' && h('button', { class: 'link', onclick: () => openStallingForm(null, u) }, 'Stalling'),
-      h('button', { class: 'link danger', onclick: () => {
-        if (!confirm(`Delete the report of ${L.fmtDay(u.day)} (${u.title || 'no heading'})?`)) return;
-        commit(L.reduce(state, { type: 'removeUnusual', id: u.id }));
-        toast('Deleted');
-        render();
-      } }, 'Delete')));
-    body.append(tr);
-    const extra = sub(u);
-    if (extra) body.append(extra);
-  });
-
+  }
   const head = h('thead', null, h('tr', null, h('th', { class: 'sr' }, '#'), order.map((k) => h('th', null, LABEL[k])), h('th', { class: 'act' }, '')));
+  const heading = `SCR UNUSALS ${label}`;
   return h('div', null,
-    items.length > 0 && exportBar(unusualSheet(items, 'Unusals'), `Unusals-${day}`, `SCR UNUSALS ${L.fmtDay(day)}`,
-      () => `*SCR UNUSALS ${L.fmtDay(day)}*\n\n${L.unusualText(items)}`),
+    items.length > 0 && exportBar(unusualSheet(items, 'Unusals'), `Unusals-${label.replace(/[^0-9A-Za-z]+/g, '-')}`, heading, () => `*${heading}*\n\n${L.unusualText(items)}`),
     items.length
       ? h('div', { class: 'cells-wrap' }, h('table', { class: 'cells' }, head, body))
-      : h('p', { class: 'empty-big' }, 'No report on this date yet. Write one in the box above: it is saved on the date shown there.'));
+      : h('p', { class: 'empty-big' }, 'No report in these dates. Write one in the box above: it is saved on the date shown there.'));
 }
 
 function viewList() {
@@ -864,7 +918,7 @@ function viewList() {
       'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase (steps are in the README). Nothing is lost meanwhile.'),
     newReportCard(view),
     h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'click a date')),
-    dayShell(view, pool, (day, items) => dayRecords(view, day, items)));
+    dayShell(view, pool, (items, label) => dayRecords(view, items, label)));
 }
 
 // ---------- stalling reports ----------
@@ -966,10 +1020,10 @@ function stallingCard(u) {
  * existing: a saved stalling report to edit. from: a loco failure to start from (its train, loco,
  * load, section and what it says happened are carried over).
  */
-function openStallingForm(existing, from) {
-  const dlg = document.getElementById('editor');
-  const s = existing ? readStallingOf(existing) : blankStalling(from ? from.day : today());
-  if (!existing && from) {
+function openStallingForm(existing, from, inline) {
+  const dlg = inline ? inline.host : document.getElementById('editor');
+  const s = inline ? inline.s : (existing ? readStallingOf(existing) : blankStalling(from ? from.day : today()));
+  if (!inline && !existing && from) {
     Object.assign(s, { trainNo: from.trainNo || '', locoNo: from.locoNo || '', load: from.load || '', section: from.location || '', remarks: from.reason || '' });
   }
   let autoEl;
@@ -1035,8 +1089,8 @@ function openStallingForm(existing, from) {
       oninput: (e) => { s.markX = e.target.value; refresh(); },
     });
 
-    dlg.replaceChildren(h('div', { class: 'editor' },
-      h('div', { class: 'dlg-head stalling' }, existing ? 'Edit stalling report' : 'New stalling report'),
+    dlg.replaceChildren(h('div', { class: inline ? 'editor inline-form' : 'editor' },
+      !inline && h('div', { class: 'dlg-head stalling' }, existing ? 'Edit stalling report' : 'New stalling report'),
       h('form', {
         class: 'u-form',
         onsubmit: (e) => {
@@ -1045,9 +1099,10 @@ function openStallingForm(existing, from) {
           if (!hasContent(s)) { toast('Write at least the train and what happened'); return; }
           s.trainNo = s.trainNo.trim().toUpperCase();
           const rec = stallingRecord(existing, s);
-          dlg.close();
+          if (!inline) dlg.close();
           save(rec);
           toast('Stalling report saved');
+          if (inline) inline.saved(rec.day);
           render();
           const saved = state.unusuals.find((u) => u.id === rec.id);
           if (saved) openStallingReport(saved);
@@ -1105,19 +1160,25 @@ function openStallingForm(existing, from) {
       h('datalist', { id: 'st-locos' }, locos.map((t) => h('option', { value: t }))),
       h('div', { class: 'editor-actions' },
         h('button', { type: 'submit', class: 'btn primary' }, 'Save and show the report'),
-        h('button', { type: 'button', class: 'btn', onclick: () => dlg.close() }, 'Cancel')))));
+        h('button', { type: 'button', class: 'btn', onclick: inline ? inline.clear : () => dlg.close() }, inline ? 'Clear' : 'Cancel')))));
     refresh();
   };
   build();
-  dlg.showModal();
+  if (!inline) dlg.showModal();
 }
 
 function viewStalling() {
   const list = stallings();
-  return h('div', null,
+  if (!ui.drafts.stalling) ui.drafts.stalling = blankStalling(today());
+  const card = entryCard('stalling', 'New stalling report', (day, host, inline) => {
+    if (!host) { ui.drafts.stalling = blankStalling(day); return; }
+    openStallingForm(null, null, { ...inline, host, s: ui.drafts.stalling });
+  });
+  return h('div', { class: 'failures' },
     SHARED && status.unusualsMissing && h('p', { class: 'notice' }, 'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase.'),
-    h('div', { class: 'uhead' }, h('button', { class: 'btn new stalling', onclick: () => openStallingForm() }, 'New stalling report')),
-    dayShell('stalling', list, (day, items) => (items.length ? h('div', { class: 'ucards' }, items.map(stallingCard)) : h('p', { class: 'empty-big' }, 'No stalling report on this date.'))));
+    card,
+    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'choose From and To dates')),
+    dayShell('stalling', list, (items) => [messageBar(items, (u) => whatsappText(readStallingOf(u))), groupedCards(items, stallingCard)]));
 }
 
 // ---------- install as an app ----------

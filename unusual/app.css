@@ -427,3 +427,17 @@ html.embed main { padding-top: 14px; }
   .det3 { grid-template-columns: 1fr 1fr; }
   .det3 > .ncell:last-child { grid-column: 1 / -1; }
 }
+
+/* ---- From and To ---- */
+.daylist .dfield { display: grid; gap: 4px; margin: 0 0 2px; }
+.daylist .btn.small { align-self: flex-start; }
+table.cells tr.dayrow td { padding: 9px 10px; background: color-mix(in srgb, var(--navy) 9%, var(--card)); font-weight: 800; font-size: 13px; letter-spacing: 0.3px; border-bottom: 1px solid var(--line); }
+table.cells tr.dayrow .count { margin-left: 8px; }
+@media (max-width: 760px) { .daylist .dfield { flex: none; } }
+
+/* ---- block and stalling: the form on the page ---- */
+.newcard.block { border-top-color: #6f8bff; }
+.newcard.stalling { border-top-color: var(--k-stall); }
+.editor.inline-form { padding: 0; }
+.editor.inline-form .rep-title { margin-top: 18px; }
+.newcard .editor-actions { margin-top: 16px; }
