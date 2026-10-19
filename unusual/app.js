@@ -846,6 +846,8 @@ function newReportCard(view) {
 }
 
 /** The saved reports of the chosen days: one row each, a heading row for each day. Edit turns a row into cells with Save and Cancel. */
+const runSafe = (fn) => async () => { try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); } };
+
 function dayRecords(view, items, label) {
   const order = boxesOf(view === 'loco' ? 'loco' : 'cw');
   const grow = (el) => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; };
@@ -877,6 +879,10 @@ function dayRecords(view, items, label) {
       for (const key of order) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' ? 'c-reason' : ''}` }, String(u[key] || '')));
       tr.append(h('td', { class: 'act' },
         h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: Object.fromEntries(order.map((k) => [k, u[k] || ''])) }; render(); } }, 'Edit'),
+        h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await reportPdfBlob([u]), `${reportFile(u)}.pdf`, u.title || 'Unusal')) }, 'Share'),
+        h('button', { class: 'link', onclick: runSafe(() => copyText(L.unusualText([u]))) }, 'Copy text'),
+        h('button', { class: 'link', onclick: () => sendWhatsApp(L.unusualText([u])) }, 'WhatsApp'),
+        h('button', { class: 'link', onclick: () => openPhotos(u) }, photosOf(u).length ? `Photos (${photosOf(u).length})` : 'Photos'),
         kindOf(u) === 'loco' && h('button', { class: 'link', onclick: () => openStallingForm(null, u) }, 'Stalling'),
         h('button', { class: 'link danger', onclick: () => {
           if (!confirm(`Delete the report of ${L.fmtDay(u.day)} (${u.title || 'no heading'})?`)) return;
