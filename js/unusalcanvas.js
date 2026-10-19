@@ -159,7 +159,12 @@ function paint(ctx, m, draw) {
       y += rh;
     };
     rowOf(['S.NO', 'TR.NO', 'ARR', 'DEP', 'DET (IN MIN)'], true);
-    m.repercussions.forEach((r, i) => rowOf([String(i + 1), String(r.tr || '').toUpperCase(), r.arr, r.dep, r.det], false));
+    m.repercussions.forEach((r, i) => rowOf([String(i + 1), String(r.tr || '').toUpperCase(), r.arr, r.still ? 'NOT DEPARTED' : r.dep, r.det], false));
+    if (m.asOn) {
+      font(19, false);
+      y += 8;
+      y += lines([`Trains not departed: detention counted up to ${m.asOn} HRS.`], M, y);
+    }
     y += 28;
   }
 

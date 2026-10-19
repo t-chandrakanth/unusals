@@ -316,7 +316,7 @@ function openForm(type, existing) {
     const kind = kindOf(draft);
     const titles = [...new Set([...TYPES[kind].titles, ...rows().filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
     const field = (key) => {
-      if (key === 'rep') return h('div', { class: 'field wide' }, h('span', null, 'Repercussions (leave empty if none)'), repEditor(h, draft.rep, (v) => { draft.rep = v; }));
+      if (key === 'rep') return h('div', { class: 'field wide' }, h('span', null, 'Repercussions (leave empty if none)'), repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
       const el = key === 'reason' || key === 'rep'
         ? h('textarea', { rows: key === 'rep' ? 3 : 6, value: draft[key], placeholder: HINT[key] })
         : h('input', {
@@ -793,7 +793,7 @@ function newReportCard(view) {
     }
     if (key === 'rep') {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Repercussions (leave empty if none)'),
-        repEditor(h, draft.rep, (v) => { draft.rep = v; }));
+        repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
     }
     const isText = false;
     const el = isText
@@ -898,7 +898,7 @@ function dayRecords(view, items, label) {
         const buf = ui.edit.buf;
         const tr = h('tr', { class: 'editing' }, h('td', { class: 'sr' }, String(n)));
         for (const key of order) {
-          if (key === 'rep') { tr.append(h('td', { class: 'c-reason' }, repEditor(h, buf.rep || '', (v) => { buf.rep = v; }, { min: 1 }))); continue; }
+          if (key === 'rep') { tr.append(h('td', { class: 'c-reason' }, repEditor(h, buf.rep || '', (v) => { buf.rep = v; }, { min: 1, asOn: buf.repAsOn, onAsOn: (v) => { buf.repAsOn = v; } }))); continue; }
           if (key === 'reason') { tr.append(h('td', { class: 'c-reason' }, eventsEditor(h, buf.reason || '', (v) => { buf.reason = v; }, { min: 2 }))); continue; }
           const el = h('textarea', { rows: 1, class: 'cell', 'aria-label': LABEL[key], autocapitalize: key === 'reason' ? null : 'characters' });
           el.value = buf[key] || '';
@@ -915,7 +915,7 @@ function dayRecords(view, items, label) {
       const tr = h('tr', null, h('td', { class: 'sr' }, String(n)));
       for (const key of order) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' ? 'c-reason' : ''}` }, String((key === 'rep' ? repOf(u) : u[key]) || '')));
       tr.append(h('td', { class: 'act' },
-        h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: Object.fromEntries(order.map((k) => [k, (k === 'rep' ? repOf(u) : u[k]) || ''])) }; render(); } }, 'Edit'),
+        h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: { ...Object.fromEntries(order.map((k) => [k, (k === 'rep' ? repOf(u) : u[k]) || ''])), repAsOn: u.repAsOn || '' } }; render(); } }, 'Edit'),
         h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await canvasToBlob(await drawReport(u, 1)), `${reportFile(u)}.png`, u.title || 'Unusal')) }, 'Share'),
         h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await reportPdfBlob([u]), `${reportFile(u)}.pdf`, u.title || 'Unusal')) }, 'PDF'),
         h('button', { class: 'link', onclick: runSafe(() => copyText(L.unusualText([u]))) }, 'Copy text'),

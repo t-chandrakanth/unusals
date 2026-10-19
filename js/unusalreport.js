@@ -3,7 +3,7 @@
 // The page is drawn from this by unusalcanvas.js. Pure functions, no DOM.
 
 import { parseEvents } from './events.js';
-import { parseRep, detOf } from './repercussions.js';
+import { parseRep, detOf, stillOn } from './repercussions.js';
 
 const text = (v) => String(v == null ? '' : v).trim();
 const dmy = (day) => String(day || '').split('-').reverse().join('-');
@@ -71,10 +71,11 @@ export function reportModel(u) {
   }
   if (text(o.previous)) remarks = [remarks, `Earlier incidents: ${text(o.previous)}`].filter(Boolean).join(' ');
 
-  const repercussions = parseRep(u.rep || o.repercussions).map((r) => ({ ...r, det: detOf(r) }));
+  const asOn = text(u.repAsOn);
+  const repercussions = parseRep(u.rep || o.repercussions).map((r) => ({ ...r, det: detOf(r, asOn), still: stillOn(r, asOn) }));
   return {
     title, subtitle, when: [dmy(u.day), text(u.time) && `${text(u.time)} HRS`].filter(Boolean).join('  ·  '),
-    photos: photosOf(u),
+    photos: photosOf(u), asOn: repercussions.some((r) => r.still) ? asOn : '',
     details, events: events.map((e) => ({ ...e, hl: /stall|stopp|derail|burst|fail/i.test(e.text) })), remarks, repercussions,
   };
 }
