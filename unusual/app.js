@@ -365,6 +365,7 @@ function openForm(type, existing) {
       h('div', { class: 'grid' }, [...FORM[kind].slice(0, -1), ...['load', 'wagonNo', 'bpcNo'].filter((k) => !FORM[kind].includes(k) && String(draft[k] || '').trim()), 'reason']
         .map((k) => (k === 'det' ? h('div', { class: 'det-row' }, field('detFrom'), field('detTo'), field('det')) : field(k)))),
       h('div', { id: 'repeat-hint', class: 'repeat-hint', style: 'display:none' }),
+      photoStrip(draft, build),
       h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
       h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),
       h('div', { class: 'editor-actions' },
@@ -461,6 +462,30 @@ async function reportPdfBlob(list) {
 }
 
 const MAX_PHOTOS = 6;
+
+/** In a report form: take or choose the photographs of the unusual, so they are saved with the report. */
+function photoStrip(draft, rebuild) {
+  const list = photosOf(draft);
+  const set = () => { draft.photos = list.length ? JSON.stringify(list) : ''; };
+  const add = async (input) => {
+    const files = [...input.files].slice(0, MAX_PHOTOS - list.length);
+    input.value = '';
+    if (!files.length) return;
+    toast('Adding the photos...');
+    for (const f of files) { try { list.push(await pictureData(f, 900)); } catch { toast('That photo could not be read.'); } }
+    set();
+    rebuild();
+  };
+  const tile = (label, capture) => {
+    const input = h('input', { type: 'file', accept: 'image/*', multiple: !capture, hidden: true, onchange: () => add(input) });
+    if (capture) input.setAttribute('capture', 'environment');
+    return h('button', { type: 'button', class: 'btn', disabled: list.length >= MAX_PHOTOS, onclick: () => input.click() }, label, input);
+  };
+  return h('div', { class: 'photo-strip' },
+    h('div', { class: 'photo-strip-head' }, h('b', null, 'Photos of the unusual'), h('span', null, list.length ? `${list.length} of ${MAX_PHOTOS}` : 'optional'), tile('Camera', true), tile('Gallery', false)),
+    list.length > 0 && h('div', { class: 'photo-grid' }, list.map((src, i) => h('figure', null, h('img', { src, alt: `Photo ${i + 1}` }),
+      h('button', { type: 'button', class: 'link danger', onclick: () => { list.splice(i, 1); set(); rebuild(); } }, 'Remove')))));
+}
 
 /** The photographs of a record: take or choose them, look at them, remove one. They go on the PDF. */
 function openPhotos(u) {
@@ -825,6 +850,7 @@ function newReportCard(view) {
       type: 'button', class: 'qchip', onclick: () => { draft.title = t; const el = card.querySelector('[data-box="title"]'); if (el) { el.value = t; el.focus(); } },
     }, t))),
     (hintEl = h('div', { class: 'repeat-hint', style: 'display:none' })),
+    photoStrip(draft, render),
     h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
     h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),
     h('div', { class: 'newactions' },

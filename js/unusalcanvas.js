@@ -172,9 +172,5 @@ function paint(ctx, m, draw) {
     y += 4;
   }
 
-  y += 6;
-  font(19, false);
-  put('Date: ____________', M, y);
-  put('Signature: ______________________', W - M, y, INK, 'right');
-  return y + LH + 36;
+  return y + 20;
 }

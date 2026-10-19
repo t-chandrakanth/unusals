@@ -349,3 +349,7 @@ html.embed main { padding-top: 14px; }
 .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin: 10px 0; }
 .photo-grid figure { margin: 0; display: grid; gap: 4px; justify-items: start; }
 .photo-grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+
+.photo-strip { margin: 10px 0; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 12px; }
+.photo-strip-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.photo-strip-head span { color: var(--soft); font-size: 13px; margin-right: auto; }
