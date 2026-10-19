@@ -13,6 +13,7 @@ import { buildPdf, buildPdfPages } from '../js/pdf.js';
 import { drawReport } from '../js/unusalcanvas.js';
 import { photosOf, reportFile } from '../js/unusalreport.js';
 import { eventsEditor } from '../js/events.js';
+import { repEditor } from '../js/repercussions.js';
 import { blankStalling, readStalling, detShort, whatsappText, reportTitle, detentionText, hasContent, remarksText, markPosition } from '../js/stalling.js';
 import { drawStalling } from '../js/stallingcanvas.js';
 import { sheetToCanvas, canvasToBlob } from '../js/canvas.js';
@@ -315,6 +316,7 @@ function openForm(type, existing) {
     const kind = kindOf(draft);
     const titles = [...new Set([...TYPES[kind].titles, ...rows().filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
     const field = (key) => {
+      if (key === 'rep') return h('div', { class: 'field wide' }, h('span', null, 'Repercussions (leave empty if none)'), repEditor(h, draft.rep, (v) => { draft.rep = v; }));
       const el = key === 'reason' || key === 'rep'
         ? h('textarea', { rows: key === 'rep' ? 3 : 6, value: draft[key], placeholder: HINT[key] })
         : h('input', {
@@ -789,7 +791,11 @@ function newReportCard(view) {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Sequence of events'),
         eventsEditor(h, draft.reason, (v) => { draft.reason = v; }));
     }
-    const isText = key === 'rep';
+    if (key === 'rep') {
+      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Repercussions (leave empty if none)'),
+        repEditor(h, draft.rep, (v) => { draft.rep = v; }));
+    }
+    const isText = false;
     const el = isText
       ? h('textarea', { rows: 3, placeholder: HINT[key] || '' })
       : h('input', {
@@ -892,6 +898,7 @@ function dayRecords(view, items, label) {
         const buf = ui.edit.buf;
         const tr = h('tr', { class: 'editing' }, h('td', { class: 'sr' }, String(n)));
         for (const key of order) {
+          if (key === 'rep') { tr.append(h('td', { class: 'c-reason' }, repEditor(h, buf.rep || '', (v) => { buf.rep = v; }, { min: 1 }))); continue; }
           if (key === 'reason') { tr.append(h('td', { class: 'c-reason' }, eventsEditor(h, buf.reason || '', (v) => { buf.reason = v; }, { min: 2 }))); continue; }
           const el = h('textarea', { rows: 1, class: 'cell', 'aria-label': LABEL[key], autocapitalize: key === 'reason' ? null : 'characters' });
           el.value = buf[key] || '';
