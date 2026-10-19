@@ -1056,7 +1056,7 @@ function openStallingForm(existing, from, inline) {
         box('signals', 'Signal aspects', 'text', 'Through'),
         box('cause', 'Cause of stalling', 'text', 'Drizzling weather', true)),
       h('h3', { class: 'rep-title' }, 'Sequence of events'),
-      h('div', { class: 'grid three' }, box('station', 'Station and line', 'text', 'KMT main line'), box('arr', 'Arr', 'time'), box('dep', 'Dep', 'time')),
+      h('div', { class: 'grid three' }, box('station', 'Previous station and line', 'text', 'KMT main line'), box('arr', 'Arr', 'time'), box('dep', 'Dep', 'time')),
       eventRows,
       h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.events.push({ t: '', text: '' }); build(); } }, '+ Add a row')),
       h('p', { class: 'rep-note' }, 'The time of the incident becomes the first row ("Loco stalled at km ...") by itself. Write the rest: backed up, relief loco asked, relief loco arrived, EOT, spot departure, and so on.'),
