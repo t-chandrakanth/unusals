@@ -465,3 +465,132 @@ body.selecting .cell-input { user-select: none; caret-color: transparent; }
 
 /* inside the combined app (index.html): the install strip and button are the shell's */
 html.embed .install-banner, html.embed .install { display: none !important; }
+
+/* ---- the reports: the new report in cells, saved reports by From and To (used by SCR UNUSALS and DPWCS LOCO) ---- */
+:root { --k-fail: #ef6b7b; --k-other: #f2a33a; --k-dpwcs: #2fb8a4; --k-stall: #6f7be8; }
+@media (prefers-color-scheme: dark) { :root { --k-fail: #ff8f9c; --k-other: #ffc46b; --k-dpwcs: #5fe0cb; --k-stall: #98a2ff; } }
+.empty-big { padding: 32px 8px; text-align: center; color: var(--soft); }
+.newcard.dpwcs { border-top-color: var(--k-dpwcs); }
+/* ---- by date: the dates at the side, the day's reports as cells ---- */
+.dayview { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 14px; align-items: start; }
+.daylist { position: sticky; top: 56px; display: flex; flex-direction: column; gap: 6px; max-height: calc(100dvh - 80px); overflow-y: auto; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.daylist .dfield { display: grid; gap: 4px; font-size: 12px; font-weight: 700; color: var(--soft); margin-bottom: 4px; }
+.daylist input[type=date] { width: 100%; }
+.dchip { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: none; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; text-align: left; }
+.dchip b { font-variant-numeric: tabular-nums; }
+.dchip span { min-width: 22px; padding: 1px 7px; border-radius: 99px; background: var(--line); font-size: 12px; font-weight: 700; text-align: center; }
+.dchip.on { border-color: var(--navy); background: var(--navy); color: #fff; }
+.dchip.on span { background: rgba(255, 255, 255, 0.25); }
+.daymain .section-title { margin-top: 0; }
+@media (max-width: 760px) {
+  .dayview { grid-template-columns: 1fr; }
+  .daylist { position: static; flex-direction: row; flex-wrap: nowrap; max-height: none; overflow-x: auto; overflow-y: hidden; }
+  .daylist .dfield { flex: none; margin: 0 6px 0 0; }
+  .dchip { flex: none; }
+}
+.cells-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+table.cells { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
+table.cells th { position: sticky; top: 0; padding: 8px 6px; border-bottom: 1px solid var(--line); background: var(--bg); text-align: left; font-size: 11px; letter-spacing: 0.4px; text-transform: uppercase; color: var(--soft); white-space: nowrap; }
+table.cells td { padding: 2px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.cells td.sr, table.cells th.sr { width: 34px; text-align: center; color: var(--soft); font-weight: 700; padding-top: 10px; }
+table.cells td.act, table.cells th.act { width: 74px; white-space: nowrap; text-align: center; }
+.cell { display: block; width: 100%; min-height: 36px; padding: 8px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 1.35; resize: none; overflow: hidden; }
+.cell:hover { border-color: var(--line); }
+.cell:focus { outline: 2px solid var(--amber); outline-offset: -1px; background: var(--card); border-color: transparent; }
+select.cell { padding: 7px 4px; }
+.c-title { min-width: 170px; }
+.c-reason { min-width: 280px; }
+.newrow td { background: color-mix(in srgb, var(--k-fail) 5%, var(--card)); border-bottom: 0; }
+.newrow .cell::placeholder { color: var(--soft); font-style: italic; }
+.ibtn { width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--soft); font-size: 16px; line-height: 1; cursor: pointer; }
+.ibtn.danger:hover { color: #fff; background: var(--k-fail); border-color: var(--k-fail); }
+.daymain .actions { margin: 0 0 12px; }
+
+/* ---- the new report: cells, Save and Clear ---- */
+.failures { display: grid; gap: 18px; }
+.newcard { padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); box-shadow: 0 6px 20px rgba(18, 38, 63, 0.06); border-top: 5px solid var(--k-fail); }
+.newcard.cw { border-top-color: var(--k-other); }
+.newcard.other { border-top-color: var(--k-dpwcs); }
+.newhead { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 14px; }
+.newhead h2 { margin: 0; font-size: 18px; flex: 1 1 auto; }
+.kind-segs { margin: 0; max-width: none !important; }
+.ndate { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--soft); }
+.ndate input { width: auto; }
+.ngrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.ncell { display: grid; gap: 4px; align-content: start; min-width: 0; font-size: 12px; font-weight: 700; color: var(--soft); text-transform: uppercase; letter-spacing: 0.3px; }
+.ncell.wide { grid-column: 1 / -1; }
+.ncell input, .ncell textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); font: inherit; font-size: 15px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.ncell input:focus, .ncell textarea:focus { outline: 2px solid var(--amber); outline-offset: 0; background: var(--card); }
+.ncell textarea { resize: vertical; min-height: 84px; line-height: 1.4; }
+.det3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.quick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+.quick > span { font-size: 12px; font-weight: 700; color: var(--soft); }
+.qchip { padding: 5px 11px; border: 1px solid var(--line); border-radius: 99px; background: var(--bg); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
+.qchip:hover { border-color: var(--navy); }
+.newactions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
+.newactions .btn { min-height: 44px; padding: 0 20px; }
+.newactions .grow { flex: 1; }
+.newcard .hint { margin: 10px 0 0; font-size: 12px; }
+.saved-title { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 0; }
+.saved-title small { font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--soft); }
+table.cells td.ro { padding: 9px 8px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+table.cells td.ro.strong { font-weight: 700; }
+table.cells tbody tr:nth-child(even):not(.subrow):not(.editing) td { background: color-mix(in srgb, var(--line) 22%, transparent); }
+table.cells tr.editing td { background: color-mix(in srgb, var(--amber) 10%, var(--card)); }
+table.cells td.act { width: auto; min-width: 150px; white-space: nowrap; text-align: left; padding: 6px 8px; }
+table.cells td.act .link, table.cells td.act .btn { margin-right: 6px; }
+table.cells tr.subrow td { padding: 0 8px 10px; border-bottom: 1px solid var(--line); }
+
+/* a four-column grid: the heading and loco number are double width, the reason is the full row */
+.ngrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ncell.s2 { grid-column: span 2; }
+.ncell.s4, .ncell.wide { grid-column: 1 / -1; }
+.det3 { grid-template-columns: 1fr 1fr 2fr; }
+.ncell input::placeholder, .ncell textarea::placeholder { color: var(--soft); opacity: 0.5; font-style: italic; }
+@media (max-width: 720px) {
+  .ngrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .det3 { grid-template-columns: 1fr 1fr; }
+  .det3 > .ncell:last-child { grid-column: 1 / -1; }
+}
+
+/* ---- From and To ---- */
+.daylist .dfield { display: grid; gap: 4px; margin: 0 0 2px; }
+.daylist .btn.small { align-self: flex-start; }
+table.cells tr.dayrow td { padding: 9px 10px; background: color-mix(in srgb, var(--navy) 9%, var(--card)); font-weight: 800; font-size: 13px; letter-spacing: 0.3px; border-bottom: 1px solid var(--line); }
+table.cells tr.dayrow .count { margin-left: 8px; }
+@media (max-width: 760px) { .daylist .dfield { flex: none; } }
+
+/* ---- block and stalling: the form on the page ---- */
+.newcard.block { border-top-color: #6f8bff; }
+.newcard.stalling { border-top-color: var(--k-stall); }
+.editor.inline-form { padding: 0; }
+.editor.inline-form .rep-title { margin-top: 18px; }
+.newcard .editor-actions { margin-top: 16px; }
+
+
+/* ---- friendly access: easier to read, and to tap ---- */
+.ncell { font-size: 13px; color: color-mix(in srgb, var(--ink) 72%, var(--soft)); }
+.ncell input, .ncell textarea { font-size: 16px; }
+@media (max-width: 720px) {
+  .newactions { position: sticky; bottom: 0; z-index: 3; margin: 16px -16px -16px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line); border-radius: 0 0 18px 18px; }
+  .newactions .grow { display: none; }
+  .newactions .btn.primary { flex: 1; }
+}
+@media (pointer: coarse) {
+  .btn, .seg, .dchip, .qchip { min-height: 44px; }
+  .ibtn { width: 44px; height: 44px; }
+  table.cells td.act .link { padding: 10px 6px; }
+  .tabs button { min-height: 44px; }
+}
+
+/* ---- the sequence of events: a time and what happened, row by row ---- */
+.evbox { display: grid; gap: 6px; }
+.evrow { display: grid; grid-template-columns: 112px minmax(0, 1fr) 38px; gap: 6px; align-items: center; }
+.evrow input { width: 100%; padding: 10px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.evrow input:focus { outline: 2px solid var(--amber); outline-offset: 0; background: var(--card); }
+.evrow .evt { font-variant-numeric: tabular-nums; }
+.evrow .x { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--soft); font-size: 18px; cursor: pointer; }
+.evrow .x:hover { color: #fff; background: var(--k-fail); border-color: var(--k-fail); }
+.evbox .btn.small { justify-self: start; }
+td.c-reason .evbox { min-width: 300px; }
+@media (max-width: 520px) { .evrow { grid-template-columns: 92px minmax(0, 1fr) 38px; } }

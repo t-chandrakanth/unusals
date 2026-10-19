@@ -1,3 +1,4 @@
+import { eventsEditor } from '../js/events.js';
 import * as L from '../js/logic.js';
 import { loadState, saveState } from '../js/db.js';
 import { seedState } from '../js/seed.js';
@@ -38,8 +39,10 @@ const ui = {
   histMode: 'date', // 'date': all locos on one day; 'loco': one loco over many days
   histDay: today(),
   uDraft: null, // the loco failure being written; kept here so a redraw does not lose it
-  uSearch: '',
-  uMonth: 'all',
+  span: {}, // From and To of the saved reports
+  drafts: {}, // the report being typed, kept so a redraw does not lose it
+  edit: null, // the saved report being changed in its row
+  histSpan: { from: '', to: '' }, // From and To of the History tab
   sumDay: '',
 };
 
@@ -789,40 +792,45 @@ function viewHistory() {
     backupPanel());
 }
 
+/** The sheets of several days one under the other, as one sheet to share. */
+function stackSheets(sheets, name) {
+  const width = sheets[0].cols.length;
+  const rows = [];
+  sheets.forEach((s, i) => {
+    if (i) rows.push([{ v: '', s: 'gap', colSpan: width }, ...Array(width - 1).fill(null)]);
+    rows.push(...s.rows);
+  });
+  return { name, cols: sheets[0].cols, rows };
+}
+
 function viewHistoryDay() {
-  const days = recordDays();
-  const day = ui.histDay;
-  const locos = day === today() ? state.locos : L.locosOnDay(state, day);
-  const sheet = reportSheet(locos, day);
-  const sent = state.reports.filter((r) => r.day === day);
-  const pick = (d) => { ui.histDay = d; render(); };
-  return h('div', null,
-    h('p', { class: 'hint' }, 'Pick a date to see the position of every loco on that day.'),
-    h('div', { class: 'toolbar wrap' },
-      h('label', { class: 'inline' }, 'Date',
-        h('input', { type: 'date', value: day, max: today(), onchange: (e) => pick(e.target.value || today()) })),
-      h('button', { class: 'btn small', onclick: () => pick(L.addDays(day, -1)) }, 'Previous day'),
-      h('button', { class: 'btn small', disabled: day >= today(), onclick: () => pick(L.addDays(day, 1)) }, 'Next day')),
-    h('div', { class: 'days', 'aria-label': 'Dates with records' }, days.map((d) => h('button', {
-      class: `day ${d === day ? 'on' : ''}`, onclick: () => pick(d),
-    }, L.fmtDay(d).slice(0, 5)))),
-    locos.length
-      ? [
-        h('p', { class: 'hint' }, days.includes(day)
-          ? `Position of all locos at the end of ${L.fmtDay(day)}.`
-          : `No report was recorded on ${L.fmtDay(day)}. Showing the last known position before it.`),
-        exportBar(sheet, `DPWS-locos-${L.fmtDay(day)}`, sheet.rows[0][0].v, () => L.reportText(locos, day)),
-        h('div', { class: 'sheet-wrap', id: 'printable' }, sheetTable(sheet)),
-      ]
-      : h('p', { class: 'empty' }, `There are no records on or before ${L.fmtDay(day)}.`),
-    sent.length > 0 && [
-      h('h2', { class: 'section-title' }, `Reports sent on ${L.fmtDay(day)}`, h('span', { class: 'count' }, sent.length)),
-      h('ul', { class: 'rows' }, sent.map((r) => h('li', null,
-        h('button', {
-          class: 'row-main',
-          onclick: () => { ui.view = 'report'; ui.reportId = r.id; render(); window.scrollTo(0, 0); },
-        }, `${L.fmtTime(r.at)}${r.by ? `  ${r.by}` : ''}  (open as sent)`)))),
-    ]);
+  const r = ui.histSpan;
+  const set = (from, to) => {
+    if (from && to && from > to) [from, to] = [to, from]; // typed the wrong way round
+    ui.histSpan = { from, to };
+    render();
+  };
+  const box = (key, label) => h('label', { class: 'inline' }, label,
+    h('input', { type: 'date', value: r[key], max: today(), onchange: (e) => set(key === 'from' ? e.target.value : r.from, key === 'to' ? e.target.value : r.to) }));
+  const picked = !!(r.from || r.to);
+  const bar = h('div', { class: 'toolbar wrap' }, box('from', 'From'), box('to', 'To'),
+    picked && h('button', { class: 'btn small', onclick: () => set('', '') }, 'Clear dates'));
+  if (!picked) {
+    return h('div', null, bar, h('p', { class: 'empty-big' }, 'Choose From and To dates to see the position of every loco on each of those days, and share them at once.'));
+  }
+  const days = recordDays().filter((d) => (!r.from || d >= r.from) && (!r.to || d <= r.to)).reverse(); // oldest day first
+  const label = r.from && r.to && r.from === r.to ? L.fmtDay(r.from) : `${r.from ? L.fmtDay(r.from) : 'the start'} to ${r.to ? L.fmtDay(r.to) : L.fmtDay(today())}`;
+  if (!days.length) return h('div', null, bar, h('p', { class: 'empty-big' }, `No loco was updated, and no report sent, on ${label}.`));
+  const perDay = days.map((d) => { const locos = d === today() ? state.locos : L.locosOnDay(state, d); return { d, locos, sheet: reportSheet(locos, d) }; });
+  const stacked = stackSheets(perDay.map((x) => x.sheet), 'Locos');
+  const heading = `DPWS LOCOS ${label}`;
+  return h('div', null, bar,
+    h('p', { class: 'hint' }, `The position of all locos at the end of each day with a record: ${days.length} day${days.length === 1 ? '' : 's'}, ${label}, oldest first.`),
+    exportBar(stacked, `DPWS-locos-${label.replace(/[^0-9A-Za-z]+/g, '-')}`, heading, () => perDay.map((x) => L.reportText(x.locos, x.d)).join('\n\n')),
+    h('div', { class: 'sheet-wrap', id: 'printable' }, perDay.map((x, i) => [
+      h('h2', { class: 'section-title' }, L.fmtDay(x.d), h('span', { class: 'count' }, String(x.locos.length))),
+      sheetTable(x.sheet),
+    ])));
 }
 
 function viewHistoryLoco() {
@@ -870,13 +878,6 @@ const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', '
 function monthLabel(key) {
   const [y, m] = key.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleString('en-GB', { month: 'short', year: 'numeric' });
-}
-
-/** The colour of a report: DPWCS troubles blue, failures and stalls red, the rest amber. */
-function unusualKind(u) {
-  if (/DPWCS|DPWS/i.test(u.title)) return 'dpwcs';
-  if (/FAIL|STALL/i.test(u.title)) return 'fail';
-  return 'other';
 }
 
 function readOfficial(u) {
@@ -954,136 +955,6 @@ async function takeUnusualFiles(draft, list, redraw) {
   redraw();
 }
 
-/**
- * The attach / paste box at the top of the form. Attach (or drop) the Sr.DEE
- * PDF, or an Excel or PDF unusual sheet; or paste copied text. The data is
- * read from it and the empty boxes of the form are filled.
- */
-function officialPaste(draft, redraw) {
-  const o = readOfficial(draft);
-  const box = h('textarea', {
-    rows: 3, value: draft._paste || '',
-    placeholder: 'Or paste the copied text here (open the PDF, Ctrl+A, Ctrl+C, then Ctrl+V)',
-  });
-  box.classList.add('u-input');
-  box.setAttribute('data-ukey', '_paste');
-  box.addEventListener('input', (e) => { draft._paste = e.target.value; });
-
-  const chooser = h('input', {
-    type: 'file', multiple: true, accept: 'image/*,.docx,.pdf,.xlsx,.csv,.txt,application/pdf', style: 'display:none',
-    onchange: (e) => { const list = [...e.target.files]; e.target.value = ''; takeUnusualFiles(draft, list, redraw); },
-  });
-  const panel = h('div', { class: 'opaste' },
-    h('div', { class: 'opaste-head' },
-      h('strong', null, 'Attach the official Sr.DEE report'),
-      o || draft.official
-        ? h('span', { class: 'okchip' }, `✓ Attached${draft.incident ? `, incident ${draft.incident}` : ''}`)
-        : h('span', { class: 'ohint' }, 'optional')),
-    h('button', { type: 'button', class: 'drop', onclick: () => chooser.click() },
-      h('b', null, 'Attach a photo, Word, PDF or Excel file'),
-      h('span', null, 'tap here, or drop the files on this box (several at a time). The data is read and the form is filled.')),
-    chooser, box,
-    h('div', { class: 'opaste-actions' },
-      h('button', { type: 'button', class: 'btn small', onclick: () => takeUnusualText(draft, draft._paste || '', redraw) }, 'Read the pasted text'),
-      draft.official && h('button', {
-        type: 'button', class: 'link danger',
-        onclick: () => { draft.official = ''; draft.incident = ''; redraw(); },
-      }, 'Remove the attached report')));
-  panel.addEventListener('dragover', (e) => { e.preventDefault(); panel.classList.add('over'); });
-  panel.addEventListener('dragleave', () => panel.classList.remove('over'));
-  panel.addEventListener('drop', (e) => {
-    e.preventDefault();
-    panel.classList.remove('over');
-    takeUnusualFiles(draft, e.dataTransfer.files, redraw);
-  });
-  return panel;
-}
-
-/**
- * The form for one unusual report, used both for a fresh report (the draft
- * lives in ui, so a redraw while typing loses nothing) and for editing.
- */
-function unusualForm(draft, { submit, onSubmit, onCancel, redraw }) {
-  const field = (label, key, opts = {}) => {
-    const el = opts.area
-      ? h('textarea', { rows: opts.rows || 6, value: draft[key], placeholder: opts.placeholder || '' })
-      : h('input', {
-        type: opts.type || 'text', value: draft[key], placeholder: opts.placeholder || '',
-        autocapitalize: opts.type ? null : 'characters', autocomplete: 'off',
-      });
-    el.classList.add('u-input');
-    el.setAttribute('data-ukey', key);
-    if (opts.list) el.setAttribute('list', opts.list);
-    el.addEventListener('input', (e) => { draft[key] = e.target.value; if (opts.after) opts.after(); });
-    return h('label', { class: `field ${opts.wide ? 'wide' : ''}` }, h('span', null, label), el);
-  };
-  // From and To are only for working out the detention: it is filled in as
-  // they are typed, and only the detention is shown or shared.
-  let formEl = null;
-  const worked = () => {
-    const d = L.detentionBetween(draft.detFrom, draft.detTo);
-    if (!d) return;
-    draft.det = d;
-    const box = formEl && formEl.querySelector('.u-input[data-ukey="det"]');
-    if (box) box.value = d;
-  };
-  const titles = [...new Set([...UNUSUAL_TITLES, ...mine().map((u) => u.title).filter(Boolean)])];
-  const locos = [...new Set(state.locos.map((l) => l.locoNo).filter(Boolean))];
-  formEl = h('form', {
-    class: 'u-form',
-    // Pasting a whole report anywhere in the form is picked up and fills the boxes.
-    onpaste: (e) => {
-      const text = (e.clipboardData || window.clipboardData).getData('text');
-      if (!/DETENTION\s+PARTICULARS|ASSET\s+FAILURE|FIRST\s+INFORMATION\s+REPORT|BRIEF\s+HISTORY|Failure Report|Incident ID/i.test(text)) return;
-      e.preventDefault();
-      takeUnusualText(draft, text, redraw);
-    },
-    onsubmit: (e) => {
-      e.preventDefault();
-      if (!draft.day) { toast('Pick the date'); return; }
-      if (!draft.title.trim()) { toast('Enter the type of unusual (the heading)'); return; }
-      onSubmit();
-    },
-  },
-  officialPaste(draft, redraw),
-  h('div', { class: 'grid' },
-    field('Date', 'day', { type: 'date' }),
-    field('Type of unusual (heading)', 'title', { wide: true, list: 'u-titles', placeholder: 'LOCO TROUBLE-DPWCS' }),
-    field('Location', 'location', { placeholder: 'PRLI-GTU' }),
-    field('Train no', 'trainNo', { placeholder: 'KSNK/BOXNL' }),
-    field('Loco no', 'locoNo', { wide: true, list: 'u-locos', placeholder: '27592+27767/KZJ/DUE-11/11' }),
-    field('Load (if any)', 'load', { wide: true, placeholder: '59/59/4882T' }),
-    field('Detention from (not shown)', 'detFrom', { type: 'time', after: worked }),
-    field('Detention to (not shown)', 'detTo', { type: 'time', after: worked }),
-    field('DET (detention, worked out from From and To)', 'det', { wide: true, placeholder: '06:39 HRS' }),
-    field('Reason (what happened)', 'reason', { area: true, wide: true, rows: 7, placeholder: 'Times, km, what was done, relief loco, crew...' })),
-  h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
-  h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),
-  h('div', { class: 'editor-actions' },
-    h('button', { type: 'submit', class: 'btn primary' }, submit),
-    onCancel && h('button', { type: 'button', class: 'btn', onclick: onCancel }, 'Cancel')));
-  return formEl;
-}
-
-function openUnusualEditor(u) {
-  const dlg = document.getElementById('editor');
-  const draft = { ...u };
-  const build = () => dlg.replaceChildren(h('div', { class: 'editor' },
-    h('h2', null, `Edit unusual report, ${L.fmtDay(u.day)}`),
-    unusualForm(draft, {
-      submit: 'Save',
-      redraw: build,
-      onSubmit: () => {
-        dlg.close();
-        dispatch({ type: 'saveUnusual', unusual: { ...draft, app: 'dpwcs', time: '' }, now: new Date().toISOString() });
-        toast('Saved');
-      },
-      onCancel: () => dlg.close(),
-    })));
-  build();
-  dlg.showModal();
-}
-
 /** The official Sr.DEE report, as tiles and a time line. */
 function officialDetails(u) {
   const o = readOfficial(u);
@@ -1106,102 +977,218 @@ function officialDetails(u) {
     o.previous && h('p', { class: 'o-prev' }, h('b', null, 'Earlier incidents: '), o.previous));
 }
 
-function unusualCard(u) {
-  const run = (fn) => async () => {
-    try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); }
+// ---------- DPWCS loco failures: laid out like SCR UNUSALS ----------
+// The tab opens with a new report ready to fill in (cells, Save, Clear). The reports already
+// saved are not listed: choose From and To dates, or click a date, and they appear one row
+// each, with Edit and Delete, to share all at once.
+
+const U_LABEL = {
+  title: 'Train details (heading)', location: 'Location', trainNo: 'Train no', locoNo: 'Loco no', load: 'Load',
+  detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Sequence of events',
+};
+const U_HINT = {
+  title: 'LOCO TROUBLE-DPWCS', location: 'PRLI-GTU', trainNo: 'KSNK/BOXNL', locoNo: '27592+27767/KZJ/DUE-11/11',
+  load: '59/59/4882T', det: '06:39 HRS', reason: 'Times, km, what was done, relief loco, crew...',
+};
+const U_WIDE = new Set(['title', 'locoNo']);
+const U_BOXES = ['title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason'];
+const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+/** "07-09-2026 (MONDAY)", the way a day is written on a report. */
+const officialDay = (key) => { const [y, m, d] = key.split('-').map(Number); return `${L.fmtDay(key)} (${WEEKDAYS[new Date(y, m - 1, d).getDay()]})`; };
+
+/** Saves a loco failure of this app. The screen is redrawn by dispatch. */
+const saveUnusual = (u) => dispatch({ type: 'saveUnusual', unusual: { ...u, type: 'loco', app: 'dpwcs', time: '' }, now: new Date().toISOString() });
+
+const isBlankDraft = (d) => !['title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'detFrom', 'detTo', 'reason'].some((k) => String(d[k] || '').trim());
+
+function draftFor() {
+  if (!ui.drafts.loco) ui.drafts.loco = L.blankUnusual(today());
+  return ui.drafts.loco;
+}
+
+/** The report as it is typed: the cells, Save and Clear, and a way to read a file or a pasted report into them. */
+function newUnusualCard() {
+  const draft = draftFor();
+  const titles = [...new Set([...UNUSUAL_TITLES, ...mine().map((u) => u.title).filter(Boolean)])].filter((t) => t.length <= 32).slice(0, 6);
+  const locos = [...new Set(state.locos.map((l) => l.locoNo).filter(Boolean))];
+
+  const cell = (key) => {
+    if (key === 'reason') {
+      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Sequence of events'),
+        eventsEditor(h, draft.reason, (v) => { draft.reason = v; }));
+    }
+    const isText = false;
+    const el = isText
+      ? h('textarea', { rows: 3, placeholder: U_HINT[key] ? `e.g. ${U_HINT[key]}` : '' })
+      : h('input', {
+        type: key === 'detFrom' || key === 'detTo' ? 'time' : 'text',
+        placeholder: U_HINT[key] && key !== 'detFrom' && key !== 'detTo' ? `e.g. ${U_HINT[key]}` : '',
+        autocapitalize: key === 'detFrom' || key === 'detTo' ? null : 'characters', autocomplete: 'off',
+      });
+    el.value = draft[key] || '';
+    el.setAttribute('data-box', key);
+    if (key === 'title') el.setAttribute('list', 'u-titles');
+    if (key === 'locoNo') el.setAttribute('list', 'u-locos');
+    el.addEventListener('input', (e) => {
+      draft[key] = e.target.value;
+      if (key === 'detFrom' || key === 'detTo') {
+        const d = L.detentionBetween(draft.detFrom, draft.detTo);
+        if (d) { draft.det = d; const box = card.querySelector('[data-box="det"]'); if (box) box.value = d; }
+      }
+    });
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doSave(); } });
+    return h('label', { class: `ncell ${key === 'reason' ? 's4' : U_WIDE.has(key) ? 's2' : ''}` }, h('span', null, U_LABEL[key]), el);
   };
-  const [y, m, d] = u.day.split('-');
-  const chip = (label, value) => value && h('span', { class: 'chip' }, h('small', null, label), value);
-  return h('article', { class: `ucard k-${unusualKind(u)}` },
-    h('div', { class: 'ucard-top' },
-      h('div', { class: 'udate' }, h('b', null, d), h('span', null, `${MONTHS[Number(m) - 1]} ${y}`)),
-      h('div', { class: 'utitle' },
-        h('strong', null, u.title || '(no heading)'),
-        h('div', { class: 'chips' }, chip('LOCATION', u.location), chip('TRAIN', u.trainNo), chip('LOCO', u.locoNo), chip('LOAD', u.load))),
-      u.det && h('span', { class: 'det' }, h('small', null, 'DET'), u.det)),
-    u.reason && h('p', { class: 'ucard-reason' }, u.reason),
-    u.rep && h('p', { class: 'ucard-rep' }, h('b', null, 'REP '), u.rep),
-    (u.official || u.incident) && officialDetails(u),
-    h('div', { class: 'ucard-actions' },
-      h('button', { class: 'link', onclick: () => openUnusualEditor(u) }, u.official ? 'Edit' : 'Edit / paste official'),
-      h('button', { class: 'link', onclick: run(async () => {
-        const blob = await canvasToBlob(sheetToCanvas(unusualSheet([u])));
-        await shareOrDownload(blob, `Unusal-${L.fmtDay(u.day)}-${(u.trainNo || 'report').replace(/[^0-9A-Za-z]+/g, '-')}.png`, `UNUSALS-DATE-${L.fmtDay(u.day)}`);
-      }) }, 'Share image'),
-      h('button', { class: 'link', onclick: run(() => copyText(L.unusualText([u]))) }, 'Copy as text'),
-      h('button', {
-        class: 'link danger',
-        onclick: () => {
-          if (!confirm(`Delete the unusual report of ${L.fmtDay(u.day)} (${u.title || 'no heading'})?`)) return;
+
+  const doSave = () => {
+    if (!draft.day) { toast('Pick the date'); return; }
+    if (isBlankDraft(draft)) { toast('Type the report first'); return; }
+    if (!String(draft.title || '').trim()) { toast('Enter the train details (the heading)'); const t = card.querySelector('[data-box="title"]'); if (t) t.focus(); return; }
+    const rec = { ...draft };
+    ui.drafts.loco = L.blankUnusual(rec.day); // the next report is usually of the same day
+    ui.span.unusuals = { from: rec.day, to: rec.day }; // and the saved one is shown below
+    toast('Report saved');
+    saveUnusual(rec);
+  };
+  const doClear = () => { const day = draft.day; ui.drafts.loco = L.blankUnusual(day); render(); };
+
+  const chooser = h('input', {
+    type: 'file', multiple: true, accept: 'image/*,.docx,.pdf,.xlsx,.csv,.txt,application/pdf', style: 'display:none',
+    onchange: (e) => { const list = [...e.target.files]; e.target.value = ''; takeUnusualFiles(draft, list, render); },
+  });
+
+  const grid = h('div', { class: 'ngrid' }, U_BOXES.map((k) => (k === 'det'
+    ? h('div', { class: 'ncell s4 det3' },
+      h('label', { class: 'ncell' }, h('span', null, U_LABEL.detFrom), cell('detFrom').querySelector('input')),
+      h('label', { class: 'ncell' }, h('span', null, U_LABEL.detTo), cell('detTo').querySelector('input')),
+      cell('det'))
+    : cell(k))));
+
+  const card = h('section', { class: 'newcard dpwcs' },
+    h('div', { class: 'newhead' },
+      h('h2', null, 'New DPWCS loco failure report'),
+      h('label', { class: 'ndate' }, h('span', null, 'Date'), h('input', {
+        type: 'date', value: draft.day, 'aria-label': 'Date of the report',
+        onchange: (e) => { draft.day = e.target.value; if (draft.day) ui.span.unusuals = { from: draft.day, to: draft.day }; render(); },
+      }))),
+    grid,
+    titles.length > 0 && h('div', { class: 'quick' }, h('span', null, 'Quick heading:'), titles.map((t) => h('button', {
+      type: 'button', class: 'qchip', onclick: () => { draft.title = t; const el = card.querySelector('[data-box="title"]'); if (el) { el.value = t; el.focus(); } },
+    }, t))),
+    h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
+    h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),
+    h('div', { class: 'newactions' },
+      h('button', { type: 'button', class: 'btn primary', onclick: doSave }, 'Save report'),
+      h('button', { type: 'button', class: 'btn', onclick: doClear }, 'Clear'),
+      h('span', { class: 'grow' }),
+      h('button', { type: 'button', class: 'btn', onclick: () => chooser.click() }, 'Attach a file or photo'),
+      chooser),
+    h('p', { class: 'hint' }, 'You can also paste a whole report anywhere in this box, or attach Word, PDF, Excel files or photos: the cells are filled for you. Ctrl+Enter saves.'));
+
+  card.addEventListener('paste', (e) => {
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (!/DETENTION\s+PARTICULARS|ASSET\s+FAILURE|FIRST\s+INFORMATION\s+REPORT|BRIEF\s+HISTORY|Failure Report|Incident ID/i.test(text)) return;
+    e.preventDefault();
+    takeUnusualText(draft, text, render);
+  });
+  return card;
+}
+
+/** The dates: From and To and the dates that have reports at the side; the reports between the two dates beside them. */
+function unusualDays(items, content) {
+  const counts = new Map();
+  for (const u of items) counts.set(u.day, (counts.get(u.day) || 0) + 1);
+  const days = [...counts.keys()].sort().reverse();
+  const r = ui.span.unusuals || { from: '', to: '' };
+  const set = (from, to) => {
+    if (from && to && from > to) [from, to] = [to, from]; // typed the wrong way round
+    ui.span.unusuals = { from, to };
+    render();
+  };
+  const chip = (d, label) => h('button', { class: `dchip ${r.from === d && r.to === d ? 'on' : ''}`, onclick: () => set(d, d) },
+    h('b', null, label || L.fmtDay(d)), counts.get(d) ? h('span', null, String(counts.get(d))) : null);
+  const box = (key, label) => h('label', { class: 'dfield' }, label, h('input', {
+    type: 'date', value: r[key], 'aria-label': `${label} date`,
+    onchange: (e) => set(key === 'from' ? e.target.value : r.from, key === 'to' ? e.target.value : r.to),
+  }));
+  const picked = !!(r.from || r.to);
+  const inRange = picked ? items.filter((u) => (!r.from || u.day >= r.from) && (!r.to || u.day <= r.to)) : [];
+  const label = r.from && r.to && r.from === r.to ? officialDay(r.from)
+    : `${r.from ? L.fmtDay(r.from) : 'the start'} to ${r.to ? L.fmtDay(r.to) : L.fmtDay(today())}`;
+  return h('div', { class: 'dayview' },
+    h('aside', { class: 'daylist' },
+      box('from', 'From'), box('to', 'To'),
+      picked && h('button', { class: 'btn small', onclick: () => set('', '') }, 'Clear dates'),
+      chip(today(), 'Today'),
+      days.filter((d) => d !== today()).map((d) => chip(d))),
+    h('div', { class: 'daymain' }, picked
+      ? [h('h2', { class: 'section-title' }, label, h('span', { class: 'count' }, String(inRange.length))), content(inRange, label)]
+      : h('p', { class: 'empty-big' }, 'Choose From and To dates, or click a date on the left, to see the reports of those days and share them.')));
+}
+
+/** The saved reports of the chosen days: one row each, a heading row for each day. Edit turns a row into cells with Save and Cancel. */
+function unusualRows(items, label) {
+  const grow = (el) => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; };
+  const span = U_BOXES.length + 2;
+  const body = h('tbody');
+  let n = 0;
+  for (const [day, list] of L.unusualsByDay(items).reverse()) { // oldest day first, like the shared sheet
+    body.append(h('tr', { class: 'dayrow' }, h('td', { colspan: span }, officialDay(day), h('span', { class: 'count' }, String(list.length)))));
+    for (const u of list) {
+      n++;
+      if (ui.edit && ui.edit.id === u.id) {
+        const buf = ui.edit.buf;
+        const tr = h('tr', { class: 'editing' }, h('td', { class: 'sr' }, String(n)));
+        for (const key of U_BOXES) {
+          if (key === 'reason') { tr.append(h('td', { class: 'c-reason' }, eventsEditor(h, buf.reason || '', (v) => { buf.reason = v; }, { min: 2 }))); continue; }
+          const el = h('textarea', { rows: 1, class: 'cell', 'aria-label': U_LABEL[key], autocapitalize: key === 'reason' ? null : 'characters' });
+          el.value = buf[key] || '';
+          el.addEventListener('input', () => { buf[key] = el.value; grow(el); });
+          requestAnimationFrame(() => grow(el));
+          tr.append(h('td', { class: key === 'title' ? 'c-title' : key === 'reason' ? 'c-reason' : '' }, el));
+        }
+        tr.append(h('td', { class: 'act' },
+          h('button', { class: 'btn small primary', onclick: () => { const rec = { ...u, ...buf }; ui.edit = null; toast('Saved'); saveUnusual(rec); } }, 'Save'),
+          h('button', { class: 'btn small', onclick: () => { ui.edit = null; render(); } }, 'Cancel')));
+        body.append(tr);
+        continue;
+      }
+      const tr = h('tr', null, h('td', { class: 'sr' }, String(n)));
+      for (const key of U_BOXES) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' ? 'c-reason' : ''}` }, String(u[key] || '')));
+      tr.append(h('td', { class: 'act' },
+        h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: Object.fromEntries(U_BOXES.map((k) => [k, u[k] || ''])) }; render(); } }, 'Edit'),
+        h('button', { class: 'link danger', onclick: () => {
+          if (!confirm(`Delete the report of ${L.fmtDay(u.day)} (${u.title || 'no heading'})?`)) return;
           dispatch({ type: 'removeUnusual', id: u.id });
           toast('Deleted');
-        },
-      }, 'Delete')));
+        } }, 'Delete')));
+      body.append(tr);
+      if (u.official || u.incident) body.append(h('tr', { class: 'subrow' }, h('td', { colspan: span }, officialDetails(u))));
+    }
+  }
+  const head = h('thead', null, h('tr', null, h('th', { class: 'sr' }, '#'), U_BOXES.map((k) => h('th', null, U_LABEL[k])), h('th', { class: 'act' }, '')));
+  const heading = `DPWCS LOCO FAILURES ${label}`;
+  const text = () => `*${heading}*\n\n${L.unusualText(items)}`;
+  const r = ui.span.unusuals || {};
+  return h('div', null,
+    items.length > 0 && exportBar(unusualSheet(items, 'Unusals'), `DPWCS-loco-failures-${label.replace(/[^0-9A-Za-z]+/g, '-')}`, heading, text),
+    items.length > 0 && h('div', { class: 'actions' },
+      h('button', { class: 'btn whatsapp', onclick: () => sendWhatsApp(text()) }, 'Send on WhatsApp'),
+      r.from && r.from === r.to && h('button', { class: 'btn', onclick: () => sendWhatsApp(daySummaryText(r.from)) }, 'Daily summary on WhatsApp')),
+    items.length
+      ? h('div', { class: 'cells-wrap' }, h('table', { class: 'cells' }, head, body))
+      : h('p', { class: 'empty-big' }, 'No report in these dates. Write one in the box above: it is saved on the date shown there.'));
 }
 
 function viewUnusuals() {
-  if (!ui.uDraft) ui.uDraft = L.blankUnusual(today());
-  const months = [...new Set(mine().map((u) => u.day.slice(0, 7)))].sort().reverse();
-  if (ui.uMonth !== 'all' && !months.includes(ui.uMonth)) ui.uMonth = 'all';
-
-  const buildList = () => {
-    const q = ui.uSearch.trim().toLowerCase();
-    const visible = mine().filter((u) =>
-      (ui.uMonth === 'all' || u.day.startsWith(ui.uMonth)) &&
-      (!q || [u.title, u.location, u.trainNo, u.locoNo, u.reason, u.rep, u.load, u.incident, u.official, L.fmtDay(u.day)].some((v) => (v || '').toLowerCase().includes(q))));
-    if (!visible.length) {
-      return [h('p', { class: 'empty' }, mine().length ? 'No unusual report matches.' : 'No DPWCS loco failures yet. Write the first one above.')];
-    }
-    const sheet = unusualSheet(visible, 'Unusals');
-    const base = `DPWCS-loco-failures-${ui.uMonth === 'all' ? 'all' : monthLabel(ui.uMonth).replace(' ', '-')}`;
-    return [
-      h('p', { class: 'hint u-screen' }, `${visible.length} report${visible.length === 1 ? '' : 's'}. Share them all as one sheet, oldest first, numbered 1, 2, 3...`),
-      exportBar(sheet, base, `DPWCS LOCO FAILURES ${ui.uMonth === 'all' ? '' : monthLabel(ui.uMonth)}`.trim(), () => L.unusualText(visible)),
-      h('div', { class: 'u-screen' }, L.unusualsByDay(visible).map(([day, items]) => h('section', null,
-        h('h2', { class: 'section-title' }, L.fmtDay(day), h('span', { class: 'count' }, items.length)),
-        h('div', { class: 'ucards' }, items.map(unusualCard))))),
-      h('div', { class: 'sheet-wrap print-only', id: 'printable' }, sheetTable(sheet)),
-    ];
-  };
-
-  const search = h('input', {
-    type: 'search', class: 'search', placeholder: 'Search train, loco, location or reason', value: ui.uSearch,
-    oninput: (e) => { ui.uSearch = e.target.value; document.getElementById('ulist').replaceChildren(...buildList()); },
-  });
-  const month = h('select', {
-    'aria-label': 'Month',
-    onchange: (e) => { ui.uMonth = e.target.value; document.getElementById('ulist').replaceChildren(...buildList()); },
-  }, h('option', { value: 'all', selected: ui.uMonth === 'all' }, 'All months'),
-  months.map((m) => h('option', { value: m, selected: m === ui.uMonth }, monthLabel(m))));
-
-  return h('div', null,
+  return h('div', { class: 'failures' },
     SHARED && status.unusualsMissing && h('p', { class: 'notice' },
       'Unusual reports are being kept on this device only for now. To share them with everyone, the shared database needs one extra table: run supabase/setup-unusuals.sql once (steps are in the README). Nothing is lost meanwhile.'),
-    h('section', { class: 'panel u-new u-screen' },
-      h('h2', null, h('span', { class: 'plus' }, '+'), 'Write a new DPWCS loco failure'),
-      unusualForm(ui.uDraft, {
-        submit: 'Save report',
-        onSubmit: () => {
-          const unusual = ui.uDraft;
-          ui.uDraft = null;
-          dispatch({ type: 'saveUnusual', unusual: { ...unusual, app: 'dpwcs', time: '' }, now: new Date().toISOString() });
-          toast('Unusual report saved');
-        },
-        onCancel: null,
-        redraw: render,
-      }),
-      h('button', { type: 'button', class: 'link', onclick: () => { ui.uDraft = null; render(); } }, 'Clear the form')),
-    h('h2', { class: 'section-title u-screen' }, 'DPWCS loco failures', h('span', { class: 'count' }, mine().length)),
-    h('div', { class: 'toolbar wrap u-screen' }, search, month),
-    (() => {
-      const day = h('input', { type: 'date', value: ui.sumDay || today(), 'aria-label': 'Day', onchange: (e) => { ui.sumDay = e.target.value || today(); } });
-      return h('div', { class: 'toolbar wrap u-screen sum-row' },
-        h('button', { class: 'btn whatsapp big', onclick: () => sendWhatsApp(daySummaryText(day.value || today())) }, "Today's reports on WhatsApp"),
-        h('label', { class: 'inline' }, 'for day', day),
-        h('button', { class: 'btn small', onclick: () => copyText(daySummaryText(day.value || today())) }, 'Copy text'));
-    })(),
-    h('div', { id: 'ulist' }, buildList()));
+    newUnusualCard(),
+    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'choose From and To dates')),
+    unusualDays(mine(), (items, label) => unusualRows(items, label)));
 }
+
 
 // ---------- More ----------
 
@@ -1463,11 +1450,20 @@ function render() {
   }
 }
 
+// A redraw from the shared database waits while a box is being typed in, then happens.
+let pendingRender = false;
+function renderSafe() {
+  const a = document.activeElement;
+  if (a && a.matches && a.matches('.newcard input, .newcard textarea, table.cells textarea')) { pendingRender = true; return; }
+  render();
+}
+document.addEventListener('focusout', () => { if (pendingRender) { pendingRender = false; setTimeout(render, 0); } });
+
 function onSyncStatus(next) {
   const screenChanged = (next.phase === 'signed-out') !== (status.phase === 'signed-out') || next.email !== status.email;
   status = next;
   if (status.phase === 'synced') { importOldRecords(); importOldUnusuals(); }
-  if (screenChanged) { render(); return; }
+  if (screenChanged) { renderSafe(); return; }
   // Routine status changes only touch the status line, so a form being
   // filled in or a table being scrolled is not disturbed.
   const line = document.getElementById('sync-status');
@@ -1489,7 +1485,7 @@ async function start() {
       key: SUPABASE_KEY,
       login: REQUIRE_LOGIN,
       getState: () => state,
-      setState: (next, redraw) => { state = next; persist(); if (redraw) render(); },
+      setState: (next, redraw) => { state = next; persist(); if (redraw) renderSafe(); },
       onStatus: onSyncStatus,
     });
     status = { ...status, phase: sync.signedIn ? 'syncing' : 'signed-out', email: sync.email };

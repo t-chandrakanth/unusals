@@ -10,6 +10,7 @@ import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
 import { unusualSheet, blockSheet } from '../js/sheet.js';
 import { blankBlock, blankRow, computeBlock, blockMessage, blockTitle, rowDetention, longMins } from '../js/block.js';
 import { buildPdf } from '../js/pdf.js';
+import { eventsEditor } from '../js/events.js';
 import { blankStalling, readStalling, detShort, whatsappText, reportTitle, detentionText, hasContent, remarksText, markPosition } from '../js/stalling.js';
 import { drawStalling } from '../js/stallingcanvas.js';
 import { sheetToCanvas, canvasToBlob } from '../js/canvas.js';
@@ -39,7 +40,7 @@ const FORM = {
 };
 const LABEL = {
   day: 'Date', time: 'Time', title: 'Train details (heading)', location: 'Location', trainNo: 'Train no',
-  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Reason (what happened)',
+  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Sequence of events',
 };
 const HINT = {
   title: 'brake binding', location: 'TNGM-YP/GNN', trainNo: 'ICDT C/S', locoNo: '42821', load: '40/40/3910',
@@ -95,7 +96,7 @@ const NO_SYNC = { outbox: [], cursor: {}, linked: false };
 let state = L.emptyState();
 let sync = null;
 let status = { phase: SHARED ? 'syncing' : 'local', pending: 0, email: '', error: '', unusualsMissing: false };
-const ui = { view: 'overview', search: '', month: 'all', range: 'all', from: '', to: '', sumDay: '', span: {}, focusNew: false, drafts: {}, edit: null };
+const ui = { view: 'loco', search: '', month: 'all', range: 'all', from: '', to: '', sumDay: '', span: {}, focusNew: false, drafts: {}, edit: null };
 let repeatMap = new Map(); // loco number -> reports in the last 90 days, when more than one
 
 const who = () => (sync && sync.email ? sync.email.split('@')[0] : '');
@@ -639,68 +640,6 @@ function viewBlocks() {
     dayShell('block', list, (items) => [messageBar(items, (u) => blockMessage(readBlock(u))), groupedCards(items, blockCard)]));
 }
 
-function viewOverview() {
-  const list = rows();
-  const t = today();
-  const month = t.slice(0, 7);
-  const week = addDays(t, -6);
-  const count = (k) => list.filter((u) => kindOf(u) === k).length;
-  const kpi = (view, label, n) => h('button', { class: `kpi ${TYPES[view] ? TYPES[view].accent : ''}`, onclick: () => { ui.view = view; render(); window.scrollTo(0, 0); } },
-    h('b', null, String(n)), h('span', null, label));
-  const days = lastDays(list, 14, t, kindOf);
-  const peak = Math.max(1, ...days.map((d) => d.loco + d.cw + d.other));
-  const rank = (items, empty, sub) => (items.length
-    ? h('ul', { class: 'rank' }, items.map(([name, n, extra]) => h('li', null,
-      h('div', { class: 'row' }, h('span', null, name), h('span', null, extra || `${n}`)),
-      h('div', { class: 'meter' }, h('i', { style: `width:${Math.round((n / items[0][1]) * 100)}%` })),
-      sub && h('div', { class: 'sub' }, sub(name)))))
-    : h('p', { class: 'nothing' }, empty));
-  const since90 = addDays(t, -90);
-  const repeats = repeatLocos(list, since90).slice(0, 5);
-  const longest = longestDetentions(list.filter((u) => u.day >= since90), 5);
-  const latest = L.unusualsByDay(list).slice(0, 2).flatMap(([, items]) => items).slice(0, 4);
-  return h('div', null,
-    h('section', { class: 'hero' },
-      h('div', { class: 'hero-top' },
-        h('div', null, h('div', { class: 'big' }, String(list.length)), h('small', null, 'unusual reports on record')),
-        h('div', { class: 'when' }, h('b', null, String(list.filter((u) => u.day.startsWith(month)).length)), ' this month', h('br'), h('b', null, String(list.filter((u) => u.day >= week).length)), ' in the last 7 days')),
-      h('div', { class: 'hero-actions' }, [h('button', { class: 'btn hero-new loco', onclick: () => openStallingForm() }, '+ Stalling report'), h('button', { class: 'btn hero-new block', onclick: () => openBlockForm() }, '+ Block detention'), h('button', { class: 'btn', onclick: bulkAttach }, 'Attach many files')])),
-    h('div', { class: 'kpis' }, kpi('loco', 'Loco failures', count('loco')), kpi('cw', 'C&W failures', count('cw')), kpi('all', 'All reports', list.length)),
-    h('section', { class: 'card-box' },
-      h('h2', null, 'Daily WhatsApp summary'),
-      h('p', { class: 'nothing', style: 'margin-bottom:10px' }, 'The counts and a short line for each report of one day, ready to paste into the group.'),
-      (() => {
-        const day = h('input', { type: 'date', value: ui.sumDay || today(), 'aria-label': 'Day', onchange: (e) => { ui.sumDay = e.target.value || today(); } });
-        const chosen = () => day.value || today();
-        return h('div', { class: 'sum-row' },
-          h('label', { class: 'dfield' }, 'Day', day),
-          h('button', { class: 'btn whatsapp big', onclick: () => sendWhatsApp(daySummaryText(chosen())) }, "Send on WhatsApp"),
-          h('button', { class: 'btn', onclick: () => copyText(daySummaryText(chosen())) }, 'Copy text'));
-      })()),
-    h('section', { class: 'card-box' },
-      h('h2', null, 'Last 14 days', h('span', { class: 'legend' }, h('span', null, h('i', { style: 'background:var(--k-fail)' }), 'Loco'), h('span', null, h('i', { style: 'background:var(--k-other)' }), 'C&W'), h('span', null, h('i', { style: 'background:var(--k-dpwcs)' }), 'Other'))),
-      h('div', { class: 'chart' }, days.map((d) => {
-        const n = d.loco + d.cw + d.other;
-        return h('div', { class: `bar ${d.day === t ? 'today' : ''}`, title: `${L.fmtDay(d.day)}: ${n}` },
-          h('div', { class: 'stack', style: `flex:${n ? n / peak : 0.02} 0 0` },
-            ['loco', 'cw', 'other'].map((k) => d[k] > 0 && h('i', { class: k, style: `flex:${d[k]} 0 0` }))),
-          h('div', { class: 'lab' }, d.day.slice(8)));
-      }))),
-    h('div', { class: 'cols' },
-      h('section', { class: 'card-box' }, h('h2', null, 'Loco numbers to watch'),
-        rank(repeats.map((r) => [r.loco, r.count, `${r.count} reports`]), 'No loco has more than one report in the last 90 days.', (n) => `latest ${L.fmtDay(repeats.find((r) => r.loco === n).last)}`)),
-      h('section', { class: 'card-box' }, h('h2', null, 'Where it happens'),
-        rank(topCounts(list.filter((u) => u.day >= since90), (u) => [String(u.location || '').trim().toUpperCase()]), 'Nothing in the last 90 days.')),
-      h('section', { class: 'card-box' }, h('h2', null, 'Longest detentions (90 days)'),
-        longest.length
-          ? h('ul', { class: 'rank alert' }, longest.map((x) => h('li', null,
-            h('div', { class: 'row' }, h('span', null, x.u.title || '(no heading)'), h('span', null, fmtMinutes(x.min))),
-            h('div', { class: 'meter' }, h('i', { style: `width:${Math.round((x.min / longest[0].min) * 100)}%` })),
-            h('div', { class: 'sub' }, `${L.fmtDay(x.u.day)}  |  ${x.u.location || ''}  |  ${x.u.trainNo || ''}`))))
-          : h('p', { class: 'nothing' }, 'No detention times written in the last 90 days.'))),
-    h('p', { class: 'hint' }, 'Open a tab and click a date to see its reports.'));
-}
-
 // ---------- by date ----------
 // Nothing from the past is shown until a date is clicked. The dates are listed at the
 // side; the reports of the clicked day are shown on their own.
@@ -773,7 +712,11 @@ function newReportCard(view) {
   };
 
   const cell = (key) => {
-    const isText = key === 'reason';
+    if (key === 'reason') {
+      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Sequence of events'),
+        eventsEditor(h, draft.reason, (v) => { draft.reason = v; }));
+    }
+    const isText = false;
     const el = isText
       ? h('textarea', { rows: 3, placeholder: HINT[key] ? `e.g. ${HINT[key]}` : '' })
       : h('input', {
@@ -873,6 +816,7 @@ function dayRecords(view, items, label) {
         const buf = ui.edit.buf;
         const tr = h('tr', { class: 'editing' }, h('td', { class: 'sr' }, String(n)));
         for (const key of order) {
+          if (key === 'reason') { tr.append(h('td', { class: 'c-reason' }, eventsEditor(h, buf.reason || '', (v) => { buf.reason = v; }, { min: 2 }))); continue; }
           const el = h('textarea', { rows: 1, class: 'cell', 'aria-label': LABEL[key], autocapitalize: key === 'reason' ? null : 'characters' });
           el.value = buf[key] || '';
           el.addEventListener('input', () => { buf[key] = el.value; grow(el); });
@@ -1229,7 +1173,7 @@ function statusText() {
 
 function render() {
   const count = (t) => rows().filter((u) => kindOf(u) === t).length;
-  const tabs = [['overview', 'Overview', null], ['loco', 'Loco failures', count('loco')], ['stalling', 'Stalling', stallings().length], ['cw', 'C&W failures', count('cw')], ['all', 'All', rows().length], ['block', 'Block detention', blocks().length]];
+  const tabs = [['loco', 'Loco failures', count('loco')], ['stalling', 'Stalling', stallings().length], ['cw', 'C&W failures', count('cw')], ['all', 'All', rows().length], ['block', 'Block detention', blocks().length]];
   const dots = { stalling: 'var(--k-stall)', loco: 'var(--k-fail)', cw: 'var(--k-other)', other: 'var(--k-dpwcs)', all: 'var(--navy)', overview: 'var(--navy)', block: '#6f8bff' };
   repeatMap = new Map(repeatLocos(rows(), addDays(today(), -90)).map((r) => [r.loco, r.count]));
   document.getElementById('app').replaceChildren(
@@ -1257,7 +1201,7 @@ function render() {
       class: ui.view === id ? 'on' : '',
       onclick: () => { ui.view = id; ui.month = 'all'; ui.search = ''; ui.range = 'all'; ui.from = ''; ui.to = ''; render(); window.scrollTo(0, 0); },
     }, h('i', { class: 'dot-k', style: `--c:${dots[id]}` }), text, n != null && h('span', { class: 'n' }, String(n))))),
-    h('main', null, ui.view === 'overview' ? viewOverview() : ui.view === 'block' ? viewBlocks() : ui.view === 'stalling' ? viewStalling() : viewList()));
+    h('main', null, ui.view === 'block' ? viewBlocks() : ui.view === 'stalling' ? viewStalling() : viewList()));
   if (ui.focusNew) { ui.focusNew = false; const first = document.querySelector('tr.newrow textarea'); if (first) first.focus(); }
 }
 
