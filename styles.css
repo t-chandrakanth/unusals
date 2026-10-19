@@ -594,3 +594,9 @@ table.cells tr.dayrow .count { margin-left: 8px; }
 .evbox .btn.small { justify-self: start; }
 td.c-reason .evbox { min-width: 300px; }
 @media (max-width: 520px) { .evrow { grid-template-columns: 92px minmax(0, 1fr) 38px; } }
+
+/* ---- DPWCS Locos: the attach box, and Add loco under the other divisions ---- */
+.attach-locos { margin: 0 0 12px; padding: 0; border: 0; background: none; }
+.attach-locos .drop { margin-bottom: 0; }
+.add-row { margin: 10px 0 4px; }
+.add-row .btn { min-height: 44px; padding: 0 22px; }

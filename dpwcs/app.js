@@ -527,7 +527,8 @@ function viewLocos() {
         h('h2', { class: `section-title ${division.toLowerCase()}` }, title, h('span', { class: 'count' }, list.length)),
         list.length > 0 && h('div', { class: 'list-head', 'aria-hidden': 'true' },
           h('span', null, 'Sr. No'), h('span', null, 'Loco No'), h('span', null, 'Train No'), h('span', null, 'Current location'), h('span', null, 'Working'), h('span', null, 'Updated')),
-        list.length ? list.map((r) => locoCard(r, since)) : h('p', { class: 'empty' }, q ? 'No match.' : 'No locos here.'));
+        list.length ? list.map((r) => locoCard(r, since)) : h('p', { class: 'empty' }, q ? 'No match.' : 'No locos here.'),
+        division === 'OTHER' && h('div', { class: 'add-row' }, h('button', { class: 'btn primary', onclick: () => openEditor(null, 'OTHER') }, '+ Add loco')));
     };
     const done = state.locos.filter((l) => L.isUpdated(l, since)).length;
     const total = state.locos.length;
@@ -547,10 +548,21 @@ function viewLocos() {
       document.getElementById('lists').replaceChildren(...buildLists());
     },
   });
+  const chooser = h('input', {
+    type: 'file', multiple: true, accept: 'image/*,.docx,.pdf,.xlsx,.csv,.txt,application/pdf', style: 'display:none',
+    onchange: (e) => { const list = [...e.target.files]; e.target.value = ''; readLocoFiles(list); },
+  });
+  const attach = h('div', { class: 'opaste attach-locos' },
+    h('button', { type: 'button', class: 'drop', onclick: () => chooser.click() },
+      h('b', null, 'Attach a photo, Word, PDF or Excel file'),
+      h('span', null, 'tap here, or drop the files on this box (several at a time). The locos in them are matched by loco number and updated after you check them.')),
+    chooser);
+  attach.addEventListener('dragover', (e) => { e.preventDefault(); attach.classList.add('over'); });
+  attach.addEventListener('dragleave', () => attach.classList.remove('over'));
+  attach.addEventListener('drop', (e) => { e.preventDefault(); attach.classList.remove('over'); readLocoFiles(e.dataTransfer.files); });
   return h('div', null,
-    h('div', { class: 'toolbar' }, search,
-      h('button', { class: 'btn', onclick: openPasteBox }, 'Paste from Excel'),
-      h('button', { class: 'btn primary', onclick: () => openEditor(null) }, '+ Add loco')),
+    h('div', { class: 'toolbar' }, search),
+    attach,
     h('p', { class: 'hint wide-only' }, 'Type in the Train No, Current location or Working box to change it, or paste a block copied from Excel. Click a loco number for all its details.'),
     h('p', { class: 'hint narrow-only' }, 'Tap a loco number to see and update its details.'),
     h('div', { id: 'lists' }, buildLists()));
@@ -558,7 +570,7 @@ function viewLocos() {
 
 // A box to paste the whole report sheet (or any cells copied from Excel) into: it shows which
 // locos will get which Train No and Location before anything is changed.
-function openPasteBox() {
+function openPasteBox(initial = '', problems = []) {
   const dlg = document.getElementById('editor');
   const preview = h('div', { class: 'paste-preview' }, 'Nothing pasted yet.');
   const apply = h('button', { type: 'button', class: 'btn primary', disabled: true }, 'Apply');
@@ -584,17 +596,40 @@ function openPasteBox() {
   });
   apply.onclick = () => { dlg.close(); applyPaste(area.value, null); };
   dlg.replaceChildren(h('form', { method: 'dialog', class: 'editor', onsubmit: (e) => e.preventDefault() },
-    h('h2', null, 'Paste from Excel'),
-    h('p', { class: 'hint' }, 'Copy the table from Excel (with the headings or the Loco No column) and paste it here. Each loco gets its Train No, Location and Working by its loco number.'),
+    h('h2', null, initial ? 'Check what was read' : 'Paste from Excel'),
+    h('p', { class: 'hint' }, initial
+      ? 'This is what was read from the attached file(s). Each loco gets its Train No, Location and Working by its loco number. Check the list below, then press Apply.'
+      : 'Copy the table from Excel (with the headings or the Loco No column) and paste it here. Each loco gets its Train No, Location and Working by its loco number.'),
+    problems.length > 0 && h('p', { class: 'form-error' }, `Could not read: ${problems.join('; ')}`),
     area, preview,
     h('div', { class: 'editor-actions' }, apply, h('button', { type: 'button', class: 'btn', onclick: () => dlg.close() }, 'Cancel'))));
   dlg.showModal();
-  area.focus();
+  if (initial) { area.value = initial; area.dispatchEvent(new Event('input')); } else area.focus();
 }
 
-function openEditor(loco) {
+/** Attached photos, Word, PDF or Excel files: read, then shown for checking like a paste. */
+async function readLocoFiles(list) {
+  const files = [...list];
+  if (!files.length) return;
+  toast(files.length > 1 ? `Reading ${files.length} files...` : `Reading ${files[0].name}...`);
+  const parts = [];
+  const bad = [];
+  for (const file of files) {
+    try {
+      const text = await fileToText(file, (pct) => toast(`Reading the photo ${file.name}: ${pct}%`));
+      if (text && text.trim()) parts.push(text); else bad.push(`${file.name} (nothing found in it)`);
+    } catch (e) {
+      console.error(e);
+      bad.push(`${file.name} (${e instanceof FileError ? e.message : 'could not be read'})`);
+    }
+  }
+  if (!parts.length) { toast(bad.length ? `Nothing could be read. ${bad.join('; ')}` : 'Nothing found in those files.'); return; }
+  openPasteBox(parts.join('\n'), bad);
+}
+
+function openEditor(loco, division) {
   const isNew = !loco;
-  const draft = loco ? { ...loco } : L.blankLoco('SC');
+  const draft = loco ? { ...loco } : L.blankLoco(division || 'SC');
   const dlg = document.getElementById('editor');
 
   const field = (label, key, opts = {}) => h('label', { class: `field ${opts.wide ? 'wide' : ''}` },
