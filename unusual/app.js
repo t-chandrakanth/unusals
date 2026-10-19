@@ -429,7 +429,7 @@ function card(u, showTag) {
       h('button', { class: 'link', onclick: run(async () => {
         await shareOrDownload(await canvasToBlob(sheetToCanvas(unusualSheet([u]))), `Unusal-${L.fmtDay(u.day)}-${(u.trainNo || 'report').replace(/[^0-9A-Za-z]+/g, '-')}.png`, `UNUSALS-DATE-${L.fmtDay(u.day)}`);
       }) }, 'Share image'),
-      h('button', { class: 'link', onclick: run(() => copyText(L.unusualText([u]))) }, 'Copy as text'),
+      h('button', { class: 'link', onclick: run(() => copyText(L.unusualMessage(u))) }, 'Copy as text'),
       h('button', { class: 'link', onclick: run(async () => shareOrDownload(await reportPdfBlob([u]), `${reportFile(u)}.pdf`, u.title || 'Unusal')) }, 'PDF'),
       h('button', { class: 'link', onclick: () => openPhotos(u) }, photosOf(u).length ? `Photos (${photosOf(u).length})` : 'Add photos'),
       kind === 'loco' && h('button', { class: 'link', onclick: () => openStallingForm(null, u) }, 'Stalling report'),
@@ -918,8 +918,8 @@ function dayRecords(view, items, label) {
         h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: { ...Object.fromEntries(order.map((k) => [k, (k === 'rep' ? repOf(u) : u[k]) || ''])), repAsOn: u.repAsOn || '' } }; render(); } }, 'Edit'),
         h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await canvasToBlob(await drawReport(u, 1)), `${reportFile(u)}.png`, u.title || 'Unusal')) }, 'Share'),
         h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await reportPdfBlob([u]), `${reportFile(u)}.pdf`, u.title || 'Unusal')) }, 'PDF'),
-        h('button', { class: 'link', onclick: runSafe(() => copyText(L.unusualText([u]))) }, 'Copy text'),
-        h('button', { class: 'link', onclick: () => sendWhatsApp(L.unusualText([u])) }, 'WhatsApp'),
+        h('button', { class: 'link', onclick: runSafe(() => copyText(L.unusualMessage(u))) }, 'Copy text'),
+        h('button', { class: 'link', onclick: () => sendWhatsApp(L.unusualMessage(u)) }, 'WhatsApp'),
         h('button', { class: 'link', onclick: () => openPhotos(u) }, photosOf(u).length ? `Photos (${photosOf(u).length})` : 'Photos'),
         kindOf(u) === 'loco' && h('button', { class: 'link', onclick: () => openStallingForm(null, u) }, 'Stalling'),
         h('button', { class: 'link danger', onclick: () => {

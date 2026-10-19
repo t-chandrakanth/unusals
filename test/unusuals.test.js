@@ -151,9 +151,25 @@ test('From and To are kept with the report but never shared: only DET shows', ()
   assert.equal(s.unusuals[0].detFrom, '02:40');
   assert.equal(s.unusuals[0].detTo, '05:14');
   const text = L.unusualText(s.unusuals);
-  assert.match(text, /DET: 02:34 HRS/);
+  assert.match(text, /DET : 02:34 HRS/);
   assert.doesNotMatch(text, /02:40|05:14/);
   const cells = unusualSheet(s.unusuals).rows.flat().filter(Boolean).map((c) => c.v).join('|');
   assert.match(cells, /02:34 HRS/);
   assert.doesNotMatch(cells, /02:40|05:14/);
+});
+
+test('the text message of one report: heading, details, events one to a line, wagon, BPC and repercussions', () => {
+  const u = {
+    ...L.blankUnusual('2026-10-19'), title: 'KPCC METAL ON TYRE', location: 'VKB-GDQ', trainNo: 'KPCC', locoNo: '60529/SBI/01/07', load: '60/60/3365T',
+    reason: '21:04 VKB DEP FROM LOOP LINE\n21:08 TRAIN STOPPED', wagonNo: 'SECR-12140893411', bpcNo: '50000951763/JSG/CKP/SER',
+    rep: 'KPCC -GDQ- ARR: 21:53, NOT DEPARTED, DET: 327 MINS (UP TO 03:20 HRS)\nYTPY -VKB- ARR: 21:37, DEP: 01:09, DET: 212 MINS',
+  };
+  assert.equal(L.unusualMessage(u), [
+    'KPCC METAL ON TYRE', 'Location : VKB-GDQ', 'Train no : KPCC', 'Loco no : 60529/SBI/01/07', 'Load : 60/60/3365T', '',
+    '21:04-VKB DEP FROM LOOP LINE', '21:08-TRAIN STOPPED', '',
+    'Wagon no : SECR-12140893411', 'BPC no : 50000951763/JSG/CKP/SER', '',
+    'REP:', '1.KPCC -GDQ- ARR: 21:53, NOT DEPARTED, DET: 327 MINS (UP TO 03:20 HRS)', '2.YTPY -VKB- ARR: 21:37, DEP: 01:09, DET: 212 MINS',
+  ].join('\n'));
+  // boxes that were not written are left out
+  assert.equal(L.unusualMessage({ ...L.blankUnusual('2026-10-19'), title: 'HOT AXLE', trainNo: 'ABC' }), 'HOT AXLE\nTrain no : ABC');
 });

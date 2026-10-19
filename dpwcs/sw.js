@@ -1,10 +1,10 @@
 // Offline support for DPWCS LOCO: the network when there is one (so updates
 // arrive straight away), the last saved copy when there is not.
-const CACHE = 'dpwcs-loco-v26';
+const CACHE = 'dpwcs-loco-v27';
 const FILES = [
   './', 'index.html', 'app.js', 'manifest.webmanifest', '../styles.css',
   '../js/logic.js', '../js/seed.js', '../js/sheet.js', '../js/xlsx.js', '../js/canvas.js', '../js/db.js', '../js/sync.js',
-  '../js/syncdata.js', '../js/config.js', '../js/historyimport.js', '../js/reports.js', '../js/events.js', '../js/summary.js', '../js/paste.js', '../js/official.js', '../js/filetext.js', '../js/unusualimport.js', '../js/unusual-data.js', '../js/unusual-official.js',
+  '../js/syncdata.js', '../js/config.js', '../js/historyimport.js', '../js/reports.js', '../js/events.js', '../js/block.js', '../js/repercussions.js', '../js/summary.js', '../js/paste.js', '../js/official.js', '../js/filetext.js', '../js/unusualimport.js', '../js/unusual-data.js', '../js/unusual-official.js',
   '../icons/icon-192.png', '../icons/logo.png', '../icons/tigoods.png', '../icons/icon-512.png',
 ];
 

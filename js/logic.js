@@ -1,5 +1,8 @@
 // Pure data logic: no DOM, no storage. Everything here is covered by tests.
 
+import { parseEvents } from './events.js';
+import { repLines } from './repercussions.js';
+
 export const FIELDS = [
   'locoNo', 'dueDate', 'trainNo', 'location', 'division',
   'hoTrain', 'hoPoint', 'hoTime', 'foisDate', 'working', 'remarks', 'sameSerial',
@@ -175,23 +178,30 @@ export function unusualsInOrder(list) {
   return unusualsByDay(list).reverse().flatMap(([, items]) => items);
 }
 
-export function unusualText(list) {
+/**
+ * One report as the text message: the heading, location, train, loco and load, the events one to a line
+ * ("21:04-WHAT HAPPENED"), the wagon and BPC, the detention and the repercussions. A box that was not
+ * written is left out.
+ */
+export function unusualMessage(u) {
+  const t = (v) => String(v == null ? '' : v).trim();
   const lines = [];
-  unusualsInOrder(list).forEach((u, i) => {
-    if (i) lines.push('');
-    lines.push(`*${i + 1}. UNUSALS-DATE-${fmtDay(u.day)}*`);
-    lines.push(`*${u.title || '-'}*`);
-    lines.push(`Location: ${u.location || '-'}`);
-    lines.push(`Train no: ${u.trainNo || '-'}`);
-    lines.push(`Loco no: ${u.locoNo || '-'}`);
-    if (u.load) lines.push(`Load: ${u.load}`);
-    lines.push(`Reason: ${u.reason || '-'}`);
-    if (u.wagonNo) lines.push(`Wagon no: ${u.wagonNo}`);
-    if (u.bpcNo) lines.push(`BPC no: ${u.bpcNo}`);
-    lines.push(`DET: ${u.det || '-'}`);
-    if (u.rep) lines.push(`REP: ${u.rep}`);
-  });
+  if (t(u.title)) lines.push(t(u.title));
+  [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load]].forEach(([k, v]) => { if (t(v)) lines.push(`${k} : ${t(v)}`); });
+  const events = parseEvents(u.reason).map((e) => (e.t && e.text ? `${e.t}-${e.text}` : e.text || e.t));
+  if (events.length) lines.push('', ...events);
+  const more = [['Wagon no', u.wagonNo], ['BPC no', u.bpcNo], ['DET', u.det]].filter(([, v]) => t(v));
+  if (more.length) lines.push('', ...more.map(([k, v]) => `${k} : ${t(v)}`));
+  let official = {};
+  try { official = JSON.parse(u.official) || {}; } catch { /* no official report */ }
+  const rep = repLines(t(u.rep) || t(official.repercussions));
+  if (rep.length) lines.push('', 'REP:', ...rep.map((r, n) => `${n + 1}.${r}`));
   return lines.join('\n');
+}
+
+/** The reports of a list as one message, each under its date, oldest day first. */
+export function unusualText(list) {
+  return unusualsInOrder(list).map((u, i) => `*${i + 1}. UNUSALS-DATE-${fmtDay(u.day)}*\n${unusualMessage(u)}`).join('\n\n');
 }
 
 /**
