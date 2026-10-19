@@ -143,8 +143,8 @@ function paint(ctx, m, draw) {
     y = section('Repercussions', M, y, W - 2 * M);
     // S.NO, TR.NO, ARR, DEP, DET (IN MIN)
     const tw = W - 2 * M;
-    const cols = [0.08, 0.40, 0.14, 0.14, 0.24].map((f) => Math.floor(tw * f));
-    cols[4] = tw - cols[0] - cols[1] - cols[2] - cols[3];
+    const cols = [0.07, 0.22, 0.25, 0.13, 0.13, 0.20].map((f) => Math.floor(tw * f));
+    cols[5] = tw - cols[0] - cols[1] - cols[2] - cols[3] - cols[4];
     const xs = [M];
     cols.forEach((c, i) => xs.push(xs[i] + c));
     const rowOf = (cells, head) => {
@@ -158,8 +158,8 @@ function paint(ctx, m, draw) {
       });
       y += rh;
     };
-    rowOf(['S.NO', 'TR.NO', 'ARR', 'DEP', 'DET (IN MIN)'], true);
-    m.repercussions.forEach((r, i) => rowOf([String(i + 1), String(r.tr || '').toUpperCase(), r.arr, r.still ? 'NOT DEPARTED' : r.dep, r.det], false));
+    rowOf(['S.NO', 'TR.NO', 'STATION', 'ARR', 'DEP', 'DET (IN MIN)'], true);
+    m.repercussions.forEach((r, i) => rowOf([String(i + 1), String(r.tr || '').toUpperCase(), String(r.st || '').toUpperCase(), r.arr, r.still ? 'NOT DEPARTED' : r.dep, r.det], false));
     if (m.asOn) {
       font(19, false);
       y += 8;

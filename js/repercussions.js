@@ -33,8 +33,12 @@ export function parseRepLine(line) {
   const dep = DEP.exec(line);
   const det = DET.exec(line);
   const at = line.search(HEAD);
-  const tr = (at > 0 ? line.slice(0, at) : at === 0 ? '' : line).replace(/[\s\-–:,]+$/, '').trim();
-  return { tr, arr: arr ? clock(arr[1]) : '', dep: dep ? clock(dep[1]) : '', det: det && !/UP TO/i.test(line) ? det[1] : '' };
+  const head = (at > 0 ? line.slice(0, at) : at === 0 ? '' : line).replace(/[\s–:,]+$/, '').trim();
+  // "KSNK -CT STN-" (station between dashes), or an older "17030 - VKB"
+  const m = /^(.+?)\s+-\s*(.+?)\s*-$/.exec(head) || /^(.+?)\s+[-–]\s+(.+)$/.exec(head);
+  const tr = (m ? m[1] : head).replace(/[\s-]+$/, '').trim();
+  const st = m ? m[2].trim() : '';
+  return { tr, st, arr: arr ? clock(arr[1]) : '', dep: dep ? clock(dep[1]) : '', det: det && !/UP TO/i.test(line) ? det[1] : '' };
 }
 
 export const parseRep = (text) => repLines(text).map(parseRepLine);
@@ -52,7 +56,7 @@ export const stillOn = (r, asOn) => !!(String(r.arr || '').trim() && !String(r.d
 /** The rows back to text, a line for each; rows with nothing in them are dropped. */
 export function formatRep(rows, asOn = '') {
   return rows.map((r) => {
-    const tr = String(r.tr || '').trim().toUpperCase();
+    const tr = [String(r.tr || '').trim().toUpperCase(), String(r.st || '').trim() && `-${String(r.st).trim().toUpperCase()}-`].filter(Boolean).join(' ');
     const d = detOf(r, asOn);
     const still = stillOn(r, asOn);
     const parts = [
@@ -71,7 +75,7 @@ export function formatRep(rows, asOn = '') {
  */
 export function repEditor(h, text, onChange, { min = 3, asOn = '', onAsOn = () => {} } = {}) {
   const rows = parseRep(text);
-  while (rows.length < min) rows.push({ tr: '', arr: '', dep: '', det: '' });
+  while (rows.length < min) rows.push({ tr: '', st: '', arr: '', dep: '', det: '' });
   let as = asOn || '';
   const box = h('div', { class: 'repbox' });
   const emit = () => onChange(formatRep(rows, as));
@@ -90,7 +94,7 @@ export function repEditor(h, text, onChange, { min = 3, asOn = '', onAsOn = () =
     const asOnBox = h('input', { type: 'time', class: 'rpas', 'aria-label': 'As on time for the trains not departed', value: as });
     asOnBox.addEventListener('input', () => { as = asOnBox.value; onAsOn(as); hints.forEach((f) => f()); emit(); });
     box.replaceChildren(
-      h('div', { class: 'reprow rephead' }, h('span', null, 'S.NO'), h('span', null, 'TR.NO'), h('span', null, 'ARR'), h('span', null, 'DEP'), h('span', null, 'DET (IN MIN)'), h('span', null)),
+      h('div', { class: 'reprow rephead' }, h('span', null, 'S.NO'), h('span', null, 'TR.NO'), h('span', null, 'STATION'), h('span', null, 'ARR'), h('span', null, 'DEP'), h('span', null, 'DET (IN MIN)'), h('span', null)),
       ...rows.map((r, i) => {
         const det = input('rpd', gapHint(r), `Detention in minutes of train ${i + 1}`, r.det, (v) => { r.det = v; emit(); });
         const refreshHint = () => { det.placeholder = gapHint(r); };
@@ -99,19 +103,20 @@ export function repEditor(h, text, onChange, { min = 3, asOn = '', onAsOn = () =
         tr.addEventListener('keydown', (e) => {
           if (e.key !== 'Enter' || e.ctrlKey || e.metaKey) return;
           e.preventDefault();
-          rows.splice(i + 1, 0, { tr: '', arr: '', dep: '', det: '' });
+          rows.splice(i + 1, 0, { tr: '', st: '', arr: '', dep: '', det: '' });
           draw(i + 1);
         });
         return h('div', { class: 'reprow' }, h('b', { class: 'rpn' }, String(i + 1)), tr,
+          input('rps', 'STATION', `Station of train ${i + 1}`, r.st, (v) => { r.st = v; emit(); }),
           input('rpa', '15:30', `Arrival of train ${i + 1}`, r.arr, (v) => { r.arr = v; refreshHint(); emit(); }),
           input('rpe', '16:00', `Departure of train ${i + 1}`, r.dep, (v) => { r.dep = v; refreshHint(); emit(); }),
           det,
           h('button', {
             type: 'button', class: 'x', title: 'Remove this row', 'aria-label': `Remove train ${i + 1}`,
-            onclick: () => { rows.splice(i, 1); if (!rows.length) rows.push({ tr: '', arr: '', dep: '', det: '' }); emit(); draw(); },
+            onclick: () => { rows.splice(i, 1); if (!rows.length) rows.push({ tr: '', st: '', arr: '', dep: '', det: '' }); emit(); draw(); },
           }, '×'));
       }),
-      h('button', { type: 'button', class: 'btn small', onclick: () => { rows.push({ tr: '', arr: '', dep: '', det: '' }); draw(rows.length - 1); } }, '+ Add a train'),
+      h('button', { type: 'button', class: 'btn small', onclick: () => { rows.push({ tr: '', st: '', arr: '', dep: '', det: '' }); draw(rows.length - 1); } }, '+ Add a train'),
       h('label', { class: 'repas' }, h('span', null, 'As on (trains not departed)'), asOnBox));
     if (focusRow !== undefined) { const el = box.querySelectorAll('.rpt')[focusRow]; if (el) el.focus(); }
   };

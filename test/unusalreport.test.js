@@ -15,7 +15,7 @@ test('a record becomes the page: heading, details, events, remarks, repercussion
   assert.equal(m.events.length, 3);
   assert.equal(m.events[1].hl, true);
   assert.match(m.remarks, /Train stopped at KM 111\/01 at 21:08\./);
-  assert.deepEqual(m.repercussions, [{ tr: '17030 - VKB', arr: '22:47', dep: '', det: '', still: false }, { tr: 'YTPY - VKB', arr: '21:37', dep: '', det: '', still: false }]);
+  assert.deepEqual(m.repercussions, [{ tr: '17030', st: 'VKB', arr: '22:47', dep: '', det: '', still: false }, { tr: 'YTPY', st: 'VKB', arr: '21:37', dep: '', det: '', still: false }]);
   assert.equal(reportFile(u), 'Unusal-12-10-2026-kpcc');
 });
 
