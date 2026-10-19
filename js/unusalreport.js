@@ -60,10 +60,10 @@ export function reportModel(u) {
   let free = [];
   if (!events.length) {
     const rows = parseEvents(u.reason);
-    events = rows.filter((r) => r.t);
-    free = rows.filter((r) => !r.t).map((r) => r.text);
-    // a single timed line is not a sequence: the whole text is the remarks
-    if (events.length < 2) { free = rows.map((r) => [r.t, r.text].filter(Boolean).join(' ')); events = []; }
+    // a single timed line is not a sequence: the whole text is the remarks. Otherwise every line is a row,
+    // so nothing that was written is left out (a line with no time has no time in its row)
+    if (rows.filter((r) => r.t).length < 2) free = rows.map((r) => [r.t, r.text].filter(Boolean).join(' '));
+    else events = rows;
   }
   let remarks = free.join(' ');
   if (!remarks && events.length) {

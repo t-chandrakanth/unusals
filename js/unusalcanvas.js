@@ -57,7 +57,8 @@ export async function drawReport(u, scale = 1) {
 }
 
 /** Lays the page out; draws it when draw is true. Returns the page height. */
-function paint(ctx, m, draw) {
+function paint(ctx, m, drawAll) {
+  let draw = drawAll;
   const font = (px, bold) => { ctx.font = `${bold ? 'bold ' : ''}${px}px ${FONT}`; };
   const rect = (x, y, w, h, fill, stroke) => {
     if (!draw) return;
@@ -115,18 +116,43 @@ function paint(ctx, m, draw) {
   };
 
   const hasEvents = m.events.length > 0;
-  const colW = hasEvents ? Math.floor((W - 2 * M - GAP) * 0.47) : W - 2 * M;
-  const rightX = M + colW + GAP;
-  const rightW = W - M - rightX;
+  const evRows = m.events.map((e) => [e.t || '–', e.text, e.hl, true]);
+  const narrowW = Math.floor((W - 2 * M - GAP) * 0.47);
+  const wideW = W - M - (M + narrowW + GAP);
 
-  let yl = section('Train and wagon details', M, y, colW);
-  yl = table(M, yl, colW, m.details, hasEvents ? 0.42 : 0.25);
-  let yr = y;
+  // side by side, unless the events run so long that the left side would stand half empty: then the
+  // details go in two columns across the page and the events below them, the full width
+  let stacked = false;
   if (hasEvents) {
-    yr = section('Sequence of events', rightX, y, rightW);
-    yr = table(rightX, yr, rightW, m.events.map((e) => [e.t || '–', e.text, e.hl, true]), 0.27);
+    draw = false;
+    const hl = table(M, 0, narrowW, m.details, 0.42);
+    const hr = table(M, 0, wideW, evRows, 0.27);
+    draw = drawAll;
+    stacked = hr - hl > 260;
   }
-  y = Math.max(yl, yr) + 28;
+
+  if (!hasEvents || !stacked) {
+    const colW = hasEvents ? narrowW : W - 2 * M;
+    const rightX = M + colW + GAP;
+    let yl = section('Train and wagon details', M, y, colW);
+    yl = table(M, yl, colW, m.details, hasEvents ? 0.42 : 0.25);
+    let yr = y;
+    if (hasEvents) {
+      yr = section('Sequence of events', rightX, y, W - M - rightX);
+      yr = table(rightX, yr, W - M - rightX, evRows, 0.27);
+    }
+    y = Math.max(yl, yr) + 28;
+  } else {
+    const half = Math.floor((W - 2 * M - GAP) / 2);
+    const left = m.details.filter((_, i) => i % 2 === 0);
+    const right = m.details.filter((_, i) => i % 2 === 1);
+    const top = section('Train and wagon details', M, y, W - 2 * M);
+    const a = table(M, top, half, left, 0.4);
+    const b = table(M + half + GAP, top, half, right, 0.4);
+    y = Math.max(a, b) + 28;
+    y = section('Sequence of events', M, y, W - 2 * M);
+    y = table(M, y, W - 2 * M, evRows, 0.12) + 28;
+  }
 
   if (m.remarks) {
     y = section('Remarks', M, y, W - 2 * M);
@@ -143,7 +169,7 @@ function paint(ctx, m, draw) {
     y = section('Repercussions', M, y, W - 2 * M);
     // S.NO, TR.NO, ARR, DEP, DET (IN MIN)
     const tw = W - 2 * M;
-    const cols = [0.07, 0.22, 0.25, 0.13, 0.13, 0.20].map((f) => Math.floor(tw * f));
+    const cols = [0.07, 0.14, 0.24, 0.12, 0.20, 0.23].map((f) => Math.floor(tw * f));
     cols[5] = tw - cols[0] - cols[1] - cols[2] - cols[3] - cols[4];
     const xs = [M];
     cols.forEach((c, i) => xs.push(xs[i] + c));
@@ -154,44 +180,43 @@ function paint(ctx, m, draw) {
       cells.forEach((_, i) => {
         rect(xs[i], y, cols[i], rh, head ? LABEL : '#ffffff', LINE);
         font(BASE, !!head);
-        lines(wrapped[i], xs[i] + PAD, y + PAD - 2, INK, 'left');
+        const mid = i === 0 || i >= 3;
+        lines(wrapped[i], mid ? xs[i] + cols[i] / 2 : xs[i] + PAD, y + PAD - 2, INK, mid ? 'center' : 'left');
       });
       y += rh;
     };
     rowOf(['S.NO', 'TR.NO', 'STATION', 'ARR', 'DEP', 'DET (IN MIN)'], true);
     m.repercussions.forEach((r, i) => rowOf([String(i + 1), String(r.tr || '').toUpperCase(), String(r.st || '').toUpperCase(), r.arr, r.still ? 'NOT DEPARTED' : r.dep, r.det], false));
+    const total = m.repercussions.reduce((t, r) => t + (Number(r.det) || 0), 0);
+    y += 10;
+    if (total > 0) { font(BASE, true); y += lines([`Total detention: ${total} MINS`], M, y); }
     if (m.asOn) {
       font(19, false);
-      y += 8;
       y += lines([`Trains not departed: detention counted up to ${m.asOn} HRS.`], M, y);
     }
     y += 28;
   }
 
-  // photographs, two to a row
+  // photographs: all in one line, side by side at one height, as large as the width allows
   const pics = m.pics || [];
   if (pics.length) {
     y = section('Photographs', M, y, W - 2 * M);
-    const cw = Math.floor((W - 2 * M - GAP) / 2);
-    const ch = 430;
-    for (let i = 0; i < pics.length; i += 2) {
-      let rowH = 0;
-      pics.slice(i, i + 2).forEach((img, j) => {
-        const k = Math.min(cw / img.width, ch / img.height);
-        const iw = img.width * k;
-        const ih = img.height * k;
-        const x = M + j * (cw + GAP);
-        if (draw) {
-          ctx.drawImage(img, x, y, iw, ih);
-          ctx.strokeStyle = LINE;
-          ctx.lineWidth = 1.4;
-          ctx.strokeRect(x + 0.5, y + 0.5, iw, ih);
-        }
-        rowH = Math.max(rowH, ih);
-      });
-      y += rowH + 24;
+    const gap = 16;
+    const avail = W - 2 * M - gap * (pics.length - 1);
+    const h = Math.min(520, avail / pics.reduce((t, img) => t + img.width / img.height, 0));
+    const total = pics.reduce((t, img) => t + (img.width / img.height) * h, 0) + gap * (pics.length - 1);
+    let x = M + (W - 2 * M - total) / 2;
+    for (const img of pics) {
+      const iw = (img.width / img.height) * h;
+      if (draw) {
+        ctx.drawImage(img, x, y, iw, h);
+        ctx.strokeStyle = LINE;
+        ctx.lineWidth = 1.4;
+        ctx.strokeRect(x + 0.5, y + 0.5, iw, h);
+      }
+      x += iw + gap;
     }
-    y += 4;
+    y += h + 28;
   }
 
   return y + 20;
