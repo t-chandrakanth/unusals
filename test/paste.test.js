@@ -30,17 +30,17 @@ test('plain columns land from the clicked box, a row per loco', () => {
 
 test('rows from the report sheet are matched by the loco number, whichever box was clicked', () => {
   const text = [
-    '1\t44323+42372\tCBKB C/S\tSMPN/WDFC/DFCR\tCDG\tWADI\t13:05 31-07\tFOIS note',
-    '8\t27609(D)+28411\tTMU\tSUH\t',
-    '9\t27300+27402\tYTPV/BOBRL\tBKL\tFOR RUSG-KTPG SECTOR',
-    '99\t11111+22222\tZZ\tNOWHERE',
+    '1\t44323+42372\tCBKB C/S\tSMPN/WDFC/DFCR\tWORKING\tCDG\tWADI\t13:05 31-07\tFOIS note',
+    '8\t27609(D)+28411\tTMU\tSUH\tYES/MU\t',
+    '9\t27300+27402\tYTPV/BOBRL\tBKL\tNOT WORKING\tFOR RUSG-KTPG SECTOR',
+    '99\t11111+22222\tZZ\tNOWHERE\tYES',
   ].join('\n');
   const p = planPaste({ locos, order, start: { id: 'b', field: 'trainNo' }, text });
   assert.equal(p.mode, 'loco');
   assert.equal(p.unmatched, 1);
-  assert.deepEqual(p.edits.get('a'), { trainNo: 'CBKB C/S', location: 'SMPN/WDFC/DFCR', hoTrain: 'CDG', hoPoint: 'WADI', hoTime: '13:05 31-07', remarks: 'FOIS note' });
-  assert.deepEqual(p.edits.get('c'), { trainNo: 'TMU', location: 'SUH', remarks: '' });
-  assert.deepEqual(p.edits.get('d'), { trainNo: 'YTPV/BOBRL', location: 'BKL', remarks: 'FOR RUSG-KTPG SECTOR' });
+  assert.deepEqual(p.edits.get('a'), { trainNo: 'CBKB C/S', location: 'SMPN/WDFC/DFCR', working: 'WORKING', hoTrain: 'CDG', hoPoint: 'WADI', hoTime: '13:05 31-07', remarks: 'FOIS note' });
+  assert.deepEqual(p.edits.get('c'), { trainNo: 'TMU', location: 'SUH', working: 'YES/MU', remarks: '' });
+  assert.deepEqual(p.edits.get('d'), { trainNo: 'YTPV/BOBRL', location: 'BKL', working: 'NOT WORKING', remarks: 'FOR RUSG-KTPG SECTOR' });
   assert.equal(p.edits.has('b'), false, 'a loco that was not in the block is left alone');
 });
 
@@ -53,9 +53,9 @@ test('a heading row names the columns, in any order', () => {
 });
 
 test('loco numbers are matched however they are written', () => {
-  const p = planPaste({ locos, order, start: null, text: '28411 + 27609\tx\tY\tZ\n' });
+  const p = planPaste({ locos, order, start: null, text: '28411 + 27609\tx\tY\tYES\n' });
   assert.equal(p.mode, 'loco');
-  assert.equal(p.edits.get('c').remarks, 'Z');
+  assert.equal(p.edits.get('c').working, 'YES');
 });
 
 test('with no box clicked and no loco numbers there is nothing to do', () => {

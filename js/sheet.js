@@ -5,7 +5,7 @@
 // cell  = { v: text, s: style name, colSpan?, rowSpan? }
 // null  = a position covered by a merged cell above or to the left.
 
-import { numbered, reportTitles, historyTitle, fmtDay, unusualsInOrder } from './logic.js';
+import { numbered, reportTitles, historyTitle, fmtDay, unusualsInOrder, workStatus } from './logic.js';
 import { computeBlock, longMins } from './block.js';
 
 export const STYLES = {
@@ -19,9 +19,10 @@ export const STYLES = {
   text:     { bg: '#FFFFFF', color: '#17202B', align: 'left' },
   alt:      { bg: '#F0F5FB', color: '#17202B', align: 'center' },
   altText:  { bg: '#F0F5FB', color: '#17202B', align: 'left' },
-  good:     { bg: '#DDF3E6', color: '#12633A', align: 'center' },
+  // WORKING in green, NOT WORKING in red
+  good:     { bg: '#1E9E5A', color: '#FFFFFF', align: 'center' },
   warn:     { bg: '#FFF0C7', color: '#7A5600', align: 'center' },
-  bad:      { bg: '#FBE0DD', color: '#A12A22', align: 'center' },
+  bad:      { bg: '#D93025', color: '#FFFFFF', align: 'center' },
   muted:    { bg: '#F3F3F3', color: '#555555', align: 'center' },
   gap:      { bg: null, color: '#000000', align: 'center', noBorder: true },
   // The current location is highlighted in the position report.
@@ -39,11 +40,8 @@ const spanRow = (cell, n) => [cell, ...Array(n - 1).fill(null)];
 
 /** How a loco's "working" entry reads: good, warn (in shed, planned), bad (defective) or ''. */
 export function workKind(working) {
-  const w = String(working || '');
-  if (/DEFIC|DEFECT|FAIL|NOT WORK/i.test(w)) return 'bad';
-  if (/SHED|PLAN|P\/I/i.test(w)) return 'warn';
-  if (/^\s*YES/i.test(w)) return 'good';
-  return '';
+  const s = workStatus(working);
+  return s === 'WORKING' ? 'good' : s ? 'bad' : '';
 }
 
 export function reportSheet(locos, day) {
@@ -52,41 +50,41 @@ export function reportSheet(locos, day) {
   const all = numbered(locos);
   const serialCell = (r) => (r.span ? c(r.serial, 'serial', r.span > 1 ? { rowSpan: r.span } : {}) : null);
 
-  rows.push(spanRow(c(t.other, 'title', { colSpan: 8 }), 8));
-  rows.push(['S NO', 'DPWCS LOCO NO', 'TR.NO', 'CURRENT LOCATION',
+  rows.push(spanRow(c(t.other, 'title', { colSpan: 9 }), 9));
+  rows.push(['S NO', 'DPWCS LOCO NO', 'TR.NO', 'CURRENT LOCATION', 'WORKING',
     'H/O TRAIN TO OTHER DIV', 'H/O POINT', 'H/O- TIME', 'REMARKS'].map((v) => c(v, v === 'CURRENT LOCATION' ? 'hl' : 'head')));
   const other = all.filter((r) => r.loco.division === 'OTHER');
   for (const r of other) {
     const l = r.loco;
     const z = r.serial % 2 ? 'cell' : 'alt';
-    rows.push([serialCell(r), c(l.locoNo, z), c(l.trainNo, z), c(l.location, 'hl'),
+    rows.push([serialCell(r), c(l.locoNo, z), c(l.trainNo, z), c(l.location, 'hl'), c(workStatus(l.working), workKind(l.working) || z),
       c(l.hoTrain, z), c(l.hoPoint, z), c(l.hoTime, z), c(l.remarks, r.serial % 2 ? 'text' : 'altText')]);
   }
-  if (!other.length) rows.push(spanRow(c('NIL', 'cell', { colSpan: 8 }), 8));
+  if (!other.length) rows.push(spanRow(c('NIL', 'cell', { colSpan: 9 }), 9));
 
-  rows.push(spanRow(c('', 'gap', { colSpan: 8 }), 8));
+  rows.push(spanRow(c('', 'gap', { colSpan: 9 }), 9));
 
-  rows.push(spanRow(c(t.sc, 'titleRed', { colSpan: 8 }), 8));
-  rows.push([...['S NO', 'DPWCS LOCO NO', 'TR.NO', 'CURRENT LOCATION']
+  rows.push(spanRow(c(t.sc, 'titleRed', { colSpan: 9 }), 9));
+  rows.push([...['S NO', 'DPWCS LOCO NO', 'TR.NO', 'CURRENT LOCATION', 'WORKING']
     .map((v) => c(v, v === 'CURRENT LOCATION' ? 'hl' : 'head')), c('REMARKS', 'head', { colSpan: 4 }), null, null, null]);
   const sc = all.filter((r) => r.loco.division === 'SC');
   for (const r of sc) {
     const l = r.loco;
     const z = r.serial % 2 ? 'cell' : 'alt';
-    rows.push([serialCell(r), c(l.locoNo, z), c(l.trainNo, z), c(l.location, 'hl'),
+    rows.push([serialCell(r), c(l.locoNo, z), c(l.trainNo, z), c(l.location, 'hl'), c(workStatus(l.working), workKind(l.working) || z),
       c(l.remarks, z, { colSpan: 4 }), null, null, null]);
   }
-  if (!sc.length) rows.push(spanRow(c('NIL', 'cell', { colSpan: 8 }), 8));
+  if (!sc.length) rows.push(spanRow(c('NIL', 'cell', { colSpan: 9 }), 9));
 
-  return { name: `Locos ${fmtDay(day)}`, cols: [6, 20, 14, 22, 20, 12, 16, 52], rows };
+  return { name: `Locos ${fmtDay(day)}`, cols: [6, 20, 14, 22, 16, 20, 12, 16, 44], rows };
 }
 
 export function historySheet(label, summary, fromKey, toKey) {
   // The "updated by" column only appears when the data is shared between people.
   const withBy = summary.some((r) => r.by);
   const head = ['DATE', 'TIME', 'TR.NO', 'CURRENT LOCATION', 'DIVISION',
-    'H/O TRAIN', 'H/O POINT', 'H/O- TIME', 'REMARKS'];
-  const cols = [13, 11, 16, 20, 12, 14, 12, 16, 40];
+    'H/O TRAIN', 'H/O POINT', 'H/O- TIME', 'WORKING', 'REMARKS'];
+  const cols = [13, 11, 16, 20, 12, 14, 12, 16, 16, 40];
   if (withBy) { head.push('UPDATED BY'); cols.push(16); }
   const rows = [
     spanRow(c(historyTitle(label, fromKey, toKey), 'title', { colSpan: head.length }), head.length),
@@ -102,7 +100,7 @@ export function historySheet(label, summary, fromKey, toKey) {
       c(r.carried ? 'no change' : r.time, s),
       c(d.trainNo, s), c(d.location, s),
       c(d.division === 'OTHER' ? 'OTHER DIV' : 'SC DIV', s),
-      c(d.hoTrain, s), c(d.hoPoint, s), c(d.hoTime, s),
+      c(d.hoTrain, s), c(d.hoPoint, s), c(d.hoTime, s), c(workStatus(d.working), (!r.carried && workKind(d.working)) || s),
       c(r.kind === 'removed' ? 'REMOVED FROM LIST' : d.remarks, r.carried ? 'muted' : (n % 2 ? 'text' : 'altText')),
     ];
     if (withBy) row.push(c(r.by, s));

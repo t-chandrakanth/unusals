@@ -101,15 +101,19 @@ test('report text and sheet carry both tables in the sheet format', () => {
   assert.match(text, /H\/O: CDG at WADI, 31-07-26 13:05/);
   const sheet = reportSheet(s.locos, '2026-10-08');
   assert.equal(sheet.rows.length, 2 + 8 + 1 + 2 + 10);
-  for (const row of sheet.rows) assert.equal(row.length, 8);
-  // no Due date and no Working in the report; the current location is highlighted
-  const heads = sheet.rows.flat().filter((x) => x && x.s !== 'cell' && x.s !== 'alt').map((x) => x.v);
+  for (const row of sheet.rows) assert.equal(row.length, 9);
+  // no Due date; the current location is highlighted; WORKING shows green and NOT WORKING red
+  const heads = sheet.rows.flat().filter((x) => x && x.s === 'head').map((x) => x.v);
   assert.equal(heads.includes('DUE DATE'), false);
-  assert.equal(heads.includes('WORKING'), false);
+  assert.equal(heads.includes('WORKING'), true);
   assert.equal(sheet.rows[1][3].v, 'CURRENT LOCATION');
   assert.equal(sheet.rows[1][3].s, 'hl');
   assert.equal(sheet.rows[2][3].s, 'hl');
-  assert.doesNotMatch(text, /Due:|Working:/);
+  const cells = sheet.rows.flat().filter(Boolean);
+  assert.ok(cells.some((x) => x.v === 'WORKING' && x.s === 'good'));
+  assert.ok(cells.some((x) => x.v === 'NOT WORKING' && x.s === 'bad'));
+  assert.doesNotMatch(text, /Due:/);
+  assert.match(text, /TR: TMU \| WORKING/);
   assert.equal(sheet.rows[7][0].rowSpan, 2);
   assert.equal(sheet.rows[8][0], null);
 });
@@ -176,4 +180,10 @@ test('a saved copy does not start a new round of updating, a sent report does', 
   assert.equal(L.savedBy(saved), 'MAHESH');
   assert.equal(L.roundStart([saved], noon), startOfDay);
   assert.equal(L.roundStart([sent, saved], noon), sent.at);
+});
+
+test('what a working entry means: working, not working, or nothing', () => {
+  for (const w of ['YES', 'yes', 'YES/MU', 'WORKING', 'Working']) assert.equal(L.workStatus(w), 'WORKING', w);
+  for (const w of ['NOT WORKING', 'Shed in', 'DEFICTIVE', 'P/I -PLANING', 'NO']) assert.equal(L.workStatus(w), 'NOT WORKING', w);
+  for (const w of ['', '-', '  ', undefined, null]) assert.equal(L.workStatus(w), '', String(w));
 });

@@ -30,16 +30,16 @@ const HEADINGS = new Map([
   ['loco no', 'locoNo'], ['dpwcs loco no', 'locoNo'], ['loco number', 'locoNo'], ['loco', 'locoNo'],
   ['tr no', 'trainNo'], ['train no', 'trainNo'], ['tr', 'trainNo'], ['train', 'trainNo'],
   ['current location', 'location'], ['location', 'location'], ['loc', 'location'],
-  ['remarks', 'remarks'], ['remark', 'remarks'],
+  ['working', 'working'], ['status', 'working'], ['remarks', 'remarks'], ['remark', 'remarks'],
   ['h/o train to other div', 'hoTrain'], ['h/o train', 'hoTrain'], ['h/o point', 'hoPoint'], ['h/o time', 'hoTime'], ['h/o- time', 'hoTime'],
 ]);
 const headingKey = (cell) => HEADINGS.get(String(cell || '').toLowerCase().replace(/[.:]/g, ' ').replace(/\s+/g, ' ').trim()) || '';
 
-// After the loco number, the report sheet runs: train, location, then REMARKS for an SC loco,
+// After the loco number, the report sheet runs: train, location, working, then REMARKS for an SC loco,
 // or H/O train, H/O point, H/O time and REMARKS for one in another division.
 const AFTER_LOCO = {
-  SC: ['trainNo', 'location', 'remarks'],
-  OTHER: ['trainNo', 'location', 'hoTrain', 'hoPoint', 'hoTime', 'remarks'],
+  SC: ['trainNo', 'location', 'working', 'remarks'],
+  OTHER: ['trainNo', 'location', 'working', 'hoTrain', 'hoPoint', 'hoTime', 'remarks'],
 };
 
 const KEYED = (locos) => {

@@ -511,7 +511,25 @@ function locoCard(row, since) {
     h('button', { class: 'loco-no loco-btn', title: 'Click to update this loco', onclick: () => openEditor(l) }, l.locoNo || '(no number)'),
     cell('trainNo', 'Train no'),
     cell('location', 'Current location'),
+    workButtons(l, ok),
     status);
+}
+
+/** Working (green) and Not working (red): press one to set it, press it again to clear it. */
+function workButtons(l, ok) {
+  const now = L.workStatus(l.working);
+  const set = (value) => {
+    // while the loco waits for its update the buttons show the previous entry: pressing it keeps it
+    if (!ok && value === now) { dispatch({ type: 'check', id: l.id, now: new Date().toISOString() }); toast(`${l.locoNo}: kept as before`); return; }
+    const next = value === now ? '' : value;
+    dispatch({ type: 'save', loco: { ...l, working: next }, now: new Date().toISOString() });
+    toast(`${l.locoNo}: ${next ? next.toLowerCase() : 'status cleared'}`);
+  };
+  const btn = (value, text, tone) => h('button', {
+    type: 'button', class: `wk ${tone}${now === value ? ' on' : ''}${now === value && !ok ? ' prev' : ''}`, 'aria-pressed': String(now === value),
+    'aria-label': `${text}: ${l.locoNo}`, onclick: (e) => { e.stopPropagation(); set(value); },
+  }, text);
+  return h('div', { class: 'wk-pair col' }, btn('WORKING', 'Working', 'good'), btn('NOT WORKING', 'Not working', 'bad'));
 }
 
 function viewLocos() {
@@ -520,7 +538,7 @@ function viewLocos() {
     const sentToday = state.reports.some((r) => r.at === since);
     const q = ui.search.trim().toLowerCase();
     const rows = L.numbered(state.locos).filter((r) => !q ||
-      [r.loco.locoNo, r.loco.trainNo, r.loco.location, r.loco.hoPoint, r.loco.remarks]
+      [r.loco.locoNo, r.loco.trainNo, r.loco.location, L.workStatus(r.loco.working), r.loco.hoPoint, r.loco.remarks]
         .some((v) => v.toLowerCase().includes(q)));
     const section = (division, title) => {
       const list = rows.filter((r) => r.loco.division === division);
@@ -529,7 +547,7 @@ function viewLocos() {
           h('h2', { class: `section-title ${division.toLowerCase()}` }, title, h('span', { class: 'count' }, list.length)),
           division === 'OTHER' && h('button', { class: 'btn primary add-loco', onclick: () => openEditor(null, 'OTHER') }, '+ Add loco')),
         list.length > 0 && h('div', { class: 'list-head', 'aria-hidden': 'true' },
-          h('span', null, 'Sr. No'), h('span', null, 'Loco No'), h('span', null, 'Train No'), h('span', null, 'Current location'), h('span', null, 'Updated')),
+          h('span', null, 'Sr. No'), h('span', null, 'Loco No'), h('span', null, 'Train No'), h('span', null, 'Current location'), h('span', null, 'Working'), h('span', null, 'Updated')),
         list.length ? list.map((r) => locoCard(r, since)) : h('p', { class: 'empty' }, q ? 'No match.' : 'No locos here.'));
     };
     const done = state.locos.filter((l) => L.isUpdated(l, since)).length;
@@ -610,12 +628,12 @@ function openPasteBox(initial = '', problems = []) {
         apply.disabled = true;
         return;
       }
-      const name = { trainNo: 'Train', location: 'Location', hoTrain: 'H/O train', hoPoint: 'H/O point', hoTime: 'H/O time', remarks: 'Remarks' };
+      const name = { trainNo: 'Train', location: 'Location', working: 'Working', hoTrain: 'H/O train', hoPoint: 'H/O point', hoTime: 'H/O time', remarks: 'Remarks' };
       preview.replaceChildren(
         h('p', null, `${plan.edits.size} locos found${plan.unmatched ? `, ${plan.unmatched} rows not matched` : ''}.`),
         h('ul', null, [...plan.edits].map(([id, f]) => {
           const l = state.locos.find((x) => x.id === id);
-          return h('li', null, h('b', null, l.locoNo), ' \u2192 ', ['trainNo', 'location'].filter((k) => k in f).map((k) => `${name[k]}: ${f[k] || '-'}`).join(' | '));
+          return h('li', null, h('b', null, l.locoNo), ' \u2192 ', ['trainNo', 'location', 'working'].filter((k) => k in f).map((k) => `${name[k]}: ${k === 'working' ? (L.workStatus(f[k]) || '-') : (f[k] || '-')}`).join(' | '));
         })));
       apply.disabled = false;
     },
@@ -708,6 +726,10 @@ function openEditor(loco, division) {
       field('Loco no', 'locoNo', { placeholder: '27609+28411', wide: !showAll }),
       field('Train no', 'trainNo'),
       field('Current location', 'location'),
+      h('div', { class: 'field wide' }, h('span', null, 'Working'), h('div', { class: 'segs wk-segs' },
+        [['WORKING', 'Working', 'good'], ['NOT WORKING', 'Not working', 'bad'], ['', 'Not set', '']].map(([v, text, tone]) => h('button', {
+          type: 'button', class: `seg ${tone}${L.workStatus(draft.working) === v ? ' on' : ''}`, onclick: () => { draft.working = v; build(); },
+        }, text)))),
       showAll && other && field('H/O train to other div', 'hoTrain'),
       showAll && other && field('H/O point', 'hoPoint'),
       showAll && other && field('H/O time', 'hoTime', {
@@ -843,6 +865,20 @@ function editableReport(locos, day, bar) {
   };
 
   const cell = (l, k, label) => {
+    if (k === 'working') {
+      const now = () => L.workStatus(value(l, 'working'));
+      const tone = () => (now() === 'WORKING' ? 'good' : now() ? 'bad' : '');
+      const sel = h('select', { class: `rcell wk-sel ${tone()}`, 'aria-label': `Working of ${l.locoNo}` },
+        ['', 'WORKING', 'NOT WORKING'].map((v) => h('option', { value: v, selected: v === now() }, v || '\u2014')));
+      if (changed(l, k)) sel.classList.add('changed');
+      sel.addEventListener('change', () => {
+        const same = sel.value === L.workStatus(l.working);
+        if (same) { if (edits[l.id]) { delete edits[l.id][k]; if (!Object.keys(edits[l.id]).length) delete edits[l.id]; } } else { (edits[l.id] = edits[l.id] || {})[k] = sel.value; }
+        sel.className = `rcell wk-sel ${tone()}${same ? '' : ' changed'}`;
+        refresh();
+      });
+      return h('td', null, sel);
+    }
     const el = h('input', { type: 'text', class: `rcell${k === 'location' ? ' loc' : ''}`, 'aria-label': `${label} of ${l.locoNo}`, autocapitalize: 'characters', autocomplete: 'off' });
     el.value = value(l, k);
     if (changed(l, k)) el.classList.add('changed');
@@ -869,10 +905,10 @@ function editableReport(locos, day, bar) {
   };
 
   const box = h('div', { class: 'report-edit', id: 'printable' },
-    table(titles.other, 'OTHER', ['DPWCS LOCO NO', 'TR.NO', 'CURRENT LOCATION', 'H/O TRAIN TO OTHER DIV', 'H/O POINT', 'H/O- TIME', 'REMARKS'],
-      [['locoNo', 'Loco no'], ['trainNo', 'Train no'], ['location', 'Current location'], ['hoTrain', 'H/O train'], ['hoPoint', 'H/O point'], ['hoTime', 'H/O time'], ['remarks', 'Remarks']], 'other'),
-    table(titles.sc, 'SC', ['DPWCS LOCO NO', 'TR.NO', 'CURRENT LOCATION', 'REMARKS'],
-      [['locoNo', 'Loco no'], ['trainNo', 'Train no'], ['location', 'Current location'], ['remarks', 'Remarks']], 'sc'),
+    table(titles.other, 'OTHER', ['DPWCS LOCO NO', 'TR.NO', 'CURRENT LOCATION', 'WORKING', 'H/O TRAIN TO OTHER DIV', 'H/O POINT', 'H/O- TIME', 'REMARKS'],
+      [['locoNo', 'Loco no'], ['trainNo', 'Train no'], ['location', 'Current location'], ['working', 'Working'], ['hoTrain', 'H/O train'], ['hoPoint', 'H/O point'], ['hoTime', 'H/O time'], ['remarks', 'Remarks']], 'other'),
+    table(titles.sc, 'SC', ['DPWCS LOCO NO', 'TR.NO', 'CURRENT LOCATION', 'WORKING', 'REMARKS'],
+      [['locoNo', 'Loco no'], ['trainNo', 'Train no'], ['location', 'Current location'], ['working', 'Working'], ['remarks', 'Remarks']], 'sc'),
     h('div', { class: 'savebar' }, saveBtn, discard, status));
   refresh();
   return box;

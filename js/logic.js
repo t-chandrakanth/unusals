@@ -194,6 +194,17 @@ export function unusualText(list) {
   return lines.join('\n');
 }
 
+/**
+ * What a loco's "working" entry means: 'WORKING', 'NOT WORKING', or '' when nothing is written.
+ * Entries from before are read too: YES, YES/MU and the like are working; Shed in, DEFICTIVE,
+ * P/I - PLANING and anything else written are not.
+ */
+export function workStatus(working) {
+  const w = String(working == null ? '' : working).trim();
+  if (!w || /^[-\u2013\s]*$/.test(w)) return '';
+  return /^(YES|WORKING|OK|GOOD)\b/i.test(w) ? 'WORKING' : 'NOT WORKING';
+}
+
 export function emptyState() {
   return { version: 1, locos: [], log: [], reports: [], unusuals: [] };
 }
@@ -339,7 +350,7 @@ export function reportText(locos, day) {
     if (!list.length) lines.push('NIL');
     for (const { loco, serial } of list) {
       lines.push(`${serial}. ${loco.locoNo}`);
-      lines.push(`   TR: ${loco.trainNo || '-'}`);
+      lines.push(`   TR: ${loco.trainNo || '-'}${workStatus(loco.working) ? ` | ${workStatus(loco.working)}` : ''}`);
       lines.push(`   Loc: ${loco.location || '-'}`);
       const d = detail(loco);
       if (d) lines.push(`   ${d}`);
@@ -364,7 +375,7 @@ export function historyText(label, rows, fromKey, toKey) {
     const d = r.data;
     const where = d.division === 'OTHER'
       ? `Other div | H/O ${d.hoTrain || '-'} at ${d.hoPoint || '-'}, ${d.hoTime || '-'}`
-      : 'SC div';
+      : `SC div${workStatus(d.working) ? ` | ${workStatus(d.working)}` : ''}`;
     const when = r.carried ? `${fmtDay(r.day)} (no change)` : `${fmtDay(r.day)} ${r.time}`;
     const tail = r.kind === 'removed' ? ' | REMOVED FROM LIST' : (d.remarks ? ` | ${d.remarks}` : '');
     const who = r.by ? ` | by ${r.by}` : '';
