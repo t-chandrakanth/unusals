@@ -617,3 +617,8 @@ td.c-reason .evbox { min-width: 300px; }
 .savebar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 22px 0 8px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
 .savebar .btn.big { min-height: 48px; padding: 0 44px; font-size: 18px; font-weight: 800; }
 .savebar .saved-at { flex: 1 1 220px; font-size: 14px; color: var(--soft); }
+
+/* ---- the Other division heading with + Add loco beside it ---- */
+.section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px 14px; }
+.section-head .section-title { margin: 14px 0 8px; }
+.section-head .add-loco { min-height: 40px; margin: 6px 0 0; padding: 0 18px; font-weight: 800; }

@@ -1,6 +1,6 @@
 // Offline support for DPWCS LOCO: the network when there is one (so updates
 // arrive straight away), the last saved copy when there is not.
-const CACHE = 'dpwcs-loco-v21';
+const CACHE = 'dpwcs-loco-v22';
 const FILES = [
   './', 'index.html', 'app.js', 'manifest.webmanifest', '../styles.css',
   '../js/logic.js', '../js/seed.js', '../js/sheet.js', '../js/xlsx.js', '../js/canvas.js', '../js/db.js', '../js/sync.js',

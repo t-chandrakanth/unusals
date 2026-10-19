@@ -525,11 +525,12 @@ function viewLocos() {
     const section = (division, title) => {
       const list = rows.filter((r) => r.loco.division === division);
       return h('section', null,
-        h('h2', { class: `section-title ${division.toLowerCase()}` }, title, h('span', { class: 'count' }, list.length)),
+        h('div', { class: 'section-head' },
+          h('h2', { class: `section-title ${division.toLowerCase()}` }, title, h('span', { class: 'count' }, list.length)),
+          division === 'OTHER' && h('button', { class: 'btn primary add-loco', onclick: () => openEditor(null, 'OTHER') }, '+ Add loco')),
         list.length > 0 && h('div', { class: 'list-head', 'aria-hidden': 'true' },
           h('span', null, 'Sr. No'), h('span', null, 'Loco No'), h('span', null, 'Train No'), h('span', null, 'Current location'), h('span', null, 'Working'), h('span', null, 'Updated')),
-        list.length ? list.map((r) => locoCard(r, since)) : h('p', { class: 'empty' }, q ? 'No match.' : 'No locos here.'),
-        division === 'OTHER' && h('div', { class: 'add-row' }, h('button', { class: 'btn primary', onclick: () => openEditor(null, 'OTHER') }, '+ Add loco')));
+        list.length ? list.map((r) => locoCard(r, since)) : h('p', { class: 'empty' }, q ? 'No match.' : 'No locos here.'));
     };
     const done = state.locos.filter((l) => L.isUpdated(l, since)).length;
     const total = state.locos.length;
@@ -537,7 +538,7 @@ function viewLocos() {
       h('span', { class: 'dot ok', 'aria-hidden': 'true' }, '\u2713'), `${done} updated`,
       h('span', { class: 'dot due', 'aria-hidden': 'true' }, '!'), `${total - done} to update`,
       h('span', { class: 'since' }, sentToday ? `since the report sent at ${L.fmtTime(since)}` : 'today'));
-    return [progress, section('OTHER', 'In other divisions'), section('SC', 'In SC division')];
+    return [progress, section('OTHER', 'Other division'), section('SC', 'SC division')];
   };
   // Typing in the search box only redraws the lists, so the keyboard stays open.
   const search = h('input', {
