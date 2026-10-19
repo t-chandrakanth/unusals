@@ -636,7 +636,7 @@ function viewBlocks() {
   return h('div', { class: 'failures' },
     SHARED && status.unusualsMissing && h('p', { class: 'notice' }, 'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase.'),
     card,
-    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'choose From and To dates')),
+    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'today to begin with')),
     dayShell('block', list, (items) => [messageBar(items, (u) => blockMessage(readBlock(u))), groupedCards(items, blockCard)]));
 }
 
@@ -645,39 +645,30 @@ function viewBlocks() {
 // side; the reports of the clicked day are shown on their own.
 
 /**
- * The saved reports of a tab: From and To dates and the dates that have reports, at the side;
- * the reports between the two dates beside them, and nothing until a date is chosen.
- * content(items, label): what to show for the reports in the chosen days.
+ * The saved reports of a tab: a slim bar with From, To and Today, and the reports of those days
+ * right under it. Today's are shown to begin with. content(items, label): what to show.
  */
 function dayShell(view, items, content) {
-  const counts = new Map();
-  for (const u of items) counts.set(u.day, (counts.get(u.day) || 0) + 1);
-  const days = [...counts.keys()].sort().reverse();
-  const r = ui.span[view] || { from: '', to: '' };
+  const r = (ui.span[view] && (ui.span[view].from || ui.span[view].to)) ? ui.span[view] : { from: today(), to: today() };
   const set = (from, to) => {
     if (from && to && from > to) [from, to] = [to, from]; // typed the wrong way round
     ui.span[view] = { from, to };
     render();
   };
-  const chip = (d, label) => h('button', { class: `dchip ${r.from === d && r.to === d ? 'on' : ''}`, onclick: () => set(d, d) },
-    h('b', null, label || L.fmtDay(d)), counts.get(d) ? h('span', null, String(counts.get(d))) : null);
   const box = (key, label) => h('label', { class: 'dfield' }, label, h('input', {
     type: 'date', value: r[key], 'aria-label': `${label} date`,
     onchange: (e) => set(key === 'from' ? e.target.value : r.from, key === 'to' ? e.target.value : r.to),
   }));
-  const picked = !!(r.from || r.to);
-  const inRange = picked ? items.filter((u) => (!r.from || u.day >= r.from) && (!r.to || u.day <= r.to)) : [];
+  const isToday = r.from === today() && r.to === today();
+  const inRange = items.filter((u) => (!r.from || u.day >= r.from) && (!r.to || u.day <= r.to));
   const label = r.from && r.to && r.from === r.to ? officialDay(r.from)
     : `${r.from ? L.fmtDay(r.from) : 'the start'} to ${r.to ? L.fmtDay(r.to) : L.fmtDay(today())}`;
   return h('div', { class: 'dayview' },
-    h('aside', { class: 'daylist' },
-      box('from', 'From'), box('to', 'To'),
-      picked && h('button', { class: 'btn small', onclick: () => set('', '') }, 'Clear dates'),
-      chip(today(), 'Today'),
-      days.filter((d) => d !== today()).map((d) => chip(d))),
-    h('div', { class: 'daymain' }, picked
-      ? [h('h2', { class: 'section-title' }, label, h('span', { class: 'count' }, String(inRange.length))), content(inRange, label)]
-      : h('p', { class: 'empty-big' }, 'Choose From and To dates, or click a date on the left, to see the reports of those days and share them.')));
+    h('div', { class: 'rangebar' }, box('from', 'From'), box('to', 'To'),
+      h('button', { class: `btn small ${isToday ? 'on' : ''}`, onclick: () => set(today(), today()) }, 'Today')),
+    h('div', { class: 'daymain' },
+      h('h2', { class: 'section-title' }, label, h('span', { class: 'count' }, String(inRange.length))),
+      content(inRange, label)));
 }
 
 // ---------- loco, C&W and all failures ----------
@@ -861,7 +852,7 @@ function viewList() {
     SHARED && status.unusualsMissing && h('p', { class: 'notice' },
       'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase (steps are in the README). Nothing is lost meanwhile.'),
     newReportCard(view),
-    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'click a date')),
+    h('h2', { class: 'section-title saved-title' }, 'Saved reports'),
     dayShell(view, pool, (items, label) => dayRecords(view, items, label)));
 }
 
@@ -1121,7 +1112,7 @@ function viewStalling() {
   return h('div', { class: 'failures' },
     SHARED && status.unusualsMissing && h('p', { class: 'notice' }, 'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase.'),
     card,
-    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'choose From and To dates')),
+    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'today to begin with')),
     dayShell('stalling', list, (items) => [messageBar(items, (u) => whatsappText(readStallingOf(u))), groupedCards(items, stallingCard)]));
 }
 

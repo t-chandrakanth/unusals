@@ -839,7 +839,7 @@ function stackSheets(sheets, name) {
 }
 
 function viewHistoryDay() {
-  const r = ui.histSpan;
+  const r = (ui.histSpan.from || ui.histSpan.to) ? ui.histSpan : { from: today(), to: today() };
   const set = (from, to) => {
     if (from && to && from > to) [from, to] = [to, from]; // typed the wrong way round
     ui.histSpan = { from, to };
@@ -847,12 +847,8 @@ function viewHistoryDay() {
   };
   const box = (key, label) => h('label', { class: 'inline' }, label,
     h('input', { type: 'date', value: r[key], max: today(), onchange: (e) => set(key === 'from' ? e.target.value : r.from, key === 'to' ? e.target.value : r.to) }));
-  const picked = !!(r.from || r.to);
   const bar = h('div', { class: 'toolbar wrap' }, box('from', 'From'), box('to', 'To'),
-    picked && h('button', { class: 'btn small', onclick: () => set('', '') }, 'Clear dates'));
-  if (!picked) {
-    return h('div', null, bar, h('p', { class: 'empty-big' }, 'Choose From and To dates to see the position of every loco on each of those days, and share them at once.'));
-  }
+    h('button', { class: 'btn small', onclick: () => set(today(), today()) }, 'Today'));
   const days = recordDays().filter((d) => (!r.from || d >= r.from) && (!r.to || d <= r.to)).reverse(); // oldest day first
   const label = r.from && r.to && r.from === r.to ? L.fmtDay(r.from) : `${r.from ? L.fmtDay(r.from) : 'the start'} to ${r.to ? L.fmtDay(r.to) : L.fmtDay(today())}`;
   if (!days.length) return h('div', null, bar, h('p', { class: 'empty-big' }, `No loco was updated, and no report sent, on ${label}.`));
@@ -1129,36 +1125,28 @@ function newUnusualCard() {
   return card;
 }
 
-/** The dates: From and To and the dates that have reports at the side; the reports between the two dates beside them. */
+/** The dates: a slim bar with From, To and Today, and the reports of those days right under it (today's to begin with). */
 function unusualDays(items, content) {
-  const counts = new Map();
-  for (const u of items) counts.set(u.day, (counts.get(u.day) || 0) + 1);
-  const days = [...counts.keys()].sort().reverse();
-  const r = ui.span.unusuals || { from: '', to: '' };
+  const r = (ui.span.unusuals && (ui.span.unusuals.from || ui.span.unusuals.to)) ? ui.span.unusuals : { from: today(), to: today() };
   const set = (from, to) => {
     if (from && to && from > to) [from, to] = [to, from]; // typed the wrong way round
     ui.span.unusuals = { from, to };
     render();
   };
-  const chip = (d, label) => h('button', { class: `dchip ${r.from === d && r.to === d ? 'on' : ''}`, onclick: () => set(d, d) },
-    h('b', null, label || L.fmtDay(d)), counts.get(d) ? h('span', null, String(counts.get(d))) : null);
   const box = (key, label) => h('label', { class: 'dfield' }, label, h('input', {
     type: 'date', value: r[key], 'aria-label': `${label} date`,
     onchange: (e) => set(key === 'from' ? e.target.value : r.from, key === 'to' ? e.target.value : r.to),
   }));
-  const picked = !!(r.from || r.to);
-  const inRange = picked ? items.filter((u) => (!r.from || u.day >= r.from) && (!r.to || u.day <= r.to)) : [];
+  const isToday = r.from === today() && r.to === today();
+  const inRange = items.filter((u) => (!r.from || u.day >= r.from) && (!r.to || u.day <= r.to));
   const label = r.from && r.to && r.from === r.to ? officialDay(r.from)
     : `${r.from ? L.fmtDay(r.from) : 'the start'} to ${r.to ? L.fmtDay(r.to) : L.fmtDay(today())}`;
   return h('div', { class: 'dayview' },
-    h('aside', { class: 'daylist' },
-      box('from', 'From'), box('to', 'To'),
-      picked && h('button', { class: 'btn small', onclick: () => set('', '') }, 'Clear dates'),
-      chip(today(), 'Today'),
-      days.filter((d) => d !== today()).map((d) => chip(d))),
-    h('div', { class: 'daymain' }, picked
-      ? [h('h2', { class: 'section-title' }, label, h('span', { class: 'count' }, String(inRange.length))), content(inRange, label)]
-      : h('p', { class: 'empty-big' }, 'Choose From and To dates, or click a date on the left, to see the reports of those days and share them.')));
+    h('div', { class: 'rangebar' }, box('from', 'From'), box('to', 'To'),
+      h('button', { class: `btn small ${isToday ? 'on' : ''}`, onclick: () => set(today(), today()) }, 'Today')),
+    h('div', { class: 'daymain' },
+      h('h2', { class: 'section-title' }, label, h('span', { class: 'count' }, String(inRange.length))),
+      content(inRange, label)));
 }
 
 /** The saved reports of the chosen days: one row each, a heading row for each day. Edit turns a row into cells with Save and Cancel. */
@@ -1220,7 +1208,7 @@ function viewUnusuals() {
     SHARED && status.unusualsMissing && h('p', { class: 'notice' },
       'Unusual reports are being kept on this device only for now. To share them with everyone, the shared database needs one extra table: run supabase/setup-unusuals.sql once (steps are in the README). Nothing is lost meanwhile.'),
     newUnusualCard(),
-    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'choose From and To dates')),
+    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'today to begin with')),
     unusualDays(mine(), (items, label) => unusualRows(items, label)));
 }
 
