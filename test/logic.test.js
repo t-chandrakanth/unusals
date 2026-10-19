@@ -157,3 +157,15 @@ test('update dots: a loco is green once updated or confirmed in the current roun
   assert.equal(L.isUpdated(s.locos[0], afternoon), true);
   assert.equal(s.log.length, logBefore + 1);
 });
+
+test('a saved copy does not start a new round of updating, a sent report does', () => {
+  const noon = new Date(2026, 9, 19, 12, 0);
+  const startOfDay = new Date(2026, 9, 19).toISOString();
+  const sent = { at: new Date(2026, 9, 19, 9, 0).toISOString(), by: 'MAHESH' };
+  const saved = { at: new Date(2026, 9, 19, 11, 0).toISOString(), by: 'MAHESH (saved)' };
+  assert.equal(L.isSavedCopy(saved), true);
+  assert.equal(L.isSavedCopy(sent), false);
+  assert.equal(L.savedBy(saved), 'MAHESH');
+  assert.equal(L.roundStart([saved], noon), startOfDay);
+  assert.equal(L.roundStart([sent, saved], noon), sent.at);
+});

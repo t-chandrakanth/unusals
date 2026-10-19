@@ -566,7 +566,31 @@ function viewLocos() {
     attach,
     h('p', { class: 'hint wide-only' }, 'Type in the Train No, Current location or Working box to change it, or paste a block copied from Excel. Click a loco number for all its details.'),
     h('p', { class: 'hint narrow-only' }, 'Tap a loco number to see and update its details.'),
-    h('div', { id: 'lists' }, buildLists()));
+    h('div', { id: 'lists' }, buildLists()),
+    saveBar());
+}
+
+/** Files the positions as they are now, with the time, to be found in History under today. */
+function saveSnapshot() {
+  const day = today();
+  const lastOne = state.reports[state.reports.length - 1];
+  const same = lastOne && lastOne.day === day && lastOne.locos.length === state.locos.length &&
+    lastOne.locos.every((l, i) => l.id === state.locos[i].id && L.sameFields(l, state.locos[i]));
+  if (same) { toast(`Already saved at ${L.fmtTime(lastOne.at)}: nothing has changed since.`); return; }
+  const report = { id: L.uid(), at: new Date().toISOString(), day, by: `${who()} (saved)`.trim(), locos: state.locos.map((l) => ({ ...l })) };
+  toast(`Saved at ${L.fmtTime(report.at)}. It is in History under today.`);
+  dispatch({ type: 'addReport', report });
+}
+
+/** The Save button at the foot of the list, and when the positions were last saved today. */
+function saveBar() {
+  const day = today();
+  const last = state.reports.filter((r) => r.day === day && L.isSavedCopy(r)).sort((a, b) => a.at.localeCompare(b.at)).pop();
+  return h('div', { class: 'savebar' },
+    h('button', { class: 'btn primary big', onclick: saveSnapshot }, 'Save'),
+    h('span', { class: 'saved-at' }, last
+      ? `Last saved today at ${L.fmtTime(last.at)}${L.savedBy(last) ? ` by ${L.savedBy(last)}` : ''}. It is in History under today.`
+      : 'Saves the positions as they are now, with the time. It is shown in History under today.'));
 }
 
 // A box to paste the whole report sheet (or any cells copied from Excel) into: it shows which
@@ -810,7 +834,7 @@ function stackSheets(sheets, name) {
 /** One report as it was sent: the sheet, the ways to share it again, and a way to remove the copy. */
 function viewSentCopy(copy) {
   const sheet = reportSheet(copy.locos, copy.day);
-  const when = `${L.fmtDay(copy.day)} ${L.fmtTime(copy.at)}${copy.by ? ` ${copy.by}` : ''}`;
+  const when = `${L.fmtDay(copy.day)} ${L.fmtTime(copy.at)}${L.savedBy(copy) ? ` ${L.savedBy(copy)}` : ''}`;
   return h('div', null,
     h('div', { class: 'toolbar wrap' },
       h('button', { class: 'btn', onclick: () => { ui.histCopy = null; render(); } }, '\u2190 Back'),
@@ -822,7 +846,7 @@ function viewSentCopy(copy) {
           dispatch({ type: 'removeReport', id: copy.id });
         },
       }, 'Delete this copy')),
-    h('p', { class: 'hint' }, `The report as it was sent on ${when}.`),
+    h('p', { class: 'hint' }, `The positions as they were ${L.isSavedCopy(copy) ? 'saved' : 'sent'} on ${when}.`),
     exportBar(sheet, `DPWS-locos-${L.fmtDay(copy.day)}-${L.fmtTime(copy.at).replace(':', '')}`, sheet.rows[0][0].v, () => L.reportText(copy.locos, copy.day)),
     h('div', { class: 'sheet-wrap', id: 'printable' }, sheetTable(sheet)));
 }
@@ -831,10 +855,10 @@ function viewSentCopy(copy) {
 function sentCopies(day) {
   const sent = state.reports.filter((x) => x.day === day).sort((a, b) => a.at.localeCompare(b.at));
   if (!sent.length) return null;
-  return h('div', { class: 'sentrow' }, h('span', null, 'Sent:'), sent.map((x) => h('button', {
-    class: 'qchip', title: 'Open the report as it was sent',
+  return h('div', { class: 'sentrow' }, h('span', null, 'Saved / sent:'), sent.map((x) => h('button', {
+    class: 'qchip', title: L.isSavedCopy(x) ? 'Open the positions as they were saved' : 'Open the report as it was sent',
     onclick: () => { ui.histCopy = x.id; render(); window.scrollTo(0, 0); },
-  }, `${L.fmtTime(x.at)}${x.by ? `  ${x.by}` : ''}`)));
+  }, `${L.fmtTime(x.at)}${L.savedBy(x) ? `  ${L.savedBy(x)}` : ''}${L.isSavedCopy(x) ? '  (saved)' : ''}`)));
 }
 
 function viewHistoryDay() {

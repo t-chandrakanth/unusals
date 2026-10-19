@@ -108,9 +108,16 @@ export function numbered(locos) {
  * The moment the current round of updating began: when the last report was
  * sent, or the start of today if nothing has been sent yet today.
  */
+/** Saved with the Save button, not sent: the name carries a "(saved)" mark, which is what the shared database keeps. */
+export const isSavedCopy = (r) => /\(saved\)\s*$/.test(String((r && r.by) || ''));
+
+/** The name without the mark. */
+export const savedBy = (r) => String((r && r.by) || '').replace(/\s*\(saved\)\s*$/, '');
+
 export function roundStart(reports, now = new Date()) {
   let since = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  for (const r of reports) if (r.at > since) since = r.at;
+  // A position that was only saved (marked after the name) is a record, not a report sent: the dots stay as they are.
+  for (const r of reports) if (r.at > since && !isSavedCopy(r)) since = r.at;
   return since;
 }
 
