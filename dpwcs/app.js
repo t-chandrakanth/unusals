@@ -44,6 +44,7 @@ const ui = {
   edit: null, // the saved report being changed in its row
   histSpan: { from: '', to: '' }, // From and To of the History tab
   histCopy: null, // a report sent earlier, opened as it was sent
+  reportEdits: {}, // changes typed into the report and not saved yet
   sumDay: '',
 };
 
@@ -784,10 +785,11 @@ function viewReport() {
   };
 
   let note;
-  if (isToday) note = 'Current position of all locos. Update locos first, then share. A copy of what you share is kept in History.';
+  if (isToday) note = 'Current position of all locos. Change any box, then press Save at the end. With no changes, share it as it is. A copy of what you share is kept in History.';
   else if (day > today()) note = 'This date is in the future, showing the current position.';
   else note = `Position as it stood at the end of ${L.fmtDay(day)}, rebuilt from the saved updates.`;
 
+  const bar = exportBar(sheet, fileBase, sheet.rows[0][0].v, () => L.reportText(locos, day), keepCopy);
   return h('div', null,
     h('div', { class: 'toolbar' },
       h('label', { class: 'inline' }, 'Date',
@@ -797,8 +799,86 @@ function viewReport() {
         })),
       !isToday && h('button', { class: 'btn', onclick: () => { ui.reportDay = today(); render(); } }, 'Back to today')),
     h('p', { class: 'hint' }, note),
-    exportBar(sheet, fileBase, sheet.rows[0][0].v, () => L.reportText(locos, day), keepCopy),
-    h('div', { class: 'sheet-wrap', id: 'printable' }, sheetTable(sheet)));
+    bar,
+    isToday ? editableReport(locos, day, bar) : h('div', { class: 'sheet-wrap', id: 'printable' }, sheetTable(sheet)));
+}
+
+/** The changes typed into the report and not saved yet: loco id -> { box: value }. */
+const pendingCount = () => Object.values(ui.reportEdits).reduce((n, f) => n + Object.keys(f).length, 0);
+
+function saveReportEdits() {
+  const now = new Date().toISOString();
+  let next = state;
+  let n = 0;
+  for (const [id, fields] of Object.entries(ui.reportEdits)) {
+    const current = next.locos.find((l) => l.id === id);
+    if (!current) continue;
+    next = L.reduce(next, { type: 'save', loco: { ...current, ...fields }, now, by: who() });
+    n++;
+  }
+  ui.reportEdits = {};
+  commit(next);
+  render();
+  toast(n ? `Saved the changes to ${n} loco${n === 1 ? '' : 's'}. They are in History under today.` : 'No changes to save.');
+}
+
+/**
+ * Today's report with every box open to typing, in the two tables of the sheet. Changed boxes are
+ * marked; Save at the end puts the changes into the locos (and their history). While changes are
+ * waiting the share buttons are off: with none, the report is shared as it is.
+ */
+function editableReport(locos, day, bar) {
+  const edits = ui.reportEdits;
+  const value = (l, k) => (edits[l.id] && k in edits[l.id] ? edits[l.id][k] : (l[k] || ''));
+  const changed = (l, k) => !!(edits[l.id] && k in edits[l.id]);
+  const titles = L.reportTitles(day);
+
+  const saveBtn = h('button', { class: 'btn primary big', onclick: saveReportEdits }, 'Save');
+  const discard = h('button', { class: 'btn', onclick: () => { ui.reportEdits = {}; render(); } }, 'Discard changes');
+  const status = h('span', { class: 'saved-at' });
+  const refresh = () => {
+    const n = pendingCount();
+    saveBtn.disabled = n === 0;
+    saveBtn.textContent = n ? `Save changes (${n})` : 'Save';
+    discard.hidden = n === 0;
+    status.textContent = n ? `${n} change${n === 1 ? '' : 's'} not saved yet. Save them, then share the report.` : 'No changes: the report can be shared as it is.';
+    for (const b of bar.querySelectorAll('.btn')) { b.disabled = n > 0; b.title = n ? 'Save the changes first' : ''; }
+  };
+
+  const cell = (l, k, label) => {
+    const el = h('input', { type: 'text', class: 'rcell', 'aria-label': `${label} of ${l.locoNo}`, autocapitalize: 'characters', autocomplete: 'off' });
+    el.value = value(l, k);
+    if (changed(l, k)) el.classList.add('changed');
+    el.addEventListener('input', () => {
+      const same = el.value.trim() === String(l[k] || '').trim();
+      if (same) { if (edits[l.id]) { delete edits[l.id][k]; if (!Object.keys(edits[l.id]).length) delete edits[l.id]; } } else { (edits[l.id] = edits[l.id] || {})[k] = el.value; }
+      el.classList.toggle('changed', !same);
+      refresh();
+    });
+    return h('td', null, el);
+  };
+
+  const table = (title, division, heads, keys, tone) => {
+    const rows = L.numbered(locos).filter((r) => r.loco.division === division);
+    return h('section', null,
+      h('h2', { class: `section-title ${tone}` }, title, h('span', { class: 'count' }, rows.length)),
+      h('div', { class: 'cells-wrap' }, h('table', { class: 'cells rtable' },
+        h('thead', null, h('tr', null, h('th', { class: 'sr' }, 'S NO'), heads.map((t) => h('th', null, t)))),
+        h('tbody', null, rows.length
+          ? rows.map((r) => h('tr', null,
+            h('td', { class: 'sr' }, r.span ? String(r.serial) : ''),
+            keys.map(([k, label]) => cell(r.loco, k, label))))
+          : h('tr', null, h('td', { colspan: heads.length + 1, class: 'ro' }, 'NIL'))))));
+  };
+
+  const box = h('div', { class: 'report-edit', id: 'printable' },
+    table(titles.other, 'OTHER', ['DPWCS LOCO NO', 'DUE DATE', 'TR.NO', 'CURRENT LOCATION', 'H/O TRAIN TO OTHER DIV', 'H/O POINT', 'H/O- TIME', 'REMARKS'],
+      [['locoNo', 'Loco no'], ['dueDate', 'Due date'], ['trainNo', 'Train no'], ['location', 'Current location'], ['hoTrain', 'H/O train'], ['hoPoint', 'H/O point'], ['hoTime', 'H/O time'], ['remarks', 'Remarks']], 'other'),
+    table(titles.sc, 'SC', ['DPWCS LOCO NO', 'DUE DATE', 'TR.NO', 'CURRENT LOCATION', 'WORKING', 'REMARKS'],
+      [['locoNo', 'Loco no'], ['dueDate', 'Due date'], ['trainNo', 'Train no'], ['location', 'Current location'], ['working', 'Working'], ['remarks', 'Remarks']], 'sc'),
+    h('div', { class: 'savebar' }, saveBtn, discard, status));
+  refresh();
+  return box;
 }
 
 // ---------- History ----------

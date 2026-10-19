@@ -622,3 +622,12 @@ td.c-reason .evbox { min-width: 300px; }
 .section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px 14px; }
 .section-head .section-title { margin: 14px 0 8px; }
 .section-head .add-loco { min-height: 40px; margin: 6px 0 0; padding: 0 18px; font-weight: 800; }
+
+/* ---- the report with every box open to typing ---- */
+.report-edit section { margin-bottom: 14px; }
+table.rtable td { padding: 3px; }
+.rcell { display: block; width: 100%; min-width: 90px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; text-transform: uppercase; }
+.rcell:focus { outline: 2px solid var(--amber); outline-offset: -1px; }
+.rcell.changed { background: color-mix(in srgb, var(--amber) 22%, var(--card)); border-color: var(--amber); }
+table.rtable td.ro { padding: 10px; text-align: center; font-weight: 700; color: var(--soft); }
+.rtable .btn:disabled, .actions .btn:disabled { opacity: 0.45; }
