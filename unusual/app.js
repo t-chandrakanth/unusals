@@ -36,20 +36,21 @@ const TYPES = {
   other: { name: 'Others', accent: 'k-dpwcs', titles: [] },
 };
 const FORM = {
-  loco: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason'],
-  cw: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason'],
-  other: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason'],
+  loco: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason', 'rep'],
+  cw: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason', 'rep'],
+  other: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason', 'rep'],
 };
 const LABEL = {
   day: 'Date', time: 'Time', title: 'Train details (heading)', location: 'Location', trainNo: 'Train no',
-  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Sequence of events',
+  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Sequence of events', rep: 'Repercussions',
 };
 const HINT = {
   title: 'brake binding', location: 'TNGM-YP/GNN', trainNo: 'ICDT C/S', locoNo: '42821', load: '40/40/3910',
   wagonNo: 'CNCR 6125060159 BLCM', bpcNo: '70000102716 TKD/25-03/CC', det: 'AT GNN 03:20 HRS',
   reason: 'Times, km, what was done, relief loco, TXR fit...',
+  rep: '1. 17030 - VKB ARR 22:47 (leave empty if none)',
 };
-const WIDE = new Set(['title', 'locoNo', 'wagonNo', 'bpcNo', 'reason']);
+const WIDE = new Set(['title', 'locoNo', 'wagonNo', 'bpcNo', 'reason', 'rep']);
 const FILE_TYPES = 'image/*,.docx,.pdf,.xlsx,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 // The DPWCS LOCO app keeps a list of its own (app = 'dpwcs'); it is not part of this register.
 const rows = () => state.unusuals.filter((u) => u.app !== 'dpwcs' && u.type !== 'block' && u.type !== 'stalling');
@@ -312,8 +313,8 @@ function openForm(type, existing) {
     const kind = kindOf(draft);
     const titles = [...new Set([...TYPES[kind].titles, ...rows().filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
     const field = (key) => {
-      const el = key === 'reason'
-        ? h('textarea', { rows: 6, value: draft[key], placeholder: HINT[key] })
+      const el = key === 'reason' || key === 'rep'
+        ? h('textarea', { rows: key === 'rep' ? 3 : 6, value: draft[key], placeholder: HINT[key] })
         : h('input', {
           type: key === 'day' ? 'date' : (key === 'time' || key === 'detFrom' || key === 'detTo') ? 'time' : 'text', value: draft[key], placeholder: HINT[key] || '',
           autocapitalize: key === 'day' || key === 'time' || key === 'detFrom' || key === 'detTo' ? null : 'characters', autocomplete: 'off',
@@ -362,7 +363,7 @@ function openForm(type, existing) {
           render();
         },
       },
-      h('div', { class: 'grid' }, [...FORM[kind].slice(0, -1), ...['load', 'wagonNo', 'bpcNo'].filter((k) => !FORM[kind].includes(k) && String(draft[k] || '').trim()), 'reason']
+      h('div', { class: 'grid' }, [...FORM[kind].filter((k) => k !== 'reason' && k !== 'rep'), ...['load', 'wagonNo', 'bpcNo'].filter((k) => !FORM[kind].includes(k) && String(draft[k] || '').trim()), 'reason', 'rep']
         .map((k) => (k === 'det' ? h('div', { class: 'det-row' }, field('detFrom'), field('detTo'), field('det')) : field(k)))),
       h('div', { id: 'repeat-hint', class: 'repeat-hint', style: 'display:none' }),
       photoStrip(draft, build),
@@ -416,6 +417,7 @@ function card(u, showTag) {
           chip('WAGON', u.wagonNo, true), chip('BPC', u.bpcNo, true))),
       u.det && h('span', { class: 'det' }, h('small', null, 'DET'), u.det)),
     u.reason && h('p', { class: 'ucard-reason' }, u.reason),
+    u.rep && h('p', { class: 'ucard-rep' }, h('b', null, 'REPERCUSSIONS '), u.rep),
     repeatNote(u),
     officialDetails(u),
     h('div', { class: 'ucard-actions' },
@@ -785,9 +787,9 @@ function newReportCard(view) {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Sequence of events'),
         eventsEditor(h, draft.reason, (v) => { draft.reason = v; }));
     }
-    const isText = false;
+    const isText = key === 'rep';
     const el = isText
-      ? h('textarea', { rows: 3, placeholder: HINT[key] ? `e.g. ${HINT[key]}` : '' })
+      ? h('textarea', { rows: 3, placeholder: HINT[key] || '' })
       : h('input', {
         type: key === 'detFrom' || key === 'detTo' ? 'time' : 'text', placeholder: HINT[key] && key !== 'detFrom' && key !== 'detTo' ? `e.g. ${HINT[key]}` : '',
         autocapitalize: key === 'detFrom' || key === 'detTo' ? null : 'characters', autocomplete: 'off',
@@ -805,7 +807,7 @@ function newReportCard(view) {
       }
     });
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doSave(); } });
-    return h('label', { class: `ncell ${key === 'reason' ? 's4' : WIDE.has(key) ? 's2' : ''}` }, h('span', null, LABEL[key]), el);
+    return h('label', { class: `ncell ${key === 'reason' || key === 'rep' ? 's4' : WIDE.has(key) ? 's2' : ''}` }, h('span', null, LABEL[key]), el);
   };
 
   const doSave = () => {
