@@ -339,7 +339,7 @@ export function reportText(locos, day) {
     if (!list.length) lines.push('NIL');
     for (const { loco, serial } of list) {
       lines.push(`${serial}. ${loco.locoNo}`);
-      lines.push(`   Due: ${loco.dueDate || '-'} | TR: ${loco.trainNo || '-'}`);
+      lines.push(`   TR: ${loco.trainNo || '-'}`);
       lines.push(`   Loc: ${loco.location || '-'}`);
       const d = detail(loco);
       if (d) lines.push(`   ${d}`);
@@ -349,7 +349,7 @@ export function reportText(locos, day) {
   section(t.other, 'OTHER', (l) =>
     `H/O: ${l.hoTrain || '-'} at ${l.hoPoint || '-'}, ${l.hoTime || '-'}`);
   lines.push('');
-  section(t.sc, 'SC', (l) => (l.working ? `Working: ${l.working}` : ''));
+  section(t.sc, 'SC', () => '');
   return lines.join('\n');
 }
 
@@ -364,7 +364,7 @@ export function historyText(label, rows, fromKey, toKey) {
     const d = r.data;
     const where = d.division === 'OTHER'
       ? `Other div | H/O ${d.hoTrain || '-'} at ${d.hoPoint || '-'}, ${d.hoTime || '-'}`
-      : `SC div${d.working ? ` | Working: ${d.working}` : ''}`;
+      : 'SC div';
     const when = r.carried ? `${fmtDay(r.day)} (no change)` : `${fmtDay(r.day)} ${r.time}`;
     const tail = r.kind === 'removed' ? ' | REMOVED FROM LIST' : (d.remarks ? ` | ${d.remarks}` : '');
     const who = r.by ? ` | by ${r.by}` : '';

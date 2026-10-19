@@ -24,6 +24,8 @@ export const STYLES = {
   bad:      { bg: '#FBE0DD', color: '#A12A22', align: 'center' },
   muted:    { bg: '#F3F3F3', color: '#555555', align: 'center' },
   gap:      { bg: null, color: '#000000', align: 'center', noBorder: true },
+  // The current location is highlighted in the position report.
+  hl:       { bg: '#FFFF00', color: '#12263F', align: 'center' },
   // Unusual reports: red date above, yellow bands for the heading and DET.
   dateTitle: { bg: '#FFFFFF', color: '#FF0000', align: 'center' },
   band:      { bg: '#FFFF00', color: '#FF0000', align: 'center' },
@@ -50,41 +52,41 @@ export function reportSheet(locos, day) {
   const all = numbered(locos);
   const serialCell = (r) => (r.span ? c(r.serial, 'serial', r.span > 1 ? { rowSpan: r.span } : {}) : null);
 
-  rows.push(spanRow(c(t.other, 'title', { colSpan: 9 }), 9));
-  rows.push(['S NO', 'DPWCS LOCO NO', 'DUE DATE', 'TR.NO', 'CURRENT LOCATION',
-    'H/O TRAIN TO OTHER DIV', 'H/O POINT', 'H/O- TIME', 'REMARKS'].map((v) => c(v, 'head')));
+  rows.push(spanRow(c(t.other, 'title', { colSpan: 8 }), 8));
+  rows.push(['S NO', 'DPWCS LOCO NO', 'TR.NO', 'CURRENT LOCATION',
+    'H/O TRAIN TO OTHER DIV', 'H/O POINT', 'H/O- TIME', 'REMARKS'].map((v) => c(v, v === 'CURRENT LOCATION' ? 'hl' : 'head')));
   const other = all.filter((r) => r.loco.division === 'OTHER');
   for (const r of other) {
     const l = r.loco;
     const z = r.serial % 2 ? 'cell' : 'alt';
-    rows.push([serialCell(r), c(l.locoNo, z), c(l.dueDate, z), c(l.trainNo, z), c(l.location, z),
+    rows.push([serialCell(r), c(l.locoNo, z), c(l.trainNo, z), c(l.location, 'hl'),
       c(l.hoTrain, z), c(l.hoPoint, z), c(l.hoTime, z), c(l.remarks, r.serial % 2 ? 'text' : 'altText')]);
   }
-  if (!other.length) rows.push(spanRow(c('NIL', 'cell', { colSpan: 9 }), 9));
+  if (!other.length) rows.push(spanRow(c('NIL', 'cell', { colSpan: 8 }), 8));
 
-  rows.push(spanRow(c('', 'gap', { colSpan: 9 }), 9));
+  rows.push(spanRow(c('', 'gap', { colSpan: 8 }), 8));
 
-  rows.push(spanRow(c(t.sc, 'titleRed', { colSpan: 9 }), 9));
-  rows.push([...['S NO', 'DPWCS LOCO NO', 'DUE DATE', 'TR.NO', 'CURRENT LOCATION', 'WORKING']
-    .map((v) => c(v, 'head')), c('REMARKS', 'head', { colSpan: 3 }), null, null]);
+  rows.push(spanRow(c(t.sc, 'titleRed', { colSpan: 8 }), 8));
+  rows.push([...['S NO', 'DPWCS LOCO NO', 'TR.NO', 'CURRENT LOCATION']
+    .map((v) => c(v, v === 'CURRENT LOCATION' ? 'hl' : 'head')), c('REMARKS', 'head', { colSpan: 4 }), null, null, null]);
   const sc = all.filter((r) => r.loco.division === 'SC');
   for (const r of sc) {
     const l = r.loco;
     const z = r.serial % 2 ? 'cell' : 'alt';
-    rows.push([serialCell(r), c(l.locoNo, z), c(l.dueDate, z), c(l.trainNo, z), c(l.location, z),
-      c(l.working, workKind(l.working) || z), c(l.remarks, z, { colSpan: 3 }), null, null]);
+    rows.push([serialCell(r), c(l.locoNo, z), c(l.trainNo, z), c(l.location, 'hl'),
+      c(l.remarks, z, { colSpan: 4 }), null, null, null]);
   }
-  if (!sc.length) rows.push(spanRow(c('NIL', 'cell', { colSpan: 9 }), 9));
+  if (!sc.length) rows.push(spanRow(c('NIL', 'cell', { colSpan: 8 }), 8));
 
-  return { name: `Locos ${fmtDay(day)}`, cols: [6, 20, 12, 16, 20, 16, 12, 16, 40], rows };
+  return { name: `Locos ${fmtDay(day)}`, cols: [6, 20, 14, 22, 20, 12, 16, 52], rows };
 }
 
 export function historySheet(label, summary, fromKey, toKey) {
   // The "updated by" column only appears when the data is shared between people.
   const withBy = summary.some((r) => r.by);
   const head = ['DATE', 'TIME', 'TR.NO', 'CURRENT LOCATION', 'DIVISION',
-    'H/O TRAIN', 'H/O POINT', 'H/O- TIME', 'WORKING', 'REMARKS'];
-  const cols = [13, 11, 16, 20, 12, 14, 12, 16, 12, 40];
+    'H/O TRAIN', 'H/O POINT', 'H/O- TIME', 'REMARKS'];
+  const cols = [13, 11, 16, 20, 12, 14, 12, 16, 40];
   if (withBy) { head.push('UPDATED BY'); cols.push(16); }
   const rows = [
     spanRow(c(historyTitle(label, fromKey, toKey), 'title', { colSpan: head.length }), head.length),
@@ -100,7 +102,7 @@ export function historySheet(label, summary, fromKey, toKey) {
       c(r.carried ? 'no change' : r.time, s),
       c(d.trainNo, s), c(d.location, s),
       c(d.division === 'OTHER' ? 'OTHER DIV' : 'SC DIV', s),
-      c(d.hoTrain, s), c(d.hoPoint, s), c(d.hoTime, s), c(d.working, (!r.carried && workKind(d.working)) || s),
+      c(d.hoTrain, s), c(d.hoPoint, s), c(d.hoTime, s),
       c(r.kind === 'removed' ? 'REMOVED FROM LIST' : d.remarks, r.carried ? 'muted' : (n % 2 ? 'text' : 'altText')),
     ];
     if (withBy) row.push(c(r.by, s));

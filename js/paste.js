@@ -28,19 +28,18 @@ export function parseTsv(text) {
 
 const HEADINGS = new Map([
   ['loco no', 'locoNo'], ['dpwcs loco no', 'locoNo'], ['loco number', 'locoNo'], ['loco', 'locoNo'],
-  ['due date', 'dueDate'], ['due', 'dueDate'],
   ['tr no', 'trainNo'], ['train no', 'trainNo'], ['tr', 'trainNo'], ['train', 'trainNo'],
   ['current location', 'location'], ['location', 'location'], ['loc', 'location'],
-  ['working', 'working'], ['remarks', 'remarks'], ['remark', 'remarks'],
+  ['remarks', 'remarks'], ['remark', 'remarks'],
   ['h/o train to other div', 'hoTrain'], ['h/o train', 'hoTrain'], ['h/o point', 'hoPoint'], ['h/o time', 'hoTime'], ['h/o- time', 'hoTime'],
 ]);
 const headingKey = (cell) => HEADINGS.get(String(cell || '').toLowerCase().replace(/[.:]/g, ' ').replace(/\s+/g, ' ').trim()) || '';
 
-// After the loco number, the report sheet runs: due date, train, location, then WORKING and REMARKS
-// for an SC loco, or H/O train, H/O point, H/O time and REMARKS for one in another division.
+// After the loco number, the report sheet runs: train, location, then REMARKS for an SC loco,
+// or H/O train, H/O point, H/O time and REMARKS for one in another division.
 const AFTER_LOCO = {
-  SC: ['dueDate', 'trainNo', 'location', 'working', 'remarks'],
-  OTHER: ['dueDate', 'trainNo', 'location', 'hoTrain', 'hoPoint', 'hoTime', 'remarks'],
+  SC: ['trainNo', 'location', 'remarks'],
+  OTHER: ['trainNo', 'location', 'hoTrain', 'hoPoint', 'hoTime', 'remarks'],
 };
 
 const KEYED = (locos) => {
@@ -55,7 +54,7 @@ const KEYED = (locos) => {
  *  start: { id, field } of the box that was clicked, or null; text: the pasted text.
  * Returns { mode, edits: Map(id -> { field: value }), cells, unmatched, outside } or null for nothing to paste.
  */
-export function planPaste({ locos, order, start, text, fields = ['trainNo', 'location', 'working'] }) {
+export function planPaste({ locos, order, start, text, fields = ['trainNo', 'location'] }) {
   const rows = parseTsv(text);
   if (!rows.length) return null;
   const byKey = KEYED(locos);

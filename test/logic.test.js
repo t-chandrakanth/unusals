@@ -101,7 +101,15 @@ test('report text and sheet carry both tables in the sheet format', () => {
   assert.match(text, /H\/O: CDG at WADI, 31-07-26 13:05/);
   const sheet = reportSheet(s.locos, '2026-10-08');
   assert.equal(sheet.rows.length, 2 + 8 + 1 + 2 + 10);
-  for (const row of sheet.rows) assert.equal(row.length, 9);
+  for (const row of sheet.rows) assert.equal(row.length, 8);
+  // no Due date and no Working in the report; the current location is highlighted
+  const heads = sheet.rows.flat().filter((x) => x && x.s !== 'cell' && x.s !== 'alt').map((x) => x.v);
+  assert.equal(heads.includes('DUE DATE'), false);
+  assert.equal(heads.includes('WORKING'), false);
+  assert.equal(sheet.rows[1][3].v, 'CURRENT LOCATION');
+  assert.equal(sheet.rows[1][3].s, 'hl');
+  assert.equal(sheet.rows[2][3].s, 'hl');
+  assert.doesNotMatch(text, /Due:|Working:/);
   assert.equal(sheet.rows[7][0].rowSpan, 2);
   assert.equal(sheet.rows[8][0], null);
 });
