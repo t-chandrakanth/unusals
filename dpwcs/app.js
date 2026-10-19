@@ -738,73 +738,29 @@ function openEditor(loco, division) {
 // ---------- Report ----------
 
 /** Counts above the position report: how the fleet stands at a glance. */
-function positionStats(locos) {
-  const sc = locos.filter((l) => l.division === 'SC');
-  const kinds = sc.map((l) => workKind(l.working));
-  const tile = (label, n, tone) => h('div', { class: `stat ${tone}` }, h('b', null, String(n)), h('span', null, label));
-  return h('div', { class: 'stats' },
-    tile('In other divisions', locos.length - sc.length, ''),
-    tile('In SC division', sc.length, 'teal'),
-    tile('Working', kinds.filter((k) => k === 'good').length, 'green'),
-    tile('In shed / planned', kinds.filter((k) => k === 'warn').length, 'amber'),
-    tile('Defective', kinds.filter((k) => k === 'bad').length, 'red'));
-}
-
 function viewReport() {
-  const saved = ui.reportId && state.reports.find((r) => r.id === ui.reportId);
-  const isToday = ui.reportDay === today();
-  const day = saved ? saved.day : ui.reportDay;
-  const locos = saved ? saved.locos : (isToday ? state.locos : L.locosOnDay(state, ui.reportDay));
+  const day = ui.reportDay;
+  const isToday = day === today();
+  const locos = isToday ? state.locos : L.locosOnDay(state, day);
   const sheet = reportSheet(locos, day);
-  const fileBase = `DPWS-locos-${L.fmtDay(day)}${saved ? `-${L.fmtTime(saved.at).replace(':', '')}` : ''}`;
-
-  // Sharing today's live report also files a copy, so there is a record of
-  // exactly what was sent each time.
-  const keepCopy = () => {
-    if (saved || !isToday) return;
-    const lastOne = state.reports[state.reports.length - 1];
-    const same = lastOne && lastOne.day === day && lastOne.locos.length === locos.length &&
-      lastOne.locos.every((l, i) => l.id === locos[i].id && L.sameFields(l, locos[i]));
-    if (same) return;
-    const report = { id: L.uid(), at: new Date().toISOString(), day, by: who(), locos: locos.map((l) => ({ ...l })) };
-    setTimeout(() => dispatch({ type: 'addReport', report }), 0);
-  };
+  const fileBase = `DPWS-locos-${L.fmtDay(day)}`;
 
   let note;
-  if (saved) note = `Saved copy of the report sent on ${L.fmtDay(saved.day)} at ${L.fmtTime(saved.at)}.`;
-  else if (isToday) note = 'Current position of all locos. Update locos first, then share.';
-  else if (ui.reportDay > today()) note = 'This date is in the future, showing the current position.';
-  else note = `Position as it stood at the end of ${L.fmtDay(ui.reportDay)}, rebuilt from the saved updates.`;
+  if (isToday) note = 'Current position of all locos. Update locos first, then share.';
+  else if (day > today()) note = 'This date is in the future, showing the current position.';
+  else note = `Position as it stood at the end of ${L.fmtDay(day)}, rebuilt from the saved updates.`;
 
-  const recent = [...state.reports].reverse().slice(0, 30);
   return h('div', null,
     h('div', { class: 'toolbar' },
       h('label', { class: 'inline' }, 'Date',
         h('input', {
           type: 'date', value: day,
-          onchange: (e) => { ui.reportDay = e.target.value || today(); ui.reportId = null; render(); },
+          onchange: (e) => { ui.reportDay = e.target.value || today(); render(); },
         })),
-      (saved || !isToday) && h('button', {
-        class: 'btn', onclick: () => { ui.reportId = null; ui.reportDay = today(); render(); },
-      }, 'Back to today')),
+      !isToday && h('button', { class: 'btn', onclick: () => { ui.reportDay = today(); render(); } }, 'Back to today')),
     h('p', { class: 'hint' }, note),
-    positionStats(locos),
-    exportBar(sheet, fileBase, sheet.rows[0][0].v, () => L.reportText(locos, day), keepCopy),
-    h('div', { class: 'sheet-wrap', id: 'printable' }, sheetTable(sheet)),
-    h('h2', { class: 'section-title' }, 'Reports sent', h('span', { class: 'count' }, state.reports.length)),
-    recent.length
-      ? h('ul', { class: 'rows' }, recent.map((r) => h('li', { class: r.id === ui.reportId ? 'on' : '' },
-        h('button', { class: 'row-main', onclick: () => { ui.reportId = r.id; render(); window.scrollTo(0, 0); } },
-          `${L.fmtDay(r.day)}  ${L.fmtTime(r.at)}${r.by ? `  ${r.by}` : ''}`),
-        h('button', {
-          class: 'link danger',
-          onclick: () => {
-            if (!confirm('Delete this saved report?')) return;
-            if (ui.reportId === r.id) ui.reportId = null;
-            dispatch({ type: 'removeReport', id: r.id });
-          },
-        }, 'Delete'))))
-      : h('p', { class: 'empty' }, 'Nothing yet. Each time you share the report, a copy is kept here.'));
+    exportBar(sheet, fileBase, sheet.rows[0][0].v, () => L.reportText(locos, day)),
+    h('div', { class: 'sheet-wrap', id: 'printable' }, sheetTable(sheet)));
 }
 
 // ---------- History ----------
