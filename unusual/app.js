@@ -879,7 +879,8 @@ function dayRecords(view, items, label) {
       for (const key of order) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' ? 'c-reason' : ''}` }, String(u[key] || '')));
       tr.append(h('td', { class: 'act' },
         h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: Object.fromEntries(order.map((k) => [k, u[k] || ''])) }; render(); } }, 'Edit'),
-        h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await reportPdfBlob([u]), `${reportFile(u)}.pdf`, u.title || 'Unusal')) }, 'Share'),
+        h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await canvasToBlob(await drawReport(u, 1)), `${reportFile(u)}.png`, u.title || 'Unusal')) }, 'Share'),
+        h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await reportPdfBlob([u]), `${reportFile(u)}.pdf`, u.title || 'Unusal')) }, 'PDF'),
         h('button', { class: 'link', onclick: runSafe(() => copyText(L.unusualText([u]))) }, 'Copy text'),
         h('button', { class: 'link', onclick: () => sendWhatsApp(L.unusualText([u])) }, 'WhatsApp'),
         h('button', { class: 'link', onclick: () => openPhotos(u) }, photosOf(u).length ? `Photos (${photosOf(u).length})` : 'Photos'),
