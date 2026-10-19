@@ -198,6 +198,8 @@ const monthLabel = (key) => { const [y, m] = key.split('-').map(Number); return 
 
 // ---------- reading files and pasted text ----------
 
+/** The repercussions of a record: as written, else the ones in its attached official report. */
+const repOf = (u) => String(u.rep || (readOfficial(u) || {}).repercussions || '').trim();
 function readOfficial(u) { try { const o = JSON.parse(u.official); return o && typeof o === 'object' ? o : null; } catch { return null; } }
 
 /** Adds the new reports of a batch (many files, or a sheet of many) in one go, after asking. */
@@ -285,7 +287,7 @@ function bulkAttach() {
 
 function openForm(type, existing) {
   const dlg = document.getElementById('editor');
-  const draft = existing ? { ...existing } : { ...L.blankUnusual(today()), type };
+  const draft = existing ? { ...existing, rep: repOf(existing) } : { ...L.blankUnusual(today()), type };
   const locos = [...new Set(state.locos.map((l) => l.locoNo).filter(Boolean))];
   const close = () => dlg.close();
 
@@ -904,9 +906,9 @@ function dayRecords(view, items, label) {
         continue;
       }
       const tr = h('tr', null, h('td', { class: 'sr' }, String(n)));
-      for (const key of order) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' ? 'c-reason' : ''}` }, String(u[key] || '')));
+      for (const key of order) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' ? 'c-reason' : ''}` }, String((key === 'rep' ? repOf(u) : u[key]) || '')));
       tr.append(h('td', { class: 'act' },
-        h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: Object.fromEntries(order.map((k) => [k, u[k] || ''])) }; render(); } }, 'Edit'),
+        h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: Object.fromEntries(order.map((k) => [k, (k === 'rep' ? repOf(u) : u[k]) || ''])) }; render(); } }, 'Edit'),
         h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await canvasToBlob(await drawReport(u, 1)), `${reportFile(u)}.png`, u.title || 'Unusal')) }, 'Share'),
         h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await reportPdfBlob([u]), `${reportFile(u)}.pdf`, u.title || 'Unusal')) }, 'PDF'),
         h('button', { class: 'link', onclick: runSafe(() => copyText(L.unusualText([u]))) }, 'Copy text'),
