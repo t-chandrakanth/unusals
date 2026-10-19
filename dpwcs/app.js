@@ -43,6 +43,7 @@ const ui = {
   drafts: {}, // the report being typed, kept so a redraw does not lose it
   edit: null, // the saved report being changed in its row
   histSpan: { from: '', to: '' }, // From and To of the History tab
+  histCopy: null, // a report sent earlier, opened as it was sent
   sumDay: '',
 };
 
@@ -745,8 +746,20 @@ function viewReport() {
   const sheet = reportSheet(locos, day);
   const fileBase = `DPWS-locos-${L.fmtDay(day)}`;
 
+  // Sharing today's live report also files a copy of exactly what was sent. The copies are not
+  // listed here: they are in History, under the day they were sent.
+  const keepCopy = () => {
+    if (!isToday) return;
+    const lastOne = state.reports[state.reports.length - 1];
+    const same = lastOne && lastOne.day === day && lastOne.locos.length === locos.length &&
+      lastOne.locos.every((l, i) => l.id === locos[i].id && L.sameFields(l, locos[i]));
+    if (same) return;
+    const report = { id: L.uid(), at: new Date().toISOString(), day, by: who(), locos: locos.map((l) => ({ ...l })) };
+    setTimeout(() => dispatch({ type: 'addReport', report }), 0);
+  };
+
   let note;
-  if (isToday) note = 'Current position of all locos. Update locos first, then share.';
+  if (isToday) note = 'Current position of all locos. Update locos first, then share. A copy of what you share is kept in History.';
   else if (day > today()) note = 'This date is in the future, showing the current position.';
   else note = `Position as it stood at the end of ${L.fmtDay(day)}, rebuilt from the saved updates.`;
 
@@ -759,7 +772,7 @@ function viewReport() {
         })),
       !isToday && h('button', { class: 'btn', onclick: () => { ui.reportDay = today(); render(); } }, 'Back to today')),
     h('p', { class: 'hint' }, note),
-    exportBar(sheet, fileBase, sheet.rows[0][0].v, () => L.reportText(locos, day)),
+    exportBar(sheet, fileBase, sheet.rows[0][0].v, () => L.reportText(locos, day), keepCopy),
     h('div', { class: 'sheet-wrap', id: 'printable' }, sheetTable(sheet)));
 }
 
@@ -794,7 +807,39 @@ function stackSheets(sheets, name) {
   return { name, cols: sheets[0].cols, rows };
 }
 
+/** One report as it was sent: the sheet, the ways to share it again, and a way to remove the copy. */
+function viewSentCopy(copy) {
+  const sheet = reportSheet(copy.locos, copy.day);
+  const when = `${L.fmtDay(copy.day)} ${L.fmtTime(copy.at)}${copy.by ? ` ${copy.by}` : ''}`;
+  return h('div', null,
+    h('div', { class: 'toolbar wrap' },
+      h('button', { class: 'btn', onclick: () => { ui.histCopy = null; render(); } }, '\u2190 Back'),
+      h('button', {
+        class: 'btn small danger',
+        onclick: () => {
+          if (!confirm('Delete this saved copy?')) return;
+          ui.histCopy = null;
+          dispatch({ type: 'removeReport', id: copy.id });
+        },
+      }, 'Delete this copy')),
+    h('p', { class: 'hint' }, `The report as it was sent on ${when}.`),
+    exportBar(sheet, `DPWS-locos-${L.fmtDay(copy.day)}-${L.fmtTime(copy.at).replace(':', '')}`, sheet.rows[0][0].v, () => L.reportText(copy.locos, copy.day)),
+    h('div', { class: 'sheet-wrap', id: 'printable' }, sheetTable(sheet)));
+}
+
+/** The copies of the report sent on a day, as buttons: the time and who sent it. */
+function sentCopies(day) {
+  const sent = state.reports.filter((x) => x.day === day).sort((a, b) => a.at.localeCompare(b.at));
+  if (!sent.length) return null;
+  return h('div', { class: 'sentrow' }, h('span', null, 'Sent:'), sent.map((x) => h('button', {
+    class: 'qchip', title: 'Open the report as it was sent',
+    onclick: () => { ui.histCopy = x.id; render(); window.scrollTo(0, 0); },
+  }, `${L.fmtTime(x.at)}${x.by ? `  ${x.by}` : ''}`)));
+}
+
 function viewHistoryDay() {
+  const copy = ui.histCopy && state.reports.find((x) => x.id === ui.histCopy);
+  if (copy) return viewSentCopy(copy);
   const r = (ui.histSpan.from || ui.histSpan.to) ? ui.histSpan : { from: today(), to: today() };
   const set = (from, to) => {
     if (from && to && from > to) [from, to] = [to, from]; // typed the wrong way round
@@ -816,6 +861,7 @@ function viewHistoryDay() {
     exportBar(stacked, `DPWS-locos-${label.replace(/[^0-9A-Za-z]+/g, '-')}`, heading, () => perDay.map((x) => L.reportText(x.locos, x.d)).join('\n\n')),
     h('div', { class: 'sheet-wrap', id: 'printable' }, perDay.map((x, i) => [
       h('h2', { class: 'section-title' }, L.fmtDay(x.d), h('span', { class: 'count' }, String(x.locos.length))),
+      sentCopies(x.d),
       sheetTable(x.sheet),
     ])));
 }

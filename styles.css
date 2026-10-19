@@ -608,3 +608,7 @@ td.c-reason .evbox { min-width: 300px; }
 .rangebar .dfield input { width: auto; min-width: 150px; }
 .rangebar .btn.small { min-height: 40px; padding: 0 18px; font-weight: 700; }
 .rangebar .btn.small.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+/* ---- the copies of the report that were sent, under their day in History ---- */
+.sentrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: -2px 0 10px; font-size: 13px; color: var(--soft); font-weight: 700; }
+.sentrow .qchip { font-weight: 700; }
