@@ -5,7 +5,7 @@ export const FIELDS = [
   'hoTrain', 'hoPoint', 'hoTime', 'foisDate', 'working', 'remarks', 'sameSerial',
 ];
 
-export const UNUSUAL_FIELDS = ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'detFrom', 'detTo', 'rep', 'incident', 'official', 'type', 'wagonNo', 'bpcNo', 'app', 'block', 'stalling'];
+export const UNUSUAL_FIELDS = ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'detFrom', 'detTo', 'rep', 'incident', 'official', 'type', 'wagonNo', 'bpcNo', 'app', 'block', 'stalling', 'photos'];
 
 export const DIVISIONS ={ OTHER: 'Other division', SC: 'SC division' };
 
@@ -127,7 +127,7 @@ export function isUpdated(loco, since) {
 }
 
 export function blankUnusual(day) {
-  return { id: uid(), day, time: '', title: '', location: '', trainNo: '', locoNo: '', load: '', reason: '', det: '', detFrom: '', detTo: '', rep: '', incident: '', official: '', type: '', wagonNo: '', bpcNo: '', app: '', block: '' };
+  return { id: uid(), day, time: '', title: '', location: '', trainNo: '', locoNo: '', load: '', reason: '', det: '', detFrom: '', detTo: '', rep: '', incident: '', official: '', type: '', wagonNo: '', bpcNo: '', app: '', block: '', photos: '' };
 }
 
 /**

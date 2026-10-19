@@ -345,3 +345,7 @@ html.embed .top .clock { margin: 2px 0 0; font-size: 12px; }
 html.embed .top .top-meta { margin: 2px 0 0; }
 html.embed .tabs { padding: 8px 12px; }
 html.embed main { padding-top: 14px; }
+
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin: 10px 0; }
+.photo-grid figure { margin: 0; display: grid; gap: 4px; justify-items: start; }
+.photo-grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }

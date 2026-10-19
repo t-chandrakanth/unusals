@@ -9,7 +9,9 @@ import { diffOps } from '../js/syncdata.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
 import { unusualSheet, blockSheet } from '../js/sheet.js';
 import { blankBlock, blankRow, computeBlock, blockMessage, blockTitle, rowDetention, longMins } from '../js/block.js';
-import { buildPdf } from '../js/pdf.js';
+import { buildPdf, buildPdfPages } from '../js/pdf.js';
+import { drawReport } from '../js/unusalcanvas.js';
+import { photosOf, reportFile } from '../js/unusalreport.js';
 import { eventsEditor } from '../js/events.js';
 import { blankStalling, readStalling, detShort, whatsappText, reportTitle, detentionText, hasContent, remarksText, markPosition } from '../js/stalling.js';
 import { drawStalling } from '../js/stallingcanvas.js';
@@ -421,6 +423,8 @@ function card(u, showTag) {
         await shareOrDownload(await canvasToBlob(sheetToCanvas(unusualSheet([u]))), `Unusal-${L.fmtDay(u.day)}-${(u.trainNo || 'report').replace(/[^0-9A-Za-z]+/g, '-')}.png`, `UNUSALS-DATE-${L.fmtDay(u.day)}`);
       }) }, 'Share image'),
       h('button', { class: 'link', onclick: run(() => copyText(L.unusualText([u]))) }, 'Copy as text'),
+      h('button', { class: 'link', onclick: run(async () => shareOrDownload(await reportPdfBlob([u]), `${reportFile(u)}.pdf`, u.title || 'Unusal')) }, 'PDF'),
+      h('button', { class: 'link', onclick: () => openPhotos(u) }, photosOf(u).length ? `Photos (${photosOf(u).length})` : 'Add photos'),
       kind === 'loco' && h('button', { class: 'link', onclick: () => openStallingForm(null, u) }, 'Stalling report'),
       h('button', {
         class: 'link danger',
@@ -435,13 +439,61 @@ function card(u, showTag) {
 
 // ---------- screens ----------
 
-function exportBar(sheet, base, title, getText) {
+function exportBar(sheet, base, title, getText, reports) {
   const run = (fn) => async () => { try { await fn(); } catch (e) { console.error(e); toast('Something went wrong. Please try again.'); } };
   return h('div', { class: 'actions' },
     h('button', { class: 'btn primary', onclick: run(async () => shareOrDownload(await canvasToBlob(sheetToCanvas(sheet)), `${base}.png`, title)) }, 'Share image'),
     h('button', { class: 'btn', onclick: run(async () => shareOrDownload(new Blob([sheetToXlsx(sheet)], { type: XLSX_TYPE }), `${base}.xlsx`, title)) }, 'Excel file'),
     h('button', { class: 'btn', onclick: run(() => copyText(getText())) }, 'Copy as text'),
+    reports && h('button', { class: 'btn', onclick: run(async () => { toast('Making the PDF...'); shareOrDownload(await reportPdfBlob(L.unusualsInOrder(reports)), `${base}.pdf`, title); }) }, 'PDF, a page each'),
     h('button', { class: 'btn whatsapp', onclick: () => sendWhatsApp(getText()) }, 'Send on WhatsApp'));
+}
+
+/** Each report as a page like the report format (details, events, remarks, repercussions, photographs), in one PDF. */
+async function reportPdfBlob(list) {
+  const pages = [];
+  for (const u of list) {
+    const canvas = await drawReport(u, 1);
+    const jpeg = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.9));
+    pages.push({ jpeg: new Uint8Array(await jpeg.arrayBuffer()), w: canvas.width, h: canvas.height });
+  }
+  return new Blob([buildPdfPages(pages)], { type: 'application/pdf' });
+}
+
+const MAX_PHOTOS = 6;
+
+/** The photographs of a record: take or choose them, look at them, remove one. They go on the PDF. */
+function openPhotos(u) {
+  const dlg = document.getElementById('editor');
+  let list = photosOf(u);
+  const build = () => {
+    const add = async (input) => {
+      const files = [...input.files].slice(0, MAX_PHOTOS - list.length);
+      input.value = '';
+      if (!files.length) return;
+      toast('Adding the photos...');
+      for (const f of files) { try { list.push(await pictureData(f, 900)); } catch { toast('That photo could not be read.'); } }
+      build();
+    };
+    const tile = (label, capture) => {
+      const input = h('input', { type: 'file', accept: 'image/*', multiple: !capture, hidden: true, onchange: () => add(input) });
+      if (capture) input.setAttribute('capture', 'environment');
+      return h('button', { type: 'button', class: 'btn', disabled: list.length >= MAX_PHOTOS, onclick: () => input.click() }, label, input);
+    };
+    dlg.replaceChildren(h('div', { class: 'editor' },
+      h('h2', null, `Photos: ${u.title || 'report'}`),
+      h('p', { class: 'hint' }, `Up to ${MAX_PHOTOS} photos. They are saved with the report and printed on its PDF.`),
+      h('div', { class: 'photo-grid' }, list.length
+        ? list.map((src, i) => h('figure', null, h('img', { src, alt: `Photo ${i + 1}` }),
+          h('button', { type: 'button', class: 'link danger', onclick: () => { list.splice(i, 1); build(); } }, 'Remove')))
+        : h('p', { class: 'nothing' }, 'No photos yet.')),
+      h('div', { class: 'actions' }, tile('Camera', true), tile('Gallery', false)),
+      h('div', { class: 'editor-actions' },
+        h('button', { type: 'button', class: 'btn primary', onclick: () => { dlg.close(); save({ ...u, photos: list.length ? JSON.stringify(list) : '' }); toast('Photos saved'); render(); } }, 'Save'),
+        h('button', { type: 'button', class: 'btn', onclick: () => dlg.close() }, 'Cancel'))));
+  };
+  build();
+  dlg.showModal();
 }
 
 /** The daily message for a day: counts, then a short line for each report. */
@@ -840,7 +892,7 @@ function dayRecords(view, items, label) {
   const head = h('thead', null, h('tr', null, h('th', { class: 'sr' }, '#'), order.map((k) => h('th', null, LABEL[k])), h('th', { class: 'act' }, '')));
   const heading = `SCR UNUSALS ${label}`;
   return h('div', null,
-    items.length > 0 && exportBar(unusualSheet(items, 'Unusals'), `Unusals-${label.replace(/[^0-9A-Za-z]+/g, '-')}`, heading, () => `*${heading}*\n\n${L.unusualText(items)}`),
+    items.length > 0 && exportBar(unusualSheet(items, 'Unusals'), `Unusals-${label.replace(/[^0-9A-Za-z]+/g, '-')}`, heading, () => `*${heading}*\n\n${L.unusualText(items)}`, items),
     items.length
       ? h('div', { class: 'cells-wrap' }, h('table', { class: 'cells' }, head, body))
       : h('p', { class: 'empty-big' }, 'No report in these dates. Write one in the box above: it is saved on the date shown there.'));
