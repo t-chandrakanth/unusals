@@ -542,7 +542,8 @@ function openBlockForm(existing, inline) {
 
   const build = () => {
     detEls.length = 0;
-    const dirs = h('div', { class: 'segs' }, ['UP', 'DN'].map((v) => h('button', { type: 'button', class: `seg ${b.dir === v ? 'on' : ''}`, onclick: () => { b.dir = v; build(); } }, v)));
+    // UP, DN, or NO DIRECTION when the block has none to name: the heading then leaves the direction out
+    const dirs = h('div', { class: 'segs' }, [['UP', 'UP'], ['DN', 'DN'], ['', 'NO DIRECTION']].map(([v, text]) => h('button', { type: 'button', class: `seg ${(b.dir || '') === v ? 'on' : ''}`, onclick: () => { b.dir = v; build(); } }, text)));
     const rowsBox = h('div', { class: 'rep-rows' },
       h('div', { class: 'rep-head' }, ['S', 'Tr.no', 'At stn', 'From', 'To', 'Det mins'].map((t) => h('span', null, t))),
       b.rows.map((r, i) => h('div', { class: 'rep-row' },

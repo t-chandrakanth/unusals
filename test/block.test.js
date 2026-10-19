@@ -140,3 +140,9 @@ test('the table of a block report has the title, the block lines and a row for e
   assert.ok(text.some((t) => t === '1 | KSNK | CT | 11:30 HRS | 15:57 HRS | 267 MINS'));
   assert.ok(text.some((t) => t === '2 | PSNH | CT | 12:34 HRS | STILL NOT DEPARTED | 276 MINS (UP TO 17:10 HRS)'));
 });
+
+test('a block with no direction leaves the direction out of the heading', () => {
+  assert.equal(blockTitle({ name: 'PQRS', dir: '', station: 'WP-BG' }), 'PQRS BLOCK PERMITTED B/W WP-BG STATION');
+  assert.equal(blockTitle({ name: 'PQRS', dir: '', station: 'WP' }), 'PQRS BLOCK PERMITTED AT WP STATION');
+  assert.equal(blockTitle({ name: 'PQRS', station: 'WP-BG' }), 'PQRS BLOCK PERMITTED B/W WP-BG STATION');
+});

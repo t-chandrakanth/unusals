@@ -1,5 +1,5 @@
 // Offline support for SCR UNUSALS: the network when there is one, the last saved copy when there is not.
-const CACHE = 'scr-unusals-v31';
+const CACHE = 'scr-unusals-v32';
 const FILES = [
   './', 'index.html', 'app.css', 'app.js', 'records.js', 'stats.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/tigoods.png', '../icons/logo.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
