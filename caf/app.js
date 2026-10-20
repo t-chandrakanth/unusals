@@ -75,7 +75,7 @@ function show() {
       <table><thead><tr><th>SNO</th><th>VIA CAF</th><th class="p">SNO</th><th>VIA CAF, JSGR, JSG</th><th class="p">SNO</th><th>VIA CAF, JBP</th></tr></thead><tbody>${rows}</tbody></table></section>`);
   }
   if (missing.size) {
-    out.insertAdjacentHTML('afterbegin', `<p class="small bad">No state found for ${esc([...missing].join(', '))}. Add ${missing.size > 1 ? 'them' : 'it'} under "Stations", as CODE = ZONE, State.</p>`);
+    out.insertAdjacentHTML('afterbegin', `<p class="small bad">No state found for ${esc([...missing].join(', '))}. Add ${missing.size > 1 ? 'them' : 'it'} under "New train names", as NAME = BRACKET, State.</p>`);
   }
   if (!list.length) out.innerHTML = '<p class="small">Paste a sheet above to see the CAF bound trains.</p>';
 }

@@ -12,35 +12,39 @@ const SHEET = [
   '13\tJSLK CAF\tMNSM\tSECR\t17:50 18/10\t41:03\t\tJ/L\t43845\t\tMAGH\t\t\t',
   '14\tFN-1 JHS NEXT TO BV\tBZA\tNR\t12:28 19/10\t17:57\t97.7\tNMG\t44135\t\tRECH\tDep\t05:54 20-10\t',
   '15\tHSPG/BFNV CAF JSGR\tHYB\tSER\t07:05 19/10\t23:20\t127.84\tS/E\t44342\t\tMCI\tDep\t05:43 20-10\t',
+  'BLOCK BPQ-CAF INCLUDING UP YARD FROM 03:15 TO 06:45/ 06:50',
+  'CAF = 07',
 ].join('\n');
 
-test('the trains of a pasted sheet are read by their headings, the second S.NO being Arr / Dep', () => {
+test('the trains of a pasted sheet are read by their headings, the second S.NO being Arr / Dep; notes below the table are not trains', () => {
   const t = parseSheet(SHEET);
   assert.equal(t.length, 7);
   assert.deepEqual(t[2], { train: 'RBL-42 CAF JBP STB', ex: 'BZA', zone: 'NR', loco: '23677+23754', location: 'VHGN', status: 'Arr', hoTime: '22:17 16-10', remarks: 'STB RTM' });
 });
 
 const LOOKUP = {
-  stations: {
-    SOP: ['Shiupur', '', ''], RBL: ['Rae Bareli Junction', 'Uttar Pradesh', ''], GAR: ['Gadarwara', 'Madhya Pradesh', 'WCR'], BZU: ['Betul', 'Madhya Pradesh', ''],
-    HSPG: ['Hspg', 'Karnataka', 'SWR'],
-  },
-  own: { SOP: ['NR', 'Uttar Pradesh'] },
+  stations: { HSPG: ['Hospet', 'Karnataka', 'SWR'], SIC: ['Sonik', '', ''], ZZZ: ['Zed', 'Goa', ''] },
+  own: { HACG: ['DHN', 'Uttar Pradesh'] },
 };
 
-test('only CAF bound trains, in the column of their route, each with the zone and state of the station in its name', () => {
+test('only CAF bound trains, in the column of their route, each with the bracket and state its name has always had', () => {
   const p = cafPosition(SHEET, LOOKUP);
-  assert.deepEqual(p.jbp, ['SOP (NR) Uttar Pradesh RECH Arr 23:25 19-10', 'RBL (NR) Uttar Pradesh VHGN Arr 22:17 16-10']);
-  assert.deepEqual(p.caf, ['GAR/BZU (WCR) Madhya Pradesh AT UTCG', 'JSLK (?) AT MAGH']);
+  assert.deepEqual(p.jbp, ['SOP (LKO) Uttar Pradesh RECH Arr 23:25 19-10', 'RBL (LOK) Uttar Pradesh VHGN Arr 22:17 16-10']);
+  assert.deepEqual(p.caf, ['GAR/BZU (NAG) Madhya Pradesh AT UTCG', 'JSLK (BSP) Chattisgarh AT MAGH']);
   assert.deepEqual(p.jsg, ['HSPG/BFNV (SWR) Karnataka MCI Dep 05:43 20-10']);
   assert.equal(count(p), 5);
-  assert.deepEqual(p.unknown, ['JSLK']);
+  assert.deepEqual(p.unknown, []);
 });
 
-test('the zone and state of a name: own lines first, a station with no zone gets the usual zone of its state, any part of the name may be the station', () => {
-  assert.deepEqual(originOf('RBL', LOOKUP), { code: 'RBL', station: 'Rae Bareli Junction', state: 'Uttar Pradesh', zone: 'NR' });
-  assert.deepEqual(originOf('SOP', LOOKUP), { code: 'SOP', zone: 'NR', state: 'Uttar Pradesh' });
-  assert.equal(originOf('ZZZ/GAR', LOOKUP).zone, 'WCR');
+test('the bracket and state of a name: own lines, then the known ones, then the station list; any part of the name may be it', () => {
+  assert.deepEqual(originOf('RBL', LOOKUP), { code: 'RBL', bracket: 'LOK', state: 'Uttar Pradesh' });
+  assert.deepEqual(originOf('HACG', LOOKUP), { code: 'HACG', bracket: 'DHN', state: 'Uttar Pradesh' });
+  assert.deepEqual(originOf('NTV NMG', LOOKUP), { code: 'NTV', bracket: 'LJN', state: 'Uttar Pradesh' });
+  assert.equal(originOf('QQQ/GAR', LOOKUP).bracket, 'NAG');
+  assert.equal(originOf('BIA 20RP', LOOKUP).state, 'Chattisgarh');
+  // not known by the message: the station list gives the state, and the zone for the bracket
+  assert.deepEqual(originOf('HSPG', LOOKUP), { code: 'HSPG', station: 'Hospet', state: 'Karnataka', bracket: 'SWR' });
+  assert.equal(originOf('ZZZ', LOOKUP).bracket, 'KR');
   assert.equal(originOf('QQQ', LOOKUP), null);
 });
 
@@ -62,11 +66,5 @@ test('rows pasted without headings are read in the usual column order; the text 
   assert.equal(t[0].hoTime, '23:25 19-10');
   const text = cafText('TODAY', '19-10-2026', cafPosition(SHEET, LOOKUP));
   assert.match(text, /^\*TODAY -05- CAF BOUND TRAINS 19-10-2026\*/);
-  assert.match(text, /\*VIA CAF, JBP\*\n1\. SOP \(NR\) Uttar Pradesh RECH Arr 23:25 19-10/);
-});
-
-test('a name of two words is read word by word as well as by its slashes', () => {
-  const lk = { stations: { NTV: ['Nautanwa', 'Uttar Pradesh', ''] } };
-  assert.equal(originOf('NTV NMG', lk).state, 'Uttar Pradesh');
-  assert.equal(originOf('NMG NTV', lk).zone, 'NR');
+  assert.match(text, /\*VIA CAF, JBP\*\n1\. SOP \(LKO\) Uttar Pradesh RECH Arr 23:25 19-10/);
 });

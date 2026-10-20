@@ -77,8 +77,8 @@
   </div>
   <div id="out"></div>
   <details id="zones">
-    <summary>Stations (zone and state of a train)</summary>
-    <p class="small">The zone and state of a train come from the first part of its name that is a station code in the station list (GAR/BZU is Gadarwara, Madhya Pradesh, WCR). A code the list does not know, or knows without a state, shows (?): add it here, one on a line, as <b>CODE = ZONE, State</b> (for example <b>SOP = NR, Uttar Pradesh</b>). It is remembered on this device.</p>
+    <summary>New train names (bracket and state)</summary>
+    <p class="small">The bracket and state of a train are the ones its name has always had in the morning CAF message (RBL is (LOK) Uttar Pradesh, GAR/BZU is (NAG) Madhya Pradesh). A name that is new shows (?), or only the zone from the station list: add it here, one on a line, as <b>NAME = BRACKET, State</b> (for example <b>BCNE = NAG, Maharashtra</b>). It is remembered on this device.</p>
     <textarea id="zt" rows="8"></textarea>
     <div class="actions" style="margin-top:8px"><button class="btn" id="zsave">Save</button><button class="btn" id="zreset">Clear my entries</button></div>
   </details>

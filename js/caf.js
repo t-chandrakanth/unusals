@@ -4,7 +4,31 @@
 
 import { parseTsv } from './paste.js';
 
-/** The railway zone a state mostly belongs to: used when the station list has the state but not the zone. */
+/**
+ * What the morning CAF message has always said for a train, by the first part of its name:
+ * "RBL (LOK) Uttar Pradesh" -> RBL: ['LOK', 'Uttar Pradesh']. Taken from the sheet of past messages and
+ * added to in the app ("Stations").
+ */
+export const KNOWN = {
+  SEBD: ['SBP', 'Odisha'], SMER: ['SBP', 'Odisha'], UCSD: ['CKP', 'Odisha'], FCK: ['SDAH', 'West Bengal'], KGP: ['KGP', 'West Bengal'],
+  DKAE: ['HWH', 'West Bengal'], DSTP: ['ASN', 'West Bengal'], NJP: ['KIR', 'West Bengal'], MCCS: ['MLDT', 'West Bengal'],
+  WENA: ['DNR', 'Bihar'], MPIB: ['DNR', 'Bihar'], FUT: ['DNR', 'Bihar'], BXR: ['DNR', 'Bihar'], KIUL: ['DNR', 'Bihar'], PRNA: ['KIR', 'Bihar'],
+  BJU: ['SEE', 'Bihar'], PHE: ['DDU', 'Bihar'], UCPD: ['DNR', 'Jharkhand'], DUMK: ['ASN', 'Jharkhand'], MDP: ['ASN', 'Jharkhand'],
+  BKSC: ['ADRA', 'Jharkhand'], HZBN: ['DHN', 'Jharkhand'], HZD: ['DHN', 'Jharkhand'], NGRH: ['DHN', 'Jharkhand'], DHN: ['DHN', 'Jharkhand'],
+  KPSH: ['DHN', 'Jharkhand'], SBGG: ['MLDT', 'Jharkhand'], HTE: ['RNC', 'Jharkhand'], NKM: ['RNC', 'Rajasthan'],
+  BTC: ['NAG', 'Madhya Pradesh'], GAR: ['NAG', 'Madhya Pradesh'], JKE: ['JBP', 'Madhya Pradesh'], NTPB: ['JBP', 'Madhya Pradesh'],
+  G: ['NAG', 'Maharashtra'], PMAM: ['NAG', 'Maharashtra'], WSA: ['NAG', 'Maharashtra'], BIA: ['R', 'Chattisgarh'], MBPB: ['R', 'Chattisgarh'],
+  BXA: ['R', 'Chattisgarh'], MVIS: ['R', 'Chattisgarh'], CCMH: ['R', 'Chattisgarh'], DURG: ['R', 'Chattisgarh'], MNBK: ['R', 'Chattisgarh'],
+  RSD: ['R', 'Chattisgarh'], MSMM: ['R', 'Chattisgarh'], BSPC: ['R', 'Chattisgarh'], MNDH: ['R', 'Chattisgarh'], BLSN: ['SBP', 'Chattisgarh'],
+  JSLK: ['BSP', 'Chattisgarh'], KHS: ['BSP', 'Chattisgarh'], AKT: ['BSP', 'Chattisgarh'], NYN: ['PRYJ', 'Uttar Pradesh'], PRYJ: ['PRYJ', 'Uttar Pradesh'],
+  IDGJ: ['PRYJ', 'Uttar Pradesh'], PNKD: ['PRYJ', 'Uttar Pradesh'], CPC: ['PRYJ', 'Uttar Pradesh'], SIC: ['PRYJ', 'Uttar Pradesh'],
+  SUBR: ['LJN', 'Uttar Pradesh'], JEA: ['LJN', 'Uttar Pradesh'], BKT: ['LJN', 'Uttar Pradesh'], BST: ['LJN', 'Uttar Pradesh'], NTV: ['LJN', 'Uttar Pradesh'],
+  RBL: ['LOK', 'Uttar Pradesh'], AYC: ['LKO', 'Uttar Pradesh'], FGTP: ['LKO', 'Uttar Pradesh'], SOP: ['LKO', 'Uttar Pradesh'],
+  HACG: ['DHN', 'Uttar Pradesh'], DEOS: ['BSB', 'Uttar Pradesh'], BE: ['BRY', 'Uttar Pradesh'], CGS: ['RNY', 'Assam'], BRGB: ['RNY', 'Assam'],
+  JRNA: ['LMG', 'Tripura'],
+};
+
+/** The railway zone a state mostly belongs to: the last resort for the bracket when nothing else says. */
 export const STATE_ZONE = {
   'Uttar Pradesh': 'NR', 'Uttarakhand': 'NR', 'Delhi': 'NR', 'Punjab': 'NR', 'Haryana': 'NR', 'Himachal Pradesh': 'NR', 'Jammu and Kashmir': 'NR',
   'Rajasthan': 'NWR', 'Gujarat': 'WR', 'Madhya Pradesh': 'WCR', 'Maharashtra': 'CR', 'Chhattisgarh': 'SECR', 'Odisha': 'ECoR',
@@ -40,10 +64,10 @@ export function parseSheet(text) {
     body = rows;
   }
   return body.map((r) => {
-    const o = {};
+    const o = { rowCells: r.filter(Boolean).length };
     cols.forEach((c, i) => { if (c) o[c] = r[i] || ''; });
-    return { train: o.train || '', ex: o.ex || '', zone: o.zone || '', loco: o.loco || '', location: o.location || '', status: o.status || '', hoTime: o.hoTime || '', remarks: o.remarks || '' };
-  }).filter((t) => t.train);
+    return { rowCells: o.rowCells, train: o.train || '', ex: o.ex || '', zone: o.zone || '', loco: o.loco || '', location: o.location || '', status: o.status || '', hoTime: o.hoTime || '', remarks: o.remarks || '' };
+  }).filter((t) => t.train && t.rowCells >= 3 && !/^BLOCK\b|=/i.test(t.train)).map(({ rowCells, ...t }) => t);
 }
 
 /** "CPC/SIC-42 CAF, JBP" -> "CPC/SIC"; "RBL-42-1 CAF JBP STB" -> "RBL"; "NTV NMG" stays. */
@@ -61,24 +85,26 @@ export function routeOf(t) {
 }
 
 /**
- * The zone and state a train belongs to: the first part of its name that is a station code in the
- * station list ("GAR/BZU" -> Gadarwara, Madhya Pradesh, WCR). lookup = { stations: { CODE: [name, state, zone] },
- * own: { CODE: [zone, state] } } (own entries, typed in the app, come first). null when no part is a known station.
+ * The bracket and state of a train, from the first part of its name that is known: first what the morning
+ * message has always said (KNOWN, then the entries typed in the app), else the station list (state, and
+ * the zone for the bracket). lookup = { stations: { CODE: [name, state, zone] }, own: { CODE: [bracket, state] } }.
+ * null when no part of the name is known at all.
  */
 export function originOf(name, lookup = {}) {
   const stations = lookup.stations || {};
   const own = lookup.own || {};
+  const codes = String(name || '').toUpperCase().split(/[\/\s]+/).map((c) => c.replace(/^-+|-+$/g, '')).filter((c) => c && !/^\d+$/.test(c) && c !== 'CAF');
+  for (const code of codes) {
+    const hit = own[code] || KNOWN[code];
+    if (hit) return { code, bracket: hit[0] || '', state: hit[1] || '' };
+  }
   let found = null;
-  for (const raw of String(name || '').toUpperCase().split(/[\/\s]+/)) {
-    const code = raw.trim();
-    if (!code || /^\d+$/.test(code)) continue;
-    let rec = null;
-    if (own[code]) rec = { code, zone: own[code][0] || '', state: own[code][1] || '' };
-    else if (stations[code]) rec = { code, station: stations[code][0], state: stations[code][1] || '', zone: stations[code][2] || '' };
-    if (!rec) continue;
-    if (!rec.zone && rec.state) rec.zone = STATE_ZONE[rec.state] || '';
-    if (rec.zone && rec.state) return rec;
-    if (!found || (!found.state && rec.state) || (!found.zone && rec.zone)) found = { ...found, ...Object.fromEntries(Object.entries(rec).filter(([, v]) => v)) };
+  for (const code of codes) {
+    const st = stations[code];
+    if (!st) continue;
+    const rec = { code, station: st[0], state: st[1] || '', bracket: st[2] || STATE_ZONE[st[1]] || '' };
+    if (rec.state && rec.bracket) return rec;
+    if (!found || (!found.state && rec.state)) found = rec;
   }
   return found;
 }
@@ -94,10 +120,10 @@ export function standing(t) {
   return t.ex.trim() ? `AT ${t.ex.trim().toUpperCase()}` : '';
 }
 
-/** One line: "RBL (NR) Uttar Pradesh VHGN Arr 22:17 16-10": the zone and state of the station the train name is made of. */
+/** One line: "RBL (LOK) Uttar Pradesh VHGN Arr 22:17 16-10": the bracket and state the train's name has always had in the morning message. */
 export function entryText(t, lookup = {}) {
   const o = originOf(baseName(t.train), lookup);
-  return [baseName(t.train), `(${(o && o.zone) || '?'})`, o ? o.state : '', standing(t)].filter(Boolean).join(' ');
+  return [baseName(t.train), `(${(o && o.bracket) || '?'})`, o ? o.state : '', standing(t)].filter(Boolean).join(' ');
 }
 
 /** { caf: [lines], jsg: [lines], jbp: [lines], unknown: [train names whose state is not known] } of the CAF bound trains of one sheet. */
