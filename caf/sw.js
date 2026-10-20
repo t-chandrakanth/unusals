@@ -1,6 +1,6 @@
 // Offline support for CAF Bound Position: the network when there is one, the last saved copy when there is not.
-const CACHE = 'caf-bound-v2';
-const FILES = ['./', 'index.html', 'app.js', 'stations.json', 'manifest.webmanifest', '../js/caf.js', '../js/paste.js', '../js/historyimport.js', '../js/canvas.js', '../js/sheet.js', '../js/xlsx.js', '../js/pdf.js', '../js/logic.js', '../js/block.js', '../js/events.js', '../js/repercussions.js', '../icons/icon-192.png', '../icons/icon-512.png'];
+const CACHE = 'caf-bound-v3';
+const FILES = ['./', 'index.html', 'app.js', 'stations.json', 'manifest.webmanifest', '../js/caf.js', '../js/filetext.js', '../js/paste.js', '../js/historyimport.js', '../js/canvas.js', '../js/sheet.js', '../js/xlsx.js', '../js/pdf.js', '../js/logic.js', '../js/block.js', '../js/events.js', '../js/repercussions.js', '../icons/icon-192.png', '../icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));

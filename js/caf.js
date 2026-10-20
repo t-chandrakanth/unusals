@@ -47,27 +47,28 @@ const PLAIN = ['sno', 'train', 'ex', 'zone', 'start', 'hor', 'km', 'stock', 'loc
 /** The trains of a pasted sheet: [{ train, ex, zone, loco, location, status, hoTime, remarks }]. */
 export function parseSheet(text) {
   const rows = parseTsv(text).filter((r) => r.some(Boolean));
-  const at = rows.findIndex((r) => r.map(key).includes('trainno'));
-  let cols;
-  let body;
-  if (at >= 0) {
-    // the second S.NO column is the Arr / Dep one
-    let seen = 0;
-    cols = rows[at].map((c) => {
-      const k = key(c);
-      if (k === 'sno') return seen++ ? 'status' : 'sno';
-      return HEADS[k] || k;
-    });
-    body = rows.slice(at + 1);
-  } else {
-    cols = PLAIN;
-    body = rows;
+  const isHead = (r) => r.map(key).includes('trainno');
+  // each heading row names the columns of the rows under it (a picture's rows come under a heading of their own)
+  let cols = PLAIN;
+  let live = !rows.some(isHead);
+  const body = [];
+  for (const r of rows) {
+    if (isHead(r)) {
+      // the second S.NO column is the Arr / Dep one
+      let seen = 0;
+      cols = r.map((c) => {
+        const k = key(c);
+        if (k === 'sno') return seen++ ? 'status' : 'sno';
+        return HEADS[k] || k;
+      });
+      live = true;
+    } else if (live) body.push({ r, cols });
   }
-  return body.map((r) => {
+  return body.map(({ r, cols }) => {
     const o = { rowCells: r.filter(Boolean).length };
     cols.forEach((c, i) => { if (c) o[c] = r[i] || ''; });
     return { rowCells: o.rowCells, train: o.train || '', ex: o.ex || '', zone: o.zone || '', loco: o.loco || '', location: o.location || '', status: o.status || '', hoTime: o.hoTime || '', remarks: o.remarks || '' };
-  }).filter((t) => t.train && t.rowCells >= 3 && !/^BLOCK\b|=/i.test(t.train)).map(({ rowCells, ...t }) => t);
+  }).filter((t) => t.train && t.rowCells >= 2 && !/^BLOCK\b|=/i.test(t.train)).map(({ rowCells, ...t }) => t);
 }
 
 /** "CPC/SIC-42 CAF, JBP" -> "CPC/SIC"; "RBL-42-1 CAF JBP STB" -> "RBL"; "NTV NMG" stays. */
@@ -167,4 +168,38 @@ export function cafSheet(prefix, date, p) {
 export function cafText(prefix, date, p) {
   const part = (title, list) => (list.length ? [`*${title}*`, ...list.map((l, i) => `${i + 1}. ${l}`), ''] : []);
   return [`*${cafTitle(prefix, date, p)}*`, '', ...part('VIA CAF', p.caf), ...part('VIA CAF, JSGR, JSG', p.jsg), ...part('VIA CAF, JBP', p.jbp)].join('\n').trim();
+}
+
+// ---------- a picture of the sheet ----------
+
+const ROUTE_WORDS = new Set(['JBP', 'JSG', 'JSGR', 'JHS', 'NP', 'NGP', 'STB', 'STR', 'INV', 'VIA']);
+
+/**
+ * The CAF trains in the text a picture was read as (a line of the table with its cells run together, as the
+ * picture reader gives them) -> rows in the sheet's own columns, as text with tabs, under a heading row. Lines
+ * of the picture that are not CAF trains are left out. The reading of a picture can be wrong in a letter or a
+ * number, so the rows are shown for checking.
+ */
+export function ocrToRows(text) {
+  const out = [];
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.replace(/[|\u00a6]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!/\bCAF\b/i.test(line)) continue;
+    const words = line.replace(/^(\d+|IMP)\s+/i, '').split(' ');
+    const at = words.findIndex((w) => /^CAF,?$/i.test(w));
+    if (at < 0) continue;
+    let end = at;
+    while (end + 1 < words.length && ROUTE_WORDS.has(words[end + 1].replace(/,$/, '').toUpperCase())) end++;
+    const train = words.slice(0, end + 1).join(' ');
+    if (/^BLOCK\b/i.test(train) || /=/.test(train)) continue;
+    const rest = words.slice(end + 1);
+    const s = rest.findIndex((w) => /^(arr|dep)\.?$/i.test(w));
+    const status = s >= 0 ? rest[s].replace('.', '') : '';
+    const location = s > 0 && /^[A-Z]{2,5}$/.test(rest[s - 1]) ? rest[s - 1] : '';
+    // the handover time follows Arr / Dep; without them it is the last time with a date on the line
+    const dates = [...(s >= 0 ? rest.slice(s + 1) : rest).join(' ').matchAll(/\b(\d{1,2}:\d{2}\s+\d{1,2}-\d{1,2}(?:-\d{2,4})?)/g)];
+    const when = s >= 0 ? dates[0] : dates[dates.length - 1];
+    out.push(['*', train, '', '', '', location, status, when ? when[1] : ''].join('\t'));
+  }
+  return out.length ? ['S.NO\tTRAIN NO\tEX\tDEST ZONE\tLOCO\tLOCATION\tS.NO\tH/O TIME', ...out].join('\n') : '';
 }

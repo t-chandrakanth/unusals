@@ -29,6 +29,7 @@
   .btn { padding: 9px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
   .btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
   .btn.wa { background: #1f9d55; color: #fff; border-color: #1f9d55; }
+  .btn.small { padding: 6px 10px; font-size: 13px; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .day { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: auto; }
   .day h3 { margin: 0; padding: 8px 12px; color: var(--red); text-align: center; font-size: 17px; border-bottom: 1px solid #222; }
@@ -58,12 +59,14 @@
     <section class="panel">
       <h2>Yesterday's sheet</h2>
       <div class="row"><label>Date <input type="date" id="d1"></label></div>
-      <textarea id="t1" placeholder="Copy the whole table from Excel (with the heading row) and paste it here"></textarea>
+      <textarea id="t1" placeholder="Copy the whole table from Excel (with the heading row) and paste it here, or paste a picture of it (Ctrl+V)"></textarea>
+      <div class="row"><button class="btn small pic" data-for="t1">Add a picture</button><span class="small">A picture is read for its CAF trains. Check them after.</span></div>
     </section>
     <section class="panel">
       <h2>Today's sheet</h2>
       <div class="row"><label>Date <input type="date" id="d2"></label></div>
-      <textarea id="t2" placeholder="Copy the whole table from Excel (with the heading row) and paste it here"></textarea>
+      <textarea id="t2" placeholder="Copy the whole table from Excel (with the heading row) and paste it here, or paste a picture of it (Ctrl+V)"></textarea>
+      <div class="row"><button class="btn small pic" data-for="t2">Add a picture</button><span class="small">A picture is read for its CAF trains. Check them after.</span></div>
     </section>
   </div>
   <div class="actions" id="actions" hidden>

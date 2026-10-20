@@ -1,6 +1,6 @@
 // CAF bound position: two pasted sheets in, the three-column table out (screen, picture, PDF, Excel, text).
 
-import { cafPosition, cafSheet, cafText, cafTitle, count } from '../js/caf.js';
+import { cafPosition, cafSheet, cafText, cafTitle, count, ocrToRows } from '../js/caf.js';
 import { sheetToCanvas } from '../js/canvas.js';
 import { STYLES } from '../js/sheet.js';
 import { sheetToXlsx } from '../js/xlsx.js';
@@ -83,6 +83,52 @@ function show() {
 for (const id of ['t1', 't2', 'd1', 'd2']) {
   $(id).addEventListener('input', () => { store.set(`caf-${id}`, $(id).value); show(); });
 }
+
+// ---------- pictures of the sheet: pasted or added, read for their CAF trains ----------
+
+/** Reads the pictures and adds the CAF trains found in them to the box, without repeating a train that is there. */
+async function readPictures(files, id) {
+  const box = $(id);
+  let added = 0;
+  try {
+    const { imageToText } = await import('../js/filetext.js');
+    for (const file of files) {
+      toast('Reading the picture. The first time it can take a minute...');
+      const text = await imageToText(file, (pct) => toast(`Reading the picture: ${pct}%`));
+      const rows = ocrToRows(text).split('\n').slice(1);
+      const have = box.value;
+      const fresh = rows.filter((r) => {
+        const [, train, , , , location] = r.split('\t');
+        return !have.split('\n').some((l) => l.includes(train) && (!location || l.includes(location)));
+      });
+      if (fresh.length) {
+        box.value = [box.value.trim(), ocrToRows(text).split('\n')[0], ...fresh].filter(Boolean).join('\n');
+        added += fresh.length;
+      }
+    }
+  } catch (e) {
+    toast(e && e.message ? e.message : 'The picture could not be read.');
+    return;
+  }
+  box.dispatchEvent(new Event('input'));
+  toast(added ? `${added} CAF train${added === 1 ? '' : 's'} read from the picture. Please check them.` : 'No CAF trains were found in the picture.');
+}
+
+for (const id of ['t1', 't2']) {
+  // a picture on its own is read; when text comes with it (Excel puts both on the clipboard) the text is used
+  $(id).addEventListener('paste', (e) => {
+    const data = e.clipboardData;
+    const pics = [...((data && data.files) || [])].filter((f) => /^image\//.test(f.type));
+    if (pics.length && !(data.getData('text') || '').trim()) { e.preventDefault(); readPictures(pics, id); }
+  });
+}
+document.querySelectorAll('button.pic').forEach((b) => {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.multiple = true; input.hidden = true;
+  input.onchange = () => { const files = [...input.files]; input.value = ''; if (files.length) readPictures(files, b.dataset.for); };
+  b.after(input);
+  b.onclick = () => input.click();
+});
 
 const allText = () => days().map((d) => cafText(d.prefix, d.date, d.p)).join('\n\n');
 
