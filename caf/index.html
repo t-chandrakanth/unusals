@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#12263f">
+<title>CAF Bound Position</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="../icons/icon-192.png">
+<link rel="icon" href="../icons/icon-192.png">
+<style>
+  :root { --navy: #12263f; --line: #cfd8e3; --bg: #f3f4f7; --card: #fff; --ink: #17202b; --soft: #5b6b7d; --red: #c62828; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0e1620; --card: #17222f; --ink: #e8edf3; --line: #2c3b4d; --soft: #9fb0c3; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  header { background: var(--navy); color: #fff; padding: 14px 16px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 2px 0 0; font-size: 13px; color: #c5d2e3; }
+  main { max-width: 1180px; margin: 0 auto; padding: 14px 16px 40px; display: grid; gap: 14px; }
+  .inputs { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 760px) { .inputs { grid-template-columns: 1fr; } }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 8px; }
+  .panel h2 { margin: 0; font-size: 15px; }
+  .panel .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  textarea, input[type=date] { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: inherit; font: 13px/1.35 ui-monospace, Consolas, monospace; }
+  input[type=date] { width: auto; font: inherit; }
+  textarea { min-height: 150px; resize: vertical; }
+  .small { color: var(--soft); font-size: 13px; margin: 0; }
+  .btn { padding: 9px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+  .btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .btn.wa { background: #1f9d55; color: #fff; border-color: #1f9d55; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .day { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: auto; }
+  .day h3 { margin: 0; padding: 8px 12px; color: var(--red); text-align: center; font-size: 17px; border-bottom: 1px solid #222; }
+  table { border-collapse: collapse; width: 100%; min-width: 760px; }
+  th, td { border: 1px solid #222; padding: 5px 8px; vertical-align: bottom; text-align: left; font-size: 15px; font-weight: 700; color: #111; }
+  th { background: #fff; text-align: center; }
+  th.p { background: #f2d7e0; }
+  tr:nth-child(even) td { background: #f2f2f2; }
+  td.ho { background: #cfe8d6 !important; }
+  @media (prefers-color-scheme: dark) { th { background: #3a2a33; color: #fff; } }
+  td.n { width: 44px; text-align: right; vertical-align: bottom; }
+  .day { color: #111; background: #fff; }
+  .bad { color: var(--red); font-weight: 700; }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+  summary { cursor: pointer; font-weight: 700; }
+  #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #17202b; color: #fff; padding: 10px 16px; border-radius: 99px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CAF BOUND POSITION</h1>
+  <p>Paste the running position sheets copied from Excel. The CAF bound trains, with their zone and its state, come out by themselves.</p>
+</header>
+<main>
+  <div class="inputs">
+    <section class="panel">
+      <h2>Yesterday's sheet</h2>
+      <div class="row"><label>Date <input type="date" id="d1"></label></div>
+      <textarea id="t1" placeholder="Copy the whole table from Excel (with the heading row) and paste it here"></textarea>
+    </section>
+    <section class="panel">
+      <h2>Today's sheet</h2>
+      <div class="row"><label>Date <input type="date" id="d2"></label></div>
+      <textarea id="t2" placeholder="Copy the whole table from Excel (with the heading row) and paste it here"></textarea>
+    </section>
+  </div>
+  <div class="actions" id="actions" hidden>
+    <button class="btn primary" id="img">Share image</button>
+    <button class="btn" id="copyimg">Copy image</button>
+    <button class="btn" id="pdf">PDF</button>
+    <button class="btn" id="xls">Excel file</button>
+    <button class="btn" id="copy">Copy as text</button>
+    <button class="btn wa" id="wa">Send on WhatsApp</button>
+    <button class="btn" id="clear">Clear</button>
+  </div>
+  <div id="out"></div>
+  <details id="zones">
+    <summary>Stations (zone and state of a train)</summary>
+    <p class="small">The zone and state of a train come from the first part of its name that is a station code in the station list (GAR/BZU is Gadarwara, Madhya Pradesh, WCR). A code the list does not know, or knows without a state, shows (?): add it here, one on a line, as <b>CODE = ZONE, State</b> (for example <b>SOP = NR, Uttar Pradesh</b>). It is remembered on this device.</p>
+    <textarea id="zt" rows="8"></textarea>
+    <div class="actions" style="margin-top:8px"><button class="btn" id="zsave">Save</button><button class="btn" id="zreset">Clear my entries</button></div>
+  </details>
+</main>
+<div id="toast" role="status"></div>
+<script type="module" src="app.js"></script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
+</body>
+</html>
