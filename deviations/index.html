@@ -30,6 +30,10 @@
   .btn.small { padding: 6px 10px; font-size: 13px; }
   .btn.x { padding: 4px 9px; color: var(--red); border-color: transparent; font-size: 18px; line-height: 1; }
   .btn.pc { padding: 3px 7px; font-size: 11px; color: var(--red); margin-left: 2px; }
+  .sday { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-top: 8px; display: grid; gap: 6px; }
+  .sday.cur { border-color: var(--navy); }
+  .sdhead { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .hits { margin: 0; padding-left: 18px; font-size: 13px; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .tbl { overflow: auto; }
   table { border-collapse: collapse; width: 100%; min-width: 640px; }
@@ -83,7 +87,8 @@
   </section>
 
   <div class="actions">
-    <button class="btn primary" id="copy">Copy message</button>
+    <button class="btn primary" id="savebtn">Save</button>
+    <button class="btn" id="copy">Copy message</button>
     <button class="btn wa" id="wa">Send on WhatsApp</button>
     <button class="btn" id="img">Share image</button>
     <button class="btn" id="copyimg">Copy image</button>
@@ -95,12 +100,20 @@
     <pre id="msg"></pre>
   </section>
 
-  <details>
-    <summary>Interchange points</summary>
-    <p class="small">One on a line, in the order of the message. Leave it empty for the usual list. Remembered on this device.</p>
-    <textarea id="points" rows="6"></textarea>
-    <div class="actions" style="margin-top:8px"><button class="btn small" id="psave">Save</button><button class="btn small" id="preset">Usual list</button></div>
-  </details>
+  <section class="panel">
+    <div class="row" style="justify-content: space-between">
+      <h2>Saved deviations, day by day <span class="small" id="scount"></span></h2>
+    </div>
+    <div class="row">
+      <label class="f">From <input type="date" id="sfrom"></label>
+      <label class="f">To <input type="date" id="sto"></label>
+      <label class="f" style="flex:1; min-width: 160px">Search <input id="sq" placeholder="Train, point or remark"></label>
+      <button class="btn small" id="sall">All days</button>
+    </div>
+    <p class="small">Every day's rows are saved on this device under their date. Open a day to edit it above, or copy and send it from here.</p>
+    <div id="saved"></div>
+  </section>
+
 </main>
 <div id="toast" role="status"></div>
 <script>if (/[?&]embed=1/.test(location.search)) document.getElementById('hdr').hidden = true;</script>

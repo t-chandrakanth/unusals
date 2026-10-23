@@ -1,6 +1,6 @@
 // Interchange deviations: the rows typed or pasted in, the message to CFTM out (text, WhatsApp, picture, PDF).
 
-import { DEFAULT_POINTS, parsePoints, parsePaste, parseRemarks, withRemarks, grouped, deviationsMessage, deviationsWhatsApp, deviationsSheet } from '../js/deviations.js';
+import { parsePoints, parsePaste, parseRemarks, withRemarks, grouped, deviationsMessage, deviationsWhatsApp, deviationsSheet } from '../js/deviations.js';
 import { sheetToCanvas } from '../js/canvas.js';
 import { buildPdf } from '../js/pdf.js';
 
@@ -14,11 +14,21 @@ const key = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate(
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const toast = (msg) => { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2600); };
 
-// ---------- state: the rows, the points, the heading fields; all kept on the device ----------
+// ---------- state: the rows of each day, the points, the heading fields; all kept on the device ----------
+// days = { 'YYYY-MM-DD': [{ point, train, remark }] }; `rows` is the day in the editor (the date box).
+let days = {};
+try { days = JSON.parse(store.get('dev-days', '{}')); if (!days || typeof days !== 'object' || Array.isArray(days)) days = {}; } catch { days = {}; }
 let rows = [];
-try { rows = JSON.parse(store.get('dev-rows', '[]')); if (!Array.isArray(rows)) rows = []; } catch { rows = []; }
 const points = () => parsePoints(store.get('dev-points'));
-const save = () => store.set('dev-rows', JSON.stringify(rows));
+const saveDays = () => store.set('dev-days', JSON.stringify(days));
+const save = () => { const d = $('date').value; if (rows.length) days[d] = rows; else delete days[d]; saveDays(); };
+/** The editor shows the day in the date box. */
+function openDay(d) {
+  rows = (days[d] || []).map((r) => ({ ...r }));
+  history.length = 0;
+  $('undo').disabled = true;
+  render();
+}
 
 // ---------- undo: the rows as they were before each change, the last 50; Ctrl+Z or the Undo button ----------
 const history = [];
@@ -40,9 +50,15 @@ const today = new Date();
 $('date').value = store.get('dev-date') || key(new Date(today.getTime() - 86400000));
 $('from').value = store.get('dev-from') || 'SR.DOM/SC';
 $('to').value = store.get('dev-to') || 'CFTM/SCR';
-$('points').value = store.get('dev-points');
+// rows saved before the days came in (one list, no date) become the day in the date box
+try {
+  const old = JSON.parse(store.get('dev-rows', 'null'));
+  if (Array.isArray(old) && old.length && !days[$('date').value]) { days[$('date').value] = old; saveDays(); }
+  localStorage.removeItem('dev-rows');
+} catch { /* nothing old */ }
 
-const opts = () => ({ from: $('from').value, to: $('to').value, date: $('date').value, points: points(), rows });
+const optsFor = (date, list) => ({ from: $('from').value, to: $('to').value, date, points: points(), rows: list });
+const opts = () => optsFor($('date').value, rows);
 
 // ---------- the grid: one row per train, a NIL row for a point with none, a + on each point ----------
 function renderGrid() {
@@ -71,7 +87,53 @@ function renderGrid() {
 function renderMessage() {
   $('msg').textContent = deviationsMessage(opts());
 }
-const render = () => { renderGrid(); renderMessage(); };
+const render = () => { renderGrid(); renderMessage(); renderSaved(); };
+
+// ---------- the saved days, below: from - to, a search, each day to open, copy, send or remove ----------
+const dmy = (iso) => String(iso || '').split('-').reverse().join('-');
+function renderSaved() {
+  const from = $('sfrom').value, to = $('sto').value;
+  const q = $('sq').value.trim().toUpperCase();
+  const list = Object.keys(days).filter((d) => days[d].length && (!from || d >= from) && (!to || d <= to)).sort().reverse();
+  const out = [];
+  for (const d of list) {
+    const hits = q ? days[d].filter((r) => `${r.point} ${r.train} ${r.remark}`.toUpperCase().includes(q)) : [];
+    if (q && !hits.length) continue;
+    const trains = days[d].filter((r) => r.train.trim()).length;
+    const pts = new Set(days[d].map((r) => r.point)).size;
+    out.push(`<div class="sday${d === $('date').value ? ' cur' : ''}" data-d="${d}">
+      <div class="sdhead"><b>${dmy(d)}</b><span class="small">${trains} train${trains === 1 ? '' : 's'} at ${pts} point${pts === 1 ? '' : 's'}${d === $('date').value ? ' · in the editor' : ''}</span></div>
+      ${hits.length ? `<ul class="hits">${hits.map((r) => `<li><b>${esc(r.point)}</b> ${esc(r.train)} ${esc(r.remark)}</li>`).join('')}</ul>` : ''}
+      <div class="actions"><button class="btn small primary" data-act="open">Open to edit</button><button class="btn small" data-act="copy">Copy message</button><button class="btn small wa" data-act="wa">WhatsApp</button><button class="btn small" data-act="img">Share image</button><button class="btn small x" data-act="del" title="Remove this day">×</button></div>
+    </div>`);
+  }
+  $('saved').innerHTML = out.join('') || `<p class="small">${Object.keys(days).length ? 'No saved day matches.' : 'Nothing saved yet. The rows above are saved under their date as you type.'}</p>`;
+  $('scount').textContent = list.length ? `${list.length} day${list.length === 1 ? '' : 's'}` : '';
+}
+for (const id of ['sfrom', 'sto']) $(id).addEventListener('input', () => { store.set(`dev-${id}`, $(id).value); renderSaved(); });
+$('sq').addEventListener('input', renderSaved);
+$('sall').onclick = () => { $('sfrom').value = ''; $('sto').value = ''; store.set('dev-sfrom', ''); store.set('dev-sto', ''); renderSaved(); };
+$('saved').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const d = b.closest('.sday').dataset.d;
+  const o = optsFor(d, days[d] || []);
+  if (b.dataset.act === 'open') {
+    $('date').value = d; store.set('dev-date', d); openDay(d);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    toast(`${dmy(d)} is in the editor.`);
+  } else if (b.dataset.act === 'copy') {
+    try { await navigator.clipboard.writeText(deviationsMessage(o)); toast(`Message of ${dmy(d)} copied.`); } catch { toast('Could not copy.'); }
+  } else if (b.dataset.act === 'wa') {
+    sendWhatsApp(o);
+  } else if (b.dataset.act === 'img') {
+    shareOrSave(await blobOf(sheetToCanvas(deviationsSheet(o)), 'image/png'), `Interchange-deviations-${d}.png`, 'image/png');
+  } else if (b.dataset.act === 'del' && confirm(`Remove the deviations of ${dmy(d)}?`)) {
+    delete days[d]; saveDays();
+    if (d === $('date').value) { rows = []; history.length = 0; $('undo').disabled = true; }
+    render();
+  }
+});
 
 $('grid').addEventListener('click', (e) => {
   const pclear = e.target.closest('button.pclear');
@@ -120,9 +182,12 @@ $('grid').addEventListener('keydown', (e) => {
   }
 });
 
-for (const id of ['from', 'to', 'date']) $(id).addEventListener('input', () => { store.set(`dev-${id}`, $(id).value); renderMessage(); });
-$('yday').onclick = () => { $('date').value = key(new Date(Date.now() - 86400000)); store.set('dev-date', $('date').value); renderMessage(); };
-$('tday').onclick = () => { $('date').value = key(new Date()); store.set('dev-date', $('date').value); renderMessage(); };
+for (const id of ['from', 'to']) $(id).addEventListener('input', () => { store.set(`dev-${id}`, $(id).value); renderMessage(); });
+// the date box picks the day: its rows come into the editor (a day not yet saved starts empty)
+const pickDay = (d) => { if (!d) return; $('date').value = d; store.set('dev-date', d); openDay(d); };
+$('date').addEventListener('change', () => pickDay($('date').value));
+$('yday').onclick = () => pickDay(key(new Date(Date.now() - 86400000)));
+$('tday').onclick = () => pickDay(key(new Date()));
 
 // ---------- paste: a list of trains, or rows from Excel ----------
 function addRows(got) {
@@ -178,9 +243,12 @@ $('grid').addEventListener('paste', (e) => {
 });
 $('clear').onclick = () => { if (!rows.length || confirm('Remove all the rows? Ctrl+Z brings them back.')) { remember(); rows = []; save(); render(); } };
 
-// ---------- the points ----------
-$('psave').onclick = () => { store.set('dev-points', $('points').value); render(); toast('Saved'); };
-$('preset').onclick = () => { store.set('dev-points', ''); $('points').value = ''; render(); toast(`The usual ${DEFAULT_POINTS.length} points.`); };
+// ---------- save: the day's rows under its date (they are also saved as they are typed) ----------
+$('savebtn').onclick = () => {
+  save(); renderSaved();
+  const n = rows.filter((r) => r.train.trim()).length;
+  toast(rows.length ? `Saved under ${dmy($('date').value)}: ${n} train${n === 1 ? '' : 's'}.` : `Nothing to save for ${dmy($('date').value)}.`);
+};
 
 // ---------- out: text, WhatsApp, picture, PDF ----------
 const fileName = (ext) => `Interchange-deviations-${$('date').value}.${ext}`;
@@ -199,10 +267,11 @@ async function shareOrSave(blob, name, type) {
 }
 
 $('copy').onclick = async () => { try { await navigator.clipboard.writeText(deviationsMessage(opts())); toast('Message copied.'); } catch { toast('Could not copy.'); } };
-$('wa').onclick = () => {
+function sendWhatsApp(o) {
   const link = window.matchMedia('(pointer: coarse)').matches ? 'https://wa.me/' : 'https://web.whatsapp.com/send';
-  window.open(`${link}?text=${encodeURIComponent(deviationsWhatsApp(opts()).slice(0, 5500))}`, 'dev-whatsapp');
-};
+  window.open(`${link}?text=${encodeURIComponent(deviationsWhatsApp(o).slice(0, 5500))}`, 'dev-whatsapp');
+}
+$('wa').onclick = () => sendWhatsApp(opts());
 $('img').onclick = async () => shareOrSave(await blobOf(picture(), 'image/png'), fileName('png'), 'image/png');
 $('copyimg').onclick = async () => {
   try {
@@ -216,4 +285,6 @@ $('pdf').onclick = async () => {
   shareOrSave(new Blob([buildPdf(jpeg, c.width, c.height)], { type: 'application/pdf' }), fileName('pdf'), 'application/pdf');
 };
 
-render();
+$('sfrom').value = store.get('dev-sfrom');
+$('sto').value = store.get('dev-sto');
+openDay($('date').value);
