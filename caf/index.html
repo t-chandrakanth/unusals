@@ -66,10 +66,10 @@
   <p id="h1p">Paste the running position sheets copied from Excel. The CAF bound trains, with their zone and its state, come out by themselves.</p>
   <nav class="tabs" role="tablist">
     <button id="tab-caf" role="tab" aria-selected="true" aria-controls="main">CAF BOUND</button>
-    <button id="tab-rej" role="tab" aria-selected="false" aria-controls="f-rej">REJECTIONS</button>
+    <button id="tab-rej" role="tab" aria-selected="false" aria-controls="f-rej">DEVIATION</button>
   </nav>
 </header>
-<iframe id="f-rej" title="Rejections: interchange deviations" data-src="../deviations/?embed=1" hidden></iframe>
+<iframe id="f-rej" title="Deviation: the interchange deviations message" data-src="../deviations/?embed=1" hidden></iframe>
 <main id="main">
   <div class="inputs">
     <section class="panel">
@@ -104,8 +104,8 @@
 </main>
 <div id="toast" role="status"></div>
 <script>
-  // Two tabs: the CAF bound table here, the rejections (interchange deviations) page in a frame, loaded on first use.
-  // The tab used last is remembered (#rejections in the address picks it too).
+  // Two tabs: the CAF bound table here, the deviation (interchange deviations message) page in a frame, loaded on first use.
+  // The tab used last is remembered (#deviation in the address picks it too; #rejections is its old name).
   (function () {
     var tabs = { caf: document.getElementById('tab-caf'), rej: document.getElementById('tab-rej') };
     var main = document.getElementById('main'), frame = document.getElementById('f-rej');
@@ -115,15 +115,15 @@
       if (rej && !frame.src) frame.src = frame.dataset.src;
       main.hidden = rej; frame.hidden = !rej;
       tabs.caf.setAttribute('aria-selected', String(!rej)); tabs.rej.setAttribute('aria-selected', String(rej));
-      h1.textContent = rej ? 'REJECTIONS' : 'CAF BOUND POSITION';
+      h1.textContent = rej ? 'DEVIATION' : 'CAF BOUND POSITION';
       h1p.textContent = rej ? 'The daily interchange deviations message: the trains for acceptance or not accepted at each interchange point.' : 'Paste the running position sheets copied from Excel. The CAF bound trains, with their zone and its state, come out by themselves.';
       try { localStorage.setItem('caf-tab', which); } catch (e) {}
-      if (location.hash !== (rej ? '#rejections' : '')) history.replaceState(null, '', rej ? '#rejections' : location.pathname + location.search);
+      if (location.hash !== (rej ? '#deviation' : '')) history.replaceState(null, '', rej ? '#deviation' : location.pathname + location.search);
     }
     tabs.caf.onclick = function () { show('caf'); };
     tabs.rej.onclick = function () { show('rej'); };
     var last = ''; try { last = localStorage.getItem('caf-tab') || ''; } catch (e) {}
-    show(location.hash === '#rejections' ? 'rej' : location.hash === '#caf' ? 'caf' : last === 'rej' ? 'rej' : 'caf');
+    show(/^#(deviations?|rejections)$/.test(location.hash) ? 'rej' : location.hash === '#caf' ? 'caf' : last === 'rej' ? 'rej' : 'caf');
   })();
 </script>
 <script type="module" src="app.js"></script>
