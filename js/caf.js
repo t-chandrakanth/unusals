@@ -85,28 +85,62 @@ export function routeOf(t) {
   return 'caf';
 }
 
+/** The state a railway zone mostly serves: the state of a train whose station the list does not have, from its DEST ZONE. */
+export const ZONE_STATE = {
+  CR: 'Maharashtra', WR: 'Gujarat', NR: 'Uttar Pradesh', NCR: 'Uttar Pradesh', NER: 'Uttar Pradesh', NWR: 'Rajasthan',
+  WCR: 'Madhya Pradesh', SECR: 'Chhattisgarh', SER: 'West Bengal', ECOR: 'Odisha', ECR: 'Bihar', ER: 'West Bengal',
+  NFR: 'Assam', SCR: 'Telangana', SWR: 'Karnataka', SR: 'Tamil Nadu', KR: 'Goa',
+};
+
+const STATES = Object.fromEntries(Object.keys(STATE_ZONE).map((s) => [s.toLowerCase(), s]));
+/** "uttar pradesh" -> "Uttar Pradesh"; '' when it is not a state. */
+export const stateNamed = (s) => STATES[String(s || '').trim().toLowerCase()] || '';
+
+/**
+ * The lines typed in the app under "New train names": NAME = BRACKET, State; a line with only a state
+ * (BCNE = Maharashtra) is taken as that. -> { CODE: [bracket, state] }.
+ */
+export function parseOwn(text) {
+  const out = {};
+  for (const line of String(text || '').split('\n')) {
+    const m = /^\s*([A-Za-z0-9]+)\s*[=:]\s*(.*?)\s*$/.exec(line);
+    if (!m || !m[2]) continue;
+    const parts = m[2].split(',').map((s) => s.trim());
+    let bracket = parts.length > 1 ? parts[0] : /^[A-Za-z]+$/.test(parts[0]) && !stateNamed(parts[0]) ? parts[0] : '';
+    const rest = parts.length > 1 ? parts.slice(1).join(', ') : bracket ? '' : parts[0];
+    out[m[1].toUpperCase()] = [bracket.toUpperCase(), stateNamed(rest) || rest];
+  }
+  return out;
+}
+
 /**
  * The bracket and state of a train, from the first part of its name that is known: first what the morning
- * message has always said (KNOWN, then the entries typed in the app), else the station list (state, and
- * the zone for the bracket). lookup = { stations: { CODE: [name, state, zone] }, own: { CODE: [bracket, state] } }.
- * null when no part of the name is known at all.
+ * message has always said (the entries typed in the app, then KNOWN), else the station list for the state,
+ * with the sheet's own DEST ZONE for the bracket (the station's zone when the sheet has none).
+ * lookup = { stations: { CODE: [name, state, zone] }, own: { CODE: [bracket, state] } }.
+ * A name no part of which is known gets the sheet's zone alone; null when there is not even that.
  */
-export function originOf(name, lookup = {}) {
+export function originOf(name, lookup = {}, zone = '') {
   const stations = lookup.stations || {};
   const own = lookup.own || {};
+  zone = String(zone || '').trim().toUpperCase();
   const codes = String(name || '').toUpperCase().split(/[\/\s]+/).map((c) => c.replace(/^-+|-+$/g, '')).filter((c) => c && !/^\d+$/.test(c) && c !== 'CAF');
   for (const code of codes) {
     const hit = own[code] || KNOWN[code];
-    if (hit) return { code, bracket: hit[0] || '', state: hit[1] || '' };
+    if (hit) return { code, bracket: hit[0] || zone, state: hit[1] || '' };
   }
   let found = null;
   for (const code of codes) {
     const st = stations[code];
     if (!st) continue;
-    const rec = { code, station: st[0], state: st[1] || '', bracket: st[2] || STATE_ZONE[st[1]] || '' };
+    const rec = { code, station: st[0], state: st[1] || '', bracket: zone || st[2] || STATE_ZONE[st[1]] || '' };
     if (rec.state && rec.bracket) return rec;
     if (!found || (!found.state && rec.state)) found = rec;
   }
+  // the station is not in the list: the state the sheet's zone mostly serves, to be corrected in the table if wrong
+  const byZone = ZONE_STATE[zone.replace(/[^A-Z]/g, '')] || '';
+  if (!found && zone) return { code: '', bracket: zone, state: byZone };
+  if (found && !found.state && byZone) found.state = byZone;
   return found;
 }
 
@@ -123,7 +157,7 @@ export function standing(t) {
 
 /** One line: "RBL (LOK) Uttar Pradesh VHGN Arr 22:17 16-10": the bracket and state the train's name has always had in the morning message. */
 export function entryText(t, lookup = {}) {
-  const o = originOf(baseName(t.train), lookup);
+  const o = originOf(baseName(t.train), lookup, t.zone);
   return [baseName(t.train), `(${(o && o.bracket) || '?'})`, o ? o.state : '', standing(t)].filter(Boolean).join(' ');
 }
 
@@ -133,7 +167,7 @@ export function cafPosition(text, lookup = {}) {
   for (const t of parseSheet(text).filter(isCaf)) {
     out[routeOf(t)].push(entryText(t, lookup));
     const name = baseName(t.train);
-    const o = originOf(name, lookup);
+    const o = originOf(name, lookup, t.zone);
     if ((!o || !o.state) && !out.unknown.includes(name)) out.unknown.push(name);
   }
   return out;

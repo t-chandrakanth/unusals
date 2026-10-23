@@ -41,6 +41,11 @@
   td.ho { background: #cfe8d6 !important; }
   @media (prefers-color-scheme: dark) { th { background: #3a2a33; color: #fff; } }
   td.n { width: 44px; text-align: right; vertical-align: bottom; }
+  td.e { cursor: text; min-width: 120px; }
+  td.e:focus { outline: 2px solid #1a73e8; outline-offset: -2px; background: #fffbe6 !important; }
+  td.e.spare:empty::before { content: "+ add a train"; color: #9aa4af; font-weight: 400; }
+  td.e.spare:focus::before { content: none; }
+  .day .hint { padding: 6px 12px 8px; color: var(--soft); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .day { color: #111; background: #fff; }
   .bad { color: var(--red); font-weight: 700; }
   details { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
@@ -81,7 +86,7 @@
   <div id="out"></div>
   <details id="zones">
     <summary>New train names (bracket and state)</summary>
-    <p class="small">The bracket and state of a train are the ones its name has always had in the morning CAF message (RBL is (LOK) Uttar Pradesh, GAR/BZU is (NAG) Madhya Pradesh). A name that is new shows (?), or only the zone from the station list: add it here, one on a line, as <b>NAME = BRACKET, State</b> (for example <b>BCNE = NAG, Maharashtra</b>). It is remembered on this device.</p>
+    <p class="small">The bracket and state of a train are the ones its name has always had in the morning CAF message (RBL is (LOK) Uttar Pradesh, GAR/BZU is (NAG) Madhya Pradesh). A name that is new gets the sheet's DEST ZONE for its bracket, and the state of its station from the station list; a station the list does not have gets the state its zone mostly serves (CR is Maharashtra, SER is West Bengal), so check it in the table. To fix a name for good, add it here, one on a line, as <b>NAME = State</b> (for example <b>BCNE = Maharashtra</b>), or <b>NAME = BRACKET, State</b> to set the bracket too. It is remembered on this device.</p>
     <textarea id="zt" rows="8"></textarea>
     <div class="actions" style="margin-top:8px"><button class="btn" id="zsave">Save</button><button class="btn" id="zreset">Clear my entries</button></div>
   </details>

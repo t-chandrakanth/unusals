@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSheet, baseName, routeOf, standing, entryText, cafPosition, cafText, count, originOf, ocrToRows } from '../js/caf.js';
+import { parseSheet, baseName, routeOf, standing, entryText, cafPosition, cafText, count, originOf, ocrToRows, parseOwn } from '../js/caf.js';
 
 const HEAD = 'S.NO\tTRAIN NO\tEX\t"DEST\nZONE"\t"TO / RL time\nDate"\tHOR\t"KM Left"\tStock\tLOCO\t"COA\nName"\t"LOCAT\nION"\tS.NO\t"H/O\n-TIME"\tREMARKS';
 const SHEET = [
@@ -31,7 +31,8 @@ test('only CAF bound trains, in the column of their route, each with the bracket
   const p = cafPosition(SHEET, LOOKUP);
   assert.deepEqual(p.jbp, ['SOP (LKO) Uttar Pradesh RECH Arr 23:25 19-10', 'RBL (LOK) Uttar Pradesh VHGN Arr 22:17 16-10']);
   assert.deepEqual(p.caf, ['GAR/BZU (NAG) Madhya Pradesh AT UTCG', 'JSLK (BSP) Chattisgarh AT MAGH']);
-  assert.deepEqual(p.jsg, ['HSPG/BFNV (SWR) Karnataka MCI Dep 05:43 20-10']);
+  // HSPG is not in the message's list: the sheet's DEST ZONE (SER) is its bracket, the station list its state
+  assert.deepEqual(p.jsg, ['HSPG/BFNV (SER) Karnataka MCI Dep 05:43 20-10']);
   assert.equal(count(p), 5);
   assert.deepEqual(p.unknown, []);
 });
@@ -46,6 +47,24 @@ test('the bracket and state of a name: own lines, then the known ones, then the 
   assert.deepEqual(originOf('HSPG', LOOKUP), { code: 'HSPG', station: 'Hospet', state: 'Karnataka', bracket: 'SWR' });
   assert.equal(originOf('ZZZ', LOOKUP).bracket, 'KR');
   assert.equal(originOf('QQQ', LOOKUP), null);
+});
+
+test("the sheet's DEST ZONE is the bracket of a name the message has not had; the known ones keep theirs", () => {
+  assert.deepEqual(originOf('HSPG', LOOKUP, 'SER'), { code: 'HSPG', station: 'Hospet', state: 'Karnataka', bracket: 'SER' });
+  // a station the list does not have: the state its zone mostly serves
+  assert.deepEqual(originOf('QQQ', LOOKUP, 'cr'), { code: '', bracket: 'CR', state: 'Maharashtra' });
+  assert.deepEqual(originOf('QQQ', LOOKUP, 'ECoR'), { code: '', bracket: 'ECOR', state: 'Odisha' });
+  assert.deepEqual(originOf('QQQ', LOOKUP, 'XYZ'), { code: '', bracket: 'XYZ', state: '' });
+  assert.equal(originOf('RBL', LOOKUP, 'NR').bracket, 'LOK');
+  assert.equal(entryText({ train: 'QQQ CAF', zone: 'CR', location: 'WIRR', status: 'Arr', hoTime: '02:54 20-10', ex: '' }, LOOKUP), 'QQQ (CR) Maharashtra WIRR Arr 02:54 20-10');
+  assert.deepEqual(cafPosition('1\tQQQ CAF\tBZA\tCR\t\t\t\t\t\t\tWIRR\tArr\t02:54 20-10\t', LOOKUP).unknown, []);
+  assert.deepEqual(cafPosition('1\tQQQ CAF\tBZA\t\t\t\t\t\t\t\tWIRR\tArr\t02:54 20-10\t', LOOKUP).unknown, ['QQQ']);
+});
+
+test('own lines: NAME = BRACKET, State; NAME = State alone; NAME = BRACKET alone', () => {
+  assert.deepEqual(parseOwn('BCNE = NAG, Maharashtra\nMMZ: maharashtra\nXYZ = ser\n\nbad line'), {
+    BCNE: ['NAG', 'Maharashtra'], MMZ: ['', 'Maharashtra'], XYZ: ['SER', ''],
+  });
 });
 
 test('names, routes and positions', () => {

@@ -1,6 +1,6 @@
 // CAF bound position: two pasted sheets in, the three-column table out (screen, picture, PDF, Excel, text).
 
-import { cafPosition, cafSheet, cafText, cafTitle, count, ocrToRows } from '../js/caf.js';
+import { cafPosition, cafSheet, cafText, cafTitle, count, ocrToRows, parseOwn } from '../js/caf.js';
 import { sheetToCanvas } from '../js/canvas.js';
 import { STYLES } from '../js/sheet.js';
 import { sheetToXlsx } from '../js/xlsx.js';
@@ -31,14 +31,7 @@ const toast = (msg) => { const t = $('toast'); t.textContent = msg; t.classList.
 
 // the station list (code -> name, state, zone) and the user's own lines over it
 let stations = {};
-const own = () => {
-  const out = {};
-  for (const line of store.get('caf-own').split('\n')) {
-    const m = /^\s*([A-Za-z0-9]+)\s*[=:]\s*([A-Za-z]+)?\s*,?\s*(.*?)\s*$/.exec(line);
-    if (m) out[m[1].toUpperCase()] = [(m[2] || '').toUpperCase(), m[3] || ''];
-  }
-  return out;
-};
+const own = () => parseOwn(store.get('caf-own'));
 const lookup = () => ({ stations, own: own() });
 
 const today = new Date();
@@ -49,12 +42,23 @@ $('t1').value = store.get('caf-t1');
 $('t2').value = store.get('caf-t2');
 $('zt').value = store.get('caf-own');
 
+// ---------- the user's corrections to a day's table ----------
+// The three lists as the user left them, over what the sheet gave. Kept on this device; dropped when that sheet changes.
+const COLS = ['caf', 'jsg', 'jbp'];
+const edits = {
+  get(id) { try { const e = JSON.parse(store.get(`caf-edit-${id}`, 'null')); return e && COLS.every((c) => Array.isArray(e[c])) ? e : null; } catch { return null; } },
+  set(id, e) { store.set(`caf-edit-${id}`, e ? JSON.stringify(e) : ''); },
+};
+
 const days = () => {
   const lk = lookup();
   return [
-    { prefix: 'YDAY', date: dmy($('d1').value), p: cafPosition($('t1').value, lk), has: $('t1').value.trim() },
-    { prefix: 'TODAY', date: dmy($('d2').value), p: cafPosition($('t2').value, lk), has: $('t2').value.trim() },
-  ].filter((d) => d.has);
+    { id: 't1', prefix: 'YDAY', date: dmy($('d1').value), p: cafPosition($('t1').value, lk), has: $('t1').value.trim() },
+    { id: 't2', prefix: 'TODAY', date: dmy($('d2').value), p: cafPosition($('t2').value, lk), has: $('t2').value.trim() },
+  ].filter((d) => d.has).map((d) => {
+    const e = edits.get(d.id);
+    return e ? { ...d, edited: true, p: { ...d.p, ...e } } : d;
+  });
 };
 
 const isHo = (line) => /\bH\/O\b/.test(line);
@@ -65,14 +69,20 @@ function show() {
   const out = $('out');
   out.replaceChildren();
   const missing = new Set();
-  for (const { prefix, date, p } of list) {
+  for (const { id, prefix, date, p, edited } of list) {
     p.unknown.forEach((n) => missing.add(n));
-    const n = Math.max(p.caf.length, p.jsg.length, p.jbp.length, 1);
-    const cells = (items, i) => `<td class="n">${items[i] ? i + 1 : ''}</td><td${items[i] && isHo(items[i]) ? ' class="ho"' : ''}>${esc(items[i] || '')}</td>`;
+    // one spare row under the trains, to type a new one into
+    const n = Math.max(p.caf.length, p.jsg.length, p.jbp.length, 1) + 1;
+    const cells = (items, i, col) => {
+      const v = items[i] || '';
+      const cls = [v && isHo(v) ? 'ho' : '', i === items.length ? 'spare' : ''].filter(Boolean).join(' ');
+      return `<td class="n">${v ? i + 1 : ''}</td><td class="e${cls ? ' ' + cls : ''}" contenteditable="true" spellcheck="false" data-day="${id}" data-col="${col}" data-i="${i}">${esc(v)}</td>`;
+    };
     let rows = '';
-    for (let i = 0; i < n; i++) rows += `<tr>${cells(p.caf, i)}${cells(p.jsg, i)}${cells(p.jbp, i)}</tr>`;
+    for (let i = 0; i < n; i++) rows += `<tr>${cells(p.caf, i, 'caf')}${cells(p.jsg, i, 'jsg')}${cells(p.jbp, i, 'jbp')}</tr>`;
     out.insertAdjacentHTML('beforeend', `<section class="day"><h3>${esc(cafTitle(prefix, date, p))}</h3>
-      <table><thead><tr><th>SNO</th><th>VIA CAF</th><th class="p">SNO</th><th>VIA CAF, JSGR, JSG</th><th class="p">SNO</th><th>VIA CAF, JBP</th></tr></thead><tbody>${rows}</tbody></table></section>`);
+      <table><thead><tr><th>SNO</th><th>VIA CAF</th><th class="p">SNO</th><th>VIA CAF, JSGR, JSG</th><th class="p">SNO</th><th>VIA CAF, JBP</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="small hint">Tap a train to correct it; the empty row adds one; clear a train to remove it. The picture, PDF, Excel and text follow.${edited ? ` <button class="btn small undo" data-day="${id}">Undo my edits</button>` : ''}</p></section>`);
   }
   if (missing.size) {
     out.insertAdjacentHTML('afterbegin', `<p class="small bad">No state found for ${esc([...missing].join(', '))}. Add ${missing.size > 1 ? 'them' : 'it'} under "New train names", as NAME = BRACKET, State.</p>`);
@@ -81,8 +91,47 @@ function show() {
 }
 
 for (const id of ['t1', 't2', 'd1', 'd2']) {
-  $(id).addEventListener('input', () => { store.set(`caf-${id}`, $(id).value); show(); });
+  $(id).addEventListener('input', () => {
+    store.set(`caf-${id}`, $(id).value);
+    // the sheet is the source: when it changes, corrections made to the old table no longer fit
+    if (id.startsWith('t') && edits.get(id)) { edits.set(id, null); toast('The sheet changed, so your edits to its table were dropped.'); }
+    show();
+  });
 }
+
+// typing in a cell: Enter or leaving the cell keeps it, Escape puts the old text back
+const cellOf = (el) => el && el.closest ? el.closest('td.e') : null;
+let cellWas = '';
+$('out').addEventListener('focusin', (e) => { const td = cellOf(e.target); if (td) cellWas = td.textContent; });
+$('out').addEventListener('keydown', (e) => {
+  const td = cellOf(e.target);
+  if (!td) return;
+  if (e.key === 'Enter') { e.preventDefault(); td.blur(); }
+  if (e.key === 'Escape') { td.textContent = cellWas; td.blur(); }
+});
+$('out').addEventListener('focusout', (e) => {
+  const td = cellOf(e.target);
+  if (!td) return;
+  const text = td.textContent.replace(/\s+/g, ' ').trim();
+  if (text === cellWas.trim()) return;
+  const { day, col } = td.dataset;
+  const i = Number(td.dataset.i);
+  const d = days().find((x) => x.id === day);
+  if (!d) return;
+  const e2 = Object.fromEntries(COLS.map((c) => [c, [...d.p[c]]]));
+  if (i < e2[col].length) e2[col][i] = text; else if (text) e2[col].push(text);
+  e2[col] = e2[col].filter(Boolean);
+  edits.set(day, e2);
+  // the table is drawn again (numbers, count, colours); a Tab moves on to the same next cell
+  const next = cellOf(e.relatedTarget);
+  const to = next && `td.e[data-day="${next.dataset.day}"][data-col="${next.dataset.col}"][data-i="${next.dataset.i}"]`;
+  show();
+  if (to) { const el = $('out').querySelector(to); if (el) el.focus(); }
+});
+$('out').addEventListener('click', (e) => {
+  const b = e.target.closest('button.undo');
+  if (b) { edits.set(b.dataset.day, null); show(); toast('Back to what the sheet gave.'); }
+});
 
 // ---------- pictures of the sheet: pasted or added, read for their CAF trains ----------
 
@@ -200,7 +249,7 @@ $('wa').onclick = () => {
   const link = window.matchMedia('(pointer: coarse)').matches ? 'https://wa.me/' : 'https://web.whatsapp.com/send';
   window.open(`${link}?text=${encodeURIComponent(allText().slice(0, 5500))}`, 'caf-whatsapp');
 };
-$('clear').onclick = () => { for (const id of ['t1', 't2']) { $(id).value = ''; store.set(`caf-${id}`, ''); } show(); };
+$('clear').onclick = () => { for (const id of ['t1', 't2']) { $(id).value = ''; store.set(`caf-${id}`, ''); edits.set(id, null); } show(); };
 $('zsave').onclick = () => { store.set('caf-own', $('zt').value); show(); toast('Saved'); };
 $('zreset').onclick = () => { store.set('caf-own', ''); $('zt').value = ''; show(); toast('Cleared'); };
 
