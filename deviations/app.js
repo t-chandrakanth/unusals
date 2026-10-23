@@ -65,7 +65,7 @@ function renderGrid() {
   const body = $('grid').tBodies[0];
   let html = '';
   for (const g of grouped(points(), rows)) {
-    const head = (clear) => `${esc(g.point)} <button class="btn small add" data-point="${esc(g.point)}" title="Add a train">+</button>${clear ? `<button class="btn small pc pclear" data-point="${esc(g.point)}" title="Remove this point's rows">clear</button>` : ''}`;
+    const head = (clear) => `${esc(g.point)} <button class="btn small add" tabindex="-1" data-point="${esc(g.point)}" title="Add a train">+</button>${clear ? `<button class="btn small pc pclear" tabindex="-1" data-point="${esc(g.point)}" title="Remove this point's rows">clear</button>` : ''}`;
     if (!g.rows.length) {
       html += `<tr class="nil first"><td class="pt">${head(false)}</td><td class="n"></td><td class="nil" colspan="2">NIL</td><td></td></tr>`;
       continue;
@@ -77,7 +77,7 @@ function renderGrid() {
         <td class="n">${i + 1}</td>
         <td class="tr"><input data-i="${idx}" data-f="train" value="${esc(r.train)}" placeholder="Train" autocapitalize="characters"></td>
         <td><input data-i="${idx}" data-f="remark" value="${esc(r.remark)}" placeholder="Remark" autocapitalize="characters"></td>
-        <td><button class="btn x del" data-i="${idx}" title="Remove">×</button></td>
+        <td><button class="btn x del" tabindex="-1" data-i="${idx}" title="Remove">×</button></td>
       </tr>`;
     });
   }
@@ -166,7 +166,8 @@ $('grid').addEventListener('input', (e) => {
   r[el.dataset.f] = el.value.toUpperCase();
   save(); renderMessage();
 });
-$('grid').addEventListener('change', (e) => { if (e.target.dataset.f) render(); });
+// leaving a box: its text is shown in capitals as it was kept; the grid is not redrawn, so Tab keeps its place
+$('grid').addEventListener('change', (e) => { const r = rows[Number(e.target.dataset.i)]; if (r && e.target.dataset.f) e.target.value = r[e.target.dataset.f]; });
 // Ctrl+Z: inside a box the browser takes back the typing there; anywhere else it is the grid's undo
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) { e.preventDefault(); undo(); }
@@ -174,11 +175,14 @@ document.addEventListener('keydown', (e) => {
 $('undo').onclick = undo;
 $('undo').disabled = true;
 $('grid').addEventListener('keydown', (e) => {
-  // Enter on a remark adds the next train at that point
-  if (e.key === 'Enter' && e.target.dataset.f === 'remark') {
+  // Tab goes train -> remark -> next train (the buttons stay out of its way). Enter on a remark, or Tab on
+  // the last remark of a point, adds the next train at that point.
+  const r = rows[Number(e.target.dataset.i)];
+  if (!r || e.target.dataset.f !== 'remark') return;
+  const last = rows.filter((x) => x.point === r.point).pop() === r;
+  if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey && last)) {
     e.preventDefault();
-    const r = rows[Number(e.target.dataset.i)];
-    if (r) $('grid').querySelector(`button.add[data-point="${CSS.escape(r.point)}"]`).click();
+    $('grid').querySelector(`button.add[data-point="${CSS.escape(r.point)}"]`).click();
   }
 });
 
