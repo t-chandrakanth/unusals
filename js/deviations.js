@@ -55,6 +55,25 @@ export function parsePaste(text, { point = '', points = DEFAULT_POINTS } = {}) {
   return rows;
 }
 
+/** A pasted list of remarks, one on a line (a leading number dropped, NIL and blank lines skipped). */
+export function parseRemarks(text) {
+  return String(text || '').split(/\r?\n/).map((l) => clean(l).replace(/^\d+[.)]?\s+/, '')).filter((l) => l && !/^nil$/i.test(l)).map((l) => l.toUpperCase());
+}
+
+/**
+ * Remarks put on the rows of a point in order, from the row at index `from` of `rows` (the point's first
+ * row by default); lines left over become rows of their own, their train still to be typed. -> new rows.
+ */
+export function withRemarks(rows, point, lines, from = null) {
+  const out = rows.map((r) => ({ ...r }));
+  const at = out.filter((r) => r.point === point);
+  let i = from === null ? 0 : Math.max(0, at.indexOf(out[from]));
+  for (const line of lines) {
+    if (i < at.length) at[i++].remark = line; else out.push({ point, train: '', remark: line });
+  }
+  return out;
+}
+
 /**
  * The rows of each point, in the order of the points; a point not in the list is added at the end.
  * A row with no train yet is kept for the grid (it is being typed) and left out of the message with `filled`.

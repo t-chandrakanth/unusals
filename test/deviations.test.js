@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_POINTS, parsePoints, parsePaste, grouped, deviationsMessage, deviationsWhatsApp, deviationsSheet } from '../js/deviations.js';
+import { DEFAULT_POINTS, parsePoints, parsePaste, parseRemarks, withRemarks, grouped, deviationsMessage, deviationsWhatsApp, deviationsSheet } from '../js/deviations.js';
 
 const ROWS = [
   { point: 'BPQ', train: 'BCN', remark: 'FOR ACCEPTANCE MAGH ARR 14:29 22-10' },
@@ -42,6 +42,16 @@ test('a plain list of trains, one on a line, goes in order under the chosen poin
   assert.deepEqual(parsePaste('BPQ\n1. BCN\n2. BJ51\nwadi\nLONI\nLUR\nNIL').map((r) => `${r.point}:${r.train}`), ['BPQ:BCN', 'BPQ:BJ51', 'WADI:LONI']);
   // without a point to go under, plain lines are not rows
   assert.deepEqual(parsePaste('BCN\nBJ51'), []);
+});
+
+test('a pasted list of remarks goes on the rows of a point in order; lines left over become rows of their own', () => {
+  assert.deepEqual(parseRemarks('1. for acceptance\n\nNIL\nrake not received '), ['FOR ACCEPTANCE', 'RAKE NOT RECEIVED']);
+  const rows = [{ point: 'BPQ', train: 'BCN', remark: '' }, { point: 'GTL', train: 'MYA', remark: 'OLD' }, { point: 'BPQ', train: 'BJ51', remark: '' }];
+  const out = withRemarks(rows, 'BPQ', ['A', 'B', 'C']);
+  assert.deepEqual(out.map((r) => `${r.point}:${r.train}:${r.remark}`), ['BPQ:BCN:A', 'GTL:MYA:OLD', 'BPQ:BJ51:B', 'BPQ::C']);
+  // from the second row of the point
+  assert.deepEqual(withRemarks(rows, 'BPQ', ['X'], 2).map((r) => r.remark), ['', 'OLD', 'X']);
+  assert.deepEqual(rows[0].remark, '', 'the rows given are not changed');
 });
 
 test('the points: the default list, or the ones typed; a point only in the rows is added at the end', () => {

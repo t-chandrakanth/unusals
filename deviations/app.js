@@ -1,6 +1,6 @@
 // Interchange deviations: the rows typed or pasted in, the message to CFTM out (text, WhatsApp, picture, PDF).
 
-import { DEFAULT_POINTS, parsePoints, parsePaste, grouped, deviationsMessage, deviationsWhatsApp, deviationsSheet } from '../js/deviations.js';
+import { DEFAULT_POINTS, parsePoints, parsePaste, parseRemarks, withRemarks, grouped, deviationsMessage, deviationsWhatsApp, deviationsSheet } from '../js/deviations.js';
 import { sheetToCanvas } from '../js/canvas.js';
 import { buildPdf } from '../js/pdf.js';
 
@@ -20,6 +20,22 @@ try { rows = JSON.parse(store.get('dev-rows', '[]')); if (!Array.isArray(rows)) 
 const points = () => parsePoints(store.get('dev-points'));
 const save = () => store.set('dev-rows', JSON.stringify(rows));
 
+// ---------- undo: the rows as they were before each change, the last 50; Ctrl+Z or the Undo button ----------
+const history = [];
+function remember() {
+  const now = JSON.stringify(rows);
+  if (history[history.length - 1] !== now) history.push(now);
+  if (history.length > 50) history.shift();
+  $('undo').disabled = false;
+}
+function undo() {
+  if (!history.length) { toast('Nothing to undo.'); return; }
+  rows = JSON.parse(history.pop());
+  save(); render();
+  $('undo').disabled = !history.length;
+  toast('Undone.');
+}
+
 const today = new Date();
 $('date').value = store.get('dev-date') || key(new Date(today.getTime() - 86400000));
 $('from').value = store.get('dev-from') || 'SR.DOM/SC';
@@ -33,14 +49,15 @@ function renderGrid() {
   const body = $('grid').tBodies[0];
   let html = '';
   for (const g of grouped(points(), rows)) {
+    const head = (clear) => `${esc(g.point)} <button class="btn small add" data-point="${esc(g.point)}" title="Add a train">+</button>${clear ? `<button class="btn small pc pclear" data-point="${esc(g.point)}" title="Remove this point's rows">clear</button>` : ''}`;
     if (!g.rows.length) {
-      html += `<tr class="nil first"><td class="pt">${esc(g.point)} <button class="btn small add" data-point="${esc(g.point)}" title="Add a train">+</button></td><td class="n"></td><td class="nil" colspan="2">NIL</td><td></td></tr>`;
+      html += `<tr class="nil first"><td class="pt">${head(false)}</td><td class="n"></td><td class="nil" colspan="2">NIL</td><td></td></tr>`;
       continue;
     }
     g.rows.forEach((r, i) => {
       const idx = rows.indexOf(r);
       html += `<tr${i === 0 ? ' class="first"' : ''}>
-        <td class="pt">${i === 0 ? `${esc(g.point)} <button class="btn small add" data-point="${esc(g.point)}" title="Add a train">+</button>` : ''}</td>
+        <td class="pt">${i === 0 ? head(true) : ''}</td>
         <td class="n">${i + 1}</td>
         <td class="tr"><input data-i="${idx}" data-f="train" value="${esc(r.train)}" placeholder="Train" autocapitalize="characters"></td>
         <td><input data-i="${idx}" data-f="remark" value="${esc(r.remark)}" placeholder="Remark" autocapitalize="characters"></td>
@@ -57,8 +74,16 @@ function renderMessage() {
 const render = () => { renderGrid(); renderMessage(); };
 
 $('grid').addEventListener('click', (e) => {
+  const pclear = e.target.closest('button.pclear');
+  if (pclear) {
+    remember();
+    rows = rows.filter((r) => r.point !== pclear.dataset.point);
+    save(); render(); toast(`${pclear.dataset.point} cleared. Ctrl+Z brings it back.`);
+    return;
+  }
   const add = e.target.closest('button.add');
   if (add) {
+    remember();
     rows.push({ point: add.dataset.point, train: '', remark: '' });
     save(); render();
     const inputs = $('grid').querySelectorAll(`input[data-f="train"]`);
@@ -66,9 +91,11 @@ $('grid').addEventListener('click', (e) => {
     if (last) last.focus();
   }
   const del = e.target.closest('button.del');
-  if (del) { rows.splice(Number(del.dataset.i), 1); save(); render(); }
+  if (del) { remember(); rows.splice(Number(del.dataset.i), 1); save(); render(); }
 });
-// typing updates the row and the message; the grid is not redrawn under the caret
+// typing updates the row and the message; the grid is not redrawn under the caret. What the box held
+// before the typing is remembered once, when it is entered, so Ctrl+Z outside the box takes the typing back.
+$('grid').addEventListener('focusin', (e) => { if (e.target.dataset && e.target.dataset.f) remember(); });
 $('grid').addEventListener('input', (e) => {
   const el = e.target;
   if (!el.dataset.f) return;
@@ -78,6 +105,12 @@ $('grid').addEventListener('input', (e) => {
   save(); renderMessage();
 });
 $('grid').addEventListener('change', (e) => { if (e.target.dataset.f) render(); });
+// Ctrl+Z: inside a box the browser takes back the typing there; anywhere else it is the grid's undo
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) { e.preventDefault(); undo(); }
+});
+$('undo').onclick = undo;
+$('undo').disabled = true;
 $('grid').addEventListener('keydown', (e) => {
   // Enter on a remark adds the next train at that point
   if (e.key === 'Enter' && e.target.dataset.f === 'remark') {
@@ -94,9 +127,18 @@ $('tday').onclick = () => { $('date').value = key(new Date()); store.set('dev-da
 // ---------- paste: a list of trains, or rows from Excel ----------
 function addRows(got) {
   if (!got.length) { toast('No rows found. Paste the trains one on a line, or the rows from Excel.'); return; }
+  remember();
   rows.push(...got);
   save(); render();
   toast(`${got.length} row${got.length === 1 ? '' : 's'} added.`);
+}
+function addRemarks(point, lines, from = null) {
+  if (!lines.length) { toast('No remarks found. Paste them one on a line.'); return false; }
+  remember();
+  rows = withRemarks(rows, point, lines, from);
+  save(); render();
+  toast(`${lines.length} remark${lines.length === 1 ? '' : 's'} put on ${point}.`);
+  return true;
 }
 function openPaste(point) {
   const sel = $('ptpoint');
@@ -109,23 +151,32 @@ $('paste').onclick = () => openPaste();
 $('ptcancel').onclick = () => { $('pastebox').hidden = true; $('pt').value = ''; };
 $('ptadd').onclick = () => {
   store.set('dev-paste-point', $('ptpoint').value);
-  const got = parsePaste($('pt').value, { point: $('ptpoint').value, points: points() });
+  const point = $('ptpoint').value;
+  if ($('ptkind').value === 'remarks') {
+    if (addRemarks(point, parseRemarks($('pt').value))) { $('pastebox').hidden = true; $('pt').value = ''; }
+    return;
+  }
+  const got = parsePaste($('pt').value, { point, points: points() });
   if (got.length) { $('pastebox').hidden = true; $('pt').value = ''; }
   addRows(got);
 };
-// many lines pasted into a train box: one row each, in order, at that point
+// many lines pasted into a train box: one row each, in order, at that point; into a remark box: the
+// remarks of that point's rows from this one on, in order
 $('grid').addEventListener('paste', (e) => {
   const el = e.target;
-  if (el.dataset.f !== 'train') return;
+  if (!el.dataset.f) return;
   const text = (e.clipboardData || window.clipboardData).getData('text') || '';
   if (!/\n\s*\S/.test(text.trim())) return;
   e.preventDefault();
-  const r = rows[Number(el.dataset.i)];
-  const got = parsePaste(text, { point: r ? r.point : '', points: points() });
-  if (r && !r.train.trim() && got.length) rows.splice(Number(el.dataset.i), 1);
+  const i = Number(el.dataset.i);
+  const r = rows[i];
+  if (!r) return;
+  if (el.dataset.f === 'remark') { addRemarks(r.point, parseRemarks(text), i); return; }
+  const got = parsePaste(text, { point: r.point, points: points() });
+  if (!r.train.trim() && got.length) rows.splice(i, 1);
   addRows(got);
 });
-$('clear').onclick = () => { if (!rows.length || confirm('Remove all the rows?')) { rows = []; save(); render(); } };
+$('clear').onclick = () => { if (!rows.length || confirm('Remove all the rows? Ctrl+Z brings them back.')) { remember(); rows = []; save(); render(); } };
 
 // ---------- the points ----------
 $('psave').onclick = () => { store.set('dev-points', $('points').value); render(); toast('Saved'); };

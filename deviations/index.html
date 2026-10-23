@@ -29,6 +29,7 @@
   .btn.wa { background: #1f9d55; color: #fff; border-color: #1f9d55; }
   .btn.small { padding: 6px 10px; font-size: 13px; }
   .btn.x { padding: 4px 9px; color: var(--red); border-color: transparent; font-size: 18px; line-height: 1; }
+  .btn.pc { padding: 3px 7px; font-size: 11px; color: var(--red); margin-left: 2px; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .tbl { overflow: auto; }
   table { border-collapse: collapse; width: 100%; min-width: 640px; }
@@ -67,15 +68,18 @@
   <section class="panel">
     <div class="row" style="justify-content: space-between">
       <h2>Deviations</h2>
-      <div class="row"><button class="btn small" id="paste">Paste from Excel</button><button class="btn small" id="clear">Clear</button></div>
+      <div class="row"><button class="btn small" id="paste">Paste from Excel</button><button class="btn small" id="undo" title="Ctrl+Z">Undo</button><button class="btn small" id="clear">Clear all</button></div>
     </div>
     <div id="pastebox" hidden>
-      <div class="row"><label class="f">Under the point <select id="ptpoint"></select></label><span class="small">for lines that are a train alone; a line with the point's name switches to it</span></div>
-      <textarea id="pt" placeholder="Paste a list of trains, one on a line, or the rows from Excel: IC POINT, S.NO, TRAIN NO, REMARKS (S.NO may be left out; a blank IC POINT means the one above)"></textarea>
+      <div class="row">
+        <label class="f">Under the point <select id="ptpoint"></select></label>
+        <label class="f">The lines are <select id="ptkind"><option value="trains">trains (or rows from Excel)</option><option value="remarks">remarks, for that point's rows in order</option></select></label>
+      </div>
+      <textarea id="pt" placeholder="Paste a list of trains, one on a line (a line with a point's name switches to it), or the rows from Excel: IC POINT, S.NO, TRAIN NO, REMARKS. Or, with 'remarks' chosen, a list of remarks for the point's rows in order."></textarea>
       <div class="actions" style="margin-top:8px"><button class="btn primary small" id="ptadd">Add these rows</button><button class="btn small" id="ptcancel">Cancel</button></div>
     </div>
     <div class="tbl"><table id="grid"><thead><tr><th>IC Point</th><th>S.No</th><th>Train No</th><th>Remarks</th><th></th></tr></thead><tbody></tbody></table></div>
-    <p class="small">Type the train and remark on a point's row; the <b>+</b> adds another train there. A point with no train goes in the message as NIL.</p>
+    <p class="small">Type the train and remark on a point's row; <b>+</b> adds another train there, <b>clear</b> empties that point. A list pasted into a train or remark box fills the rows in order. <b>Ctrl+Z</b> (or Undo) takes back the last change. A point with no train goes in the message as NIL.</p>
   </section>
 
   <div class="actions">
