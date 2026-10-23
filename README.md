@@ -8,6 +8,12 @@ tabs at the top:
 | **DPWCS LOCO** | Loco positions, the daily report and history | `.../unusals/dpwcs/` | `dpwcs/` |
 | **SCR UNUSALS** | Loco, stalling, C&W, other and block reports, day by day | `.../unusals/unusual/` | `unusual/` |
 
+On their own, outside the two tabs: **CAF Bound Position** at `.../unusals/caf/`
+(the CAF bound trains from the pasted running position sheets) and **Interchange
+Deviations** at `.../unusals/deviations/` (the daily deviations message to CFTM:
+the trains at each interchange point with the remark, NIL where there is none,
+typed or pasted from Excel; out as text, WhatsApp, picture or PDF).
+
 Install it once, from the front address, and both open from the one icon. The
 tab you used last is the one it opens on (`#dpwcs` or `#unusual` after the
 address picks one). Each part keeps its own copy of the data on the device and
