@@ -52,14 +52,24 @@
   summary { cursor: pointer; font-weight: 700; }
   #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #17202b; color: #fff; padding: 10px 16px; border-radius: 99px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; }
   #toast.show { opacity: 1; }
+  .tabs { display: flex; gap: 6px; margin: 10px 0 -14px; }
+  .tabs button { flex: 1; max-width: 220px; padding: 9px 12px; border: 0; border-radius: 10px 10px 0 0; background: rgba(255,255,255,.12); color: #c5d2e3; font: inherit; font-weight: 800; letter-spacing: .03em; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--bg); color: var(--navy); }
+  @media (prefers-color-scheme: dark) { .tabs button[aria-selected="true"] { color: #e8edf3; } }
+  #f-rej { display: block; width: 100%; height: calc(100vh - 150px); border: 0; background: var(--bg); }
 </style>
 </head>
 <body>
 <header>
-  <h1>CAF BOUND POSITION</h1>
-  <p>Paste the running position sheets copied from Excel. The CAF bound trains, with their zone and its state, come out by themselves.</p>
+  <h1 id="h1">CAF BOUND POSITION</h1>
+  <p id="h1p">Paste the running position sheets copied from Excel. The CAF bound trains, with their zone and its state, come out by themselves.</p>
+  <nav class="tabs" role="tablist">
+    <button id="tab-caf" role="tab" aria-selected="true" aria-controls="main">CAF BOUND</button>
+    <button id="tab-rej" role="tab" aria-selected="false" aria-controls="f-rej">REJECTIONS</button>
+  </nav>
 </header>
-<main>
+<iframe id="f-rej" title="Rejections: interchange deviations" data-src="../deviations/?embed=1" hidden></iframe>
+<main id="main">
   <div class="inputs">
     <section class="panel">
       <h2>Yesterday's sheet</h2>
@@ -92,6 +102,29 @@
   </details>
 </main>
 <div id="toast" role="status"></div>
+<script>
+  // Two tabs: the CAF bound table here, the rejections (interchange deviations) page in a frame, loaded on first use.
+  // The tab used last is remembered (#rejections in the address picks it too).
+  (function () {
+    var tabs = { caf: document.getElementById('tab-caf'), rej: document.getElementById('tab-rej') };
+    var main = document.getElementById('main'), frame = document.getElementById('f-rej');
+    var h1 = document.getElementById('h1'), h1p = document.getElementById('h1p');
+    function show(which) {
+      var rej = which === 'rej';
+      if (rej && !frame.src) frame.src = frame.dataset.src;
+      main.hidden = rej; frame.hidden = !rej;
+      tabs.caf.setAttribute('aria-selected', String(!rej)); tabs.rej.setAttribute('aria-selected', String(rej));
+      h1.textContent = rej ? 'REJECTIONS' : 'CAF BOUND POSITION';
+      h1p.textContent = rej ? 'The daily interchange deviations message: the trains for acceptance or not accepted at each interchange point.' : 'Paste the running position sheets copied from Excel. The CAF bound trains, with their zone and its state, come out by themselves.';
+      try { localStorage.setItem('caf-tab', which); } catch (e) {}
+      if (location.hash !== (rej ? '#rejections' : '')) history.replaceState(null, '', rej ? '#rejections' : location.pathname + location.search);
+    }
+    tabs.caf.onclick = function () { show('caf'); };
+    tabs.rej.onclick = function () { show('rej'); };
+    var last = ''; try { last = localStorage.getItem('caf-tab') || ''; } catch (e) {}
+    show(location.hash === '#rejections' ? 'rej' : location.hash === '#caf' ? 'caf' : last === 'rej' ? 'rej' : 'caf');
+  })();
+</script>
 <script type="module" src="app.js"></script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
 </body>

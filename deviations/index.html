@@ -49,7 +49,7 @@
 </style>
 </head>
 <body>
-<header>
+<header id="hdr">
   <h1>INTERCHANGE DEVIATIONS</h1>
   <p>The daily deviations message to CFTM: the trains at each interchange point with the remark, NIL where there is none.</p>
 </header>
@@ -98,6 +98,7 @@
   </details>
 </main>
 <div id="toast" role="status"></div>
+<script>if (/[?&]embed=1/.test(location.search)) document.getElementById('hdr').hidden = true;</script>
 <script type="module" src="app.js"></script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
 </body>
