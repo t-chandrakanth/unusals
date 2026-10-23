@@ -21,21 +21,33 @@ export function parsePoints(text) {
 
 /**
  * Rows copied from Excel: IC POINT, S.NO, TRAIN NO, REMARKS (S.NO may be missing; a heading row is skipped;
- * a row with no point belongs to the point above it). -> [{ point, train, remark }].
+ * a row with no point belongs to the point above it). A line with a train alone (a plain list of trains,
+ * one on a line) goes under the point above it, or `point`; a line that is a point's name alone starts
+ * that point. -> [{ point, train, remark }].
  */
-export function parsePaste(text) {
+export function parsePaste(text, { point = '', points = DEFAULT_POINTS } = {}) {
   const rows = [];
-  let last = '';
+  let last = key(point);
+  const known = points.map(key);
   for (const r of parseTsv(text)) {
     if (!r.some(Boolean)) continue;
     const cells = r.map(clean);
     if (/^(ic\s*point|point|interchange)/i.test(cells[0]) && /train/i.test(cells.join(' '))) continue;
+    if (cells.filter(Boolean).length === 1 && cells[0]) {
+      const one = cells[0].replace(/^\d+[.)]?\s+/, '');
+      if (known.includes(key(one))) { last = key(one); continue; }
+      if (/^nil$/i.test(one)) continue;
+      if (last) rows.push({ point: last, train: key(one), remark: '' });
+      continue;
+    }
     let [point, a, b, ...rest] = cells;
     // with S.NO: POINT, 1, BCN, remark; without: POINT, BCN, remark
     let train, remark;
     if (/^\d+\.?$/.test(a || '')) { train = b; remark = rest.join(' '); } else { train = a; remark = [b, ...rest].filter(Boolean).join(' '); }
     point = key(point) || last;
-    if (!point || !train) continue;
+    if (!point) continue;
+    if (known.includes(point) && !train) { last = point; continue; }
+    if (!train) continue;
     last = point;
     if (/^nil$/i.test(train)) continue;
     rows.push({ point, train: key(train), remark: clean(remark).toUpperCase() });

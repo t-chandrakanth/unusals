@@ -70,7 +70,8 @@
       <div class="row"><button class="btn small" id="paste">Paste from Excel</button><button class="btn small" id="clear">Clear</button></div>
     </div>
     <div id="pastebox" hidden>
-      <textarea id="pt" placeholder="Copy the rows from Excel and paste them here: IC POINT, S.NO, TRAIN NO, REMARKS (S.NO may be left out; a blank IC POINT means the one above)"></textarea>
+      <div class="row"><label class="f">Under the point <select id="ptpoint"></select></label><span class="small">for lines that are a train alone; a line with the point's name switches to it</span></div>
+      <textarea id="pt" placeholder="Paste a list of trains, one on a line, or the rows from Excel: IC POINT, S.NO, TRAIN NO, REMARKS (S.NO may be left out; a blank IC POINT means the one above)"></textarea>
       <div class="actions" style="margin-top:8px"><button class="btn primary small" id="ptadd">Add these rows</button><button class="btn small" id="ptcancel">Cancel</button></div>
     </div>
     <div class="tbl"><table id="grid"><thead><tr><th>IC Point</th><th>S.No</th><th>Train No</th><th>Remarks</th><th></th></tr></thead><tbody></tbody></table></div>

@@ -91,17 +91,40 @@ for (const id of ['from', 'to', 'date']) $(id).addEventListener('input', () => {
 $('yday').onclick = () => { $('date').value = key(new Date(Date.now() - 86400000)); store.set('dev-date', $('date').value); renderMessage(); };
 $('tday').onclick = () => { $('date').value = key(new Date()); store.set('dev-date', $('date').value); renderMessage(); };
 
-// ---------- paste from Excel ----------
-$('paste').onclick = () => { $('pastebox').hidden = false; $('pt').focus(); };
-$('ptcancel').onclick = () => { $('pastebox').hidden = true; $('pt').value = ''; };
-$('ptadd').onclick = () => {
-  const got = parsePaste($('pt').value);
-  if (!got.length) { toast('No rows found. Each row needs the IC point, the train and the remark.'); return; }
+// ---------- paste: a list of trains, or rows from Excel ----------
+function addRows(got) {
+  if (!got.length) { toast('No rows found. Paste the trains one on a line, or the rows from Excel.'); return; }
   rows.push(...got);
   save(); render();
-  $('pastebox').hidden = true; $('pt').value = '';
   toast(`${got.length} row${got.length === 1 ? '' : 's'} added.`);
+}
+function openPaste(point) {
+  const sel = $('ptpoint');
+  sel.innerHTML = points().map((p) => `<option>${esc(p)}</option>`).join('');
+  sel.value = point || store.get('dev-paste-point') || points()[0];
+  if (!sel.value) sel.selectedIndex = 0;
+  $('pastebox').hidden = false; $('pt').focus();
+}
+$('paste').onclick = () => openPaste();
+$('ptcancel').onclick = () => { $('pastebox').hidden = true; $('pt').value = ''; };
+$('ptadd').onclick = () => {
+  store.set('dev-paste-point', $('ptpoint').value);
+  const got = parsePaste($('pt').value, { point: $('ptpoint').value, points: points() });
+  if (got.length) { $('pastebox').hidden = true; $('pt').value = ''; }
+  addRows(got);
 };
+// many lines pasted into a train box: one row each, in order, at that point
+$('grid').addEventListener('paste', (e) => {
+  const el = e.target;
+  if (el.dataset.f !== 'train') return;
+  const text = (e.clipboardData || window.clipboardData).getData('text') || '';
+  if (!/\n\s*\S/.test(text.trim())) return;
+  e.preventDefault();
+  const r = rows[Number(el.dataset.i)];
+  const got = parsePaste(text, { point: r ? r.point : '', points: points() });
+  if (r && !r.train.trim() && got.length) rows.splice(Number(el.dataset.i), 1);
+  addRows(got);
+});
 $('clear').onclick = () => { if (!rows.length || confirm('Remove all the rows?')) { rows = []; save(); render(); } };
 
 // ---------- the points ----------

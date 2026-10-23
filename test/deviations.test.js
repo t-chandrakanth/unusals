@@ -34,6 +34,16 @@ test('rows pasted from Excel: with or without S.NO, a heading row skipped, a bla
   ]);
 });
 
+test('a plain list of trains, one on a line, goes in order under the chosen point; a point name on a line of its own switches the point', () => {
+  const list = 'BCN/PRE27/9/ CAF STB\nDTO-42 CAF JBP RICE \nGAR/BZU-42 NP CEMT \n\nFN-1 JHS/MANNING\n';
+  assert.deepEqual(parsePaste(list, { point: 'bpq' }).map((r) => [r.point, r.train, r.remark]), [
+    ['BPQ', 'BCN/PRE27/9/ CAF STB', ''], ['BPQ', 'DTO-42 CAF JBP RICE', ''], ['BPQ', 'GAR/BZU-42 NP CEMT', ''], ['BPQ', 'FN-1 JHS/MANNING', ''],
+  ]);
+  assert.deepEqual(parsePaste('BPQ\n1. BCN\n2. BJ51\nwadi\nLONI\nLUR\nNIL').map((r) => `${r.point}:${r.train}`), ['BPQ:BCN', 'BPQ:BJ51', 'WADI:LONI']);
+  // without a point to go under, plain lines are not rows
+  assert.deepEqual(parsePaste('BCN\nBJ51'), []);
+});
+
 test('the points: the default list, or the ones typed; a point only in the rows is added at the end', () => {
   assert.deepEqual(parsePoints(''), DEFAULT_POINTS);
   assert.deepEqual(parsePoints('bpq\nwadi, BZA\n\nbpq'), ['BPQ', 'WADI', 'BZA']);
