@@ -3,6 +3,7 @@
 import { parsePoints, parsePaste, parseRemarks, withRemarks, grouped, deviationsMessage, deviationsWhatsApp, deviationsSheet } from '../js/deviations.js';
 import { sheetToCanvas } from '../js/canvas.js';
 import { buildPdf } from '../js/pdf.js';
+import { sheetToXlsx } from '../js/xlsx.js';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -292,3 +293,7 @@ $('pdf').onclick = async () => {
 $('sfrom').value = store.get('dev-sfrom');
 $('sto').value = store.get('dev-sto');
 openDay($('date').value);
+$('xls').onclick = () => {
+  const bytes = sheetToXlsx(deviationsSheet(opts()));
+  shareOrSave(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fileName('xlsx'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+};
