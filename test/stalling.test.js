@@ -82,7 +82,7 @@ test('the WhatsApp message carries the table, the events, the detention and the 
   const m = whatsappText(drta());
   assert.match(m, /^\*STALLING REPORT – TRAIN DRTA\*/);
   assert.match(m, /Stalled at: KM 478\/01/);
-  assert.match(m, /- Relief loco arrived AT 20:46/);
+  assert.match(m, /20:46-Relief loco arrived/);
   assert.match(m, /\*Detention: 1 hr 51 min/);
   assert.match(m, /3\. VSPG – CKN ARR 19:41/);
 });
@@ -103,7 +103,7 @@ test('the time of the incident gives the first row by itself, once', () => {
   const own = { ...s, events: [{ t: '19:06', text: 'Loco stalled' }] };
   assert.equal(eventsOf(own).length, 1);
   assert.equal(detention({ ...s, events: [...s.events, { t: '20:57', text: 'Spot departure' }] }).total, 111);
-  assert.match(whatsappText(s), /- Loco stalled at km 478\/01 AT 19:06/);
+  assert.match(whatsappText(s), /19:06-Loco stalled at km 478\/01/);
 });
 
 test('a km is read with its post, and the stall is placed on the profile by it', () => {

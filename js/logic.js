@@ -209,10 +209,12 @@ export function cwMessage(u, { dpwcs = false } = {}) {
   }
   const wagon = [['Wagon no', u.wagonNo], ['BPC no', u.bpcNo]].filter(([, v]) => t(v));
   if (wagon.length) out.push(...wagon.map(([k, v]) => `${k} : ${t(v)}`), '');
-  const events = parseEvents(u.reason).map((e) => (e.t && e.text ? `- ${e.text} AT ${e.t}` : `- ${e.text || e.t}`));
+  // time first on every line: "08:30-KZJ YTPY ARR"
+  const events = parseEvents(u.reason).map((e) => (e.t && e.text ? `${e.t}-${e.text}` : e.text || e.t));
   if (events.length) out.push('', '*Sequence of Events:*', ...events, '');
+  // plan lines keep a leading time if one was written, otherwise they are numbered
   const plan = repLines(u.plan);
-  if (plan.length) out.push('*Plan of action:*', ...plan.map((p, n) => `${n + 1}. ${p}`), '');
+  if (plan.length) out.push('*Plan of action:*', ...plan.map((p, n) => (/^\d{1,2}[:.]\d{2}\b/.test(p) ? p.replace(/^(\d{1,2}[:.]\d{2})\s*[-:]?\s*/, '$1-') : `${n + 1}. ${p}`)), '');
   if (dpwcs && t(u.det)) out.push(`*Detention :* ${t(u.det)}`, '');
   let official = {};
   try { official = JSON.parse(u.official) || {}; } catch { /* no official report */ }
