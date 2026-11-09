@@ -4,7 +4,7 @@
 // app next door, and the shared database table of unusual reports.
 
 import * as L from '../js/logic.js';
-import { linesEditor, insertButton } from '../js/lines.js';
+import { insertButton } from '../js/lines.js';
 import { createSync } from '../js/sync.js';
 import { diffOps } from '../js/syncdata.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
@@ -318,7 +318,7 @@ function openForm(type, existing) {
     const kind = kindOf(draft);
     const titles = [...new Set([...TYPES[kind].titles, ...rows().filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
     const field = (key) => {
-      if (key === 'plan') return h('div', { class: 'field wide' }, h('span', null, 'Plan of action'), linesEditor(h, draft.plan, (v) => { draft.plan = v; }, { placeholder: HINT.plan.split('\n')[0], label: 'Step', addText: '+ Add line' }));
+      if (key === 'plan') return h('div', { class: 'field wide' }, h('span', null, 'Plan of action'), eventsEditor(h, draft.plan, (v) => { draft.plan = v; }, { min: 3 }));
       if (key === 'rep') return h('div', { class: 'field wide' }, h('span', null, 'Goods repercussions (leave empty if none)'), repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
       const el = key === 'reason' || key === 'rep'
         ? h('textarea', { rows: key === 'rep' ? 3 : 6, value: draft[key], placeholder: HINT[key] })
@@ -796,7 +796,7 @@ function newReportCard(view) {
     }
     if (key === 'plan') {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Plan of action'),
-        linesEditor(h, draft.plan, (v) => { draft.plan = v; }, { placeholder: HINT.plan.split('\n')[0], label: 'Step', addText: '+ Add line' }));
+        eventsEditor(h, draft.plan, (v) => { draft.plan = v; }, { min: 3 }));
     }
     if (key === 'rep') {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Goods repercussions (leave empty if none)'),
@@ -1124,11 +1124,11 @@ function openStallingForm(existing, from, inline) {
         insertButton(h, `Add a repercussion below ${i + 1}`, () => { s.repercussions.splice(i + 1, 0, ''); build(); }),
         h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.repercussions.splice(i, 1); if (!s.repercussions.length) s.repercussions.push(''); build(); } }, '×'))));
     const planRows = h('div', { class: 'ev-rows' },
-      s.plan.map((r, i) => h('div', { class: 'ev-row rep' },
-        h('span', { class: 'rn' }, String(i + 1)),
-        bare(() => r, (v) => { s.plan[i] = v; }, 'Plan of action', 'Relief loco 33111 to attach from rear'),
-        insertButton(h, `Add a step below ${i + 1}`, () => { s.plan.splice(i + 1, 0, ''); build(); }),
-        h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.plan.splice(i, 1); if (!s.plan.length) s.plan.push(''); build(); } }, '×'))));
+      s.plan.map((e, i) => h('div', { class: 'ev-row' },
+        bare(() => e.t, (v) => { e.t = v; }, 'Time', '12:10'),
+        bare(() => e.text, (v) => { e.text = v; }, 'Plan of action', 'Relief loco 33111 to attach from rear'),
+        insertButton(h, `Add a step below ${i + 1}`, () => { s.plan.splice(i + 1, 0, { t: '', text: '' }); build(); }),
+        h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.plan.splice(i, 1); if (!s.plan.length) s.plan.push({ t: '', text: '' }); build(); } }, '×'))));
     const remarks = h('textarea', { rows: 4, value: s.remarks, placeholder: 'Left empty, the remarks are written from the train timings and the events.' });
     remarks.addEventListener('input', (e) => { s.remarks = e.target.value; });
     const slider = h('input', {
@@ -1184,7 +1184,7 @@ function openStallingForm(existing, from, inline) {
       }, 'Write the remarks from the events')),
       h('h3', { class: 'rep-title' }, 'Plan of action'),
       planRows,
-      h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.plan.push(''); build(); } }, '+ Add line')),
+      h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.plan.push({ t: '', text: '' }); build(); } }, '+ Add line')),
       h('h3', { class: 'rep-title' }, 'Goods repercussions'),
       repRows,
       h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.repercussions.push(''); build(); } }, '+ Add a row')),
