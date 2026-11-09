@@ -370,7 +370,7 @@ html.embed main { padding-top: 14px; }
   .top .top-center .top-meta { font-size: 11px; }
   .u-form .grid { gap: 10px; }
   .u-form .field span, .ncell > span { font-size: 11px; }
-  .u-form input, .u-form textarea, .ncell input, .ncell textarea { padding: 10px; font-size: 15px; }
+  .u-form input, .u-form textarea, .ncell input, .ncell textarea { padding: 10px; font-size: 16px; }
   .u-form input::placeholder, .ncell input::placeholder { font-size: 13px; }
   .newactions { gap: 6px; flex-wrap: nowrap; }
   .newactions .btn { padding: 0 12px; font-size: 14px; white-space: nowrap; }
