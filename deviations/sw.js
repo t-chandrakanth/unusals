@@ -1,5 +1,5 @@
 // Offline support for Interchange Deviations: the network when there is one, the last saved copy when there is not.
-const CACHE = 'deviations-v2';
+const CACHE = 'deviations-v3';
 const FILES = ['./', 'index.html', 'app.js', 'manifest.webmanifest', '../js/deviations.js', '../js/paste.js', '../js/historyimport.js', '../js/canvas.js', '../js/sheet.js', '../js/pdf.js', '../js/xlsx.js', '../js/logic.js', '../js/block.js', '../js/events.js', '../js/repercussions.js', '../icons/icon-192.png', '../icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
