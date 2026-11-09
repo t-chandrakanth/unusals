@@ -154,6 +154,12 @@ function paint(ctx, m, drawAll) {
     y = table(M, y, W - 2 * M, evRows, 0.12) + 28;
   }
 
+  if (m.plan && m.plan.length) {
+    y = section('Plan of action', M, y, W - 2 * M);
+    let n = 0;
+    y = table(M, y, W - 2 * M, m.plan.map((p) => [p.t || String(++n), p.text, false, true]), 0.12) + 28;
+  }
+
   if (m.remarks) {
     y = section('Remarks', M, y, W - 2 * M);
     font(BASE, false);
@@ -166,7 +172,7 @@ function paint(ctx, m, drawAll) {
   }
 
   if (m.repercussions.length) {
-    y = section('Repercussions', M, y, W - 2 * M);
+    y = section('Goods repercussions', M, y, W - 2 * M);
     // S.NO, TR.NO, ARR, DEP, DET (IN MIN)
     const tw = W - 2 * M;
     const cols = [0.07, 0.14, 0.24, 0.12, 0.20, 0.23].map((f) => Math.floor(tw * f));

@@ -220,7 +220,8 @@ export function cwMessage(u) {
   if (head) out.push(head, '');
   const rows = [['Loco no', u.locoNo], ['Load', u.load]].filter(([, v]) => t(v));
   if (rows.length) out.push(...rows.map(([k, v]) => `${k} : ${t(v)}`), '');
-  const wagon = [['Wagon no', u.wagonNo], ['BPC no', u.bpcNo]].filter(([, v]) => t(v));
+  const wagons = t(u.wagonNo).split('\n').map((w) => w.trim()).filter(Boolean);
+  const wagon = [...wagons.map((w) => ['Wagon no', w]), ['BPC no', u.bpcNo]].filter(([, v]) => t(v));
   if (wagon.length) out.push(...wagon.map(([k, v]) => `${k} : ${t(v)}`), '');
   // time first on every line: "08:30-KZJ YTPY ARR"
   const events = parseEvents(u.reason).map((e) => (e.t && e.text ? `${e.t}-${e.text}` : e.text || e.t));

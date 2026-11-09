@@ -34,7 +34,7 @@ export function reportModel(u) {
   const name = (text(u.title) || 'UNUSUAL').toUpperCase();
   const title = `${/REPORT/.test(name) ? name : `${name} REPORT`}${train ? ` – TRAIN ${train}` : ''}`;
   const subtitle = [
-    text(u.wagonNo) && `Wagon ${text(u.wagonNo)}`,
+    text(u.wagonNo) && `Wagon ${text(u.wagonNo).split('\n').map((w) => w.trim()).filter(Boolean).join(', ')}`,
     text(u.location) && `Location ${text(u.location)}`,
     text(u.incident) && `Incident ${text(u.incident)}`,
   ].filter(Boolean).join(' · ');
@@ -45,7 +45,7 @@ export function reportModel(u) {
     ['Loco No', [text(u.locoNo) || text(o.loco), o.multi && `+ ${text(o.multi)}`].filter(Boolean).join(' '), false],
     ['Load', text(u.load), false],
     ['Location', text(u.location) || text(o.section), false],
-    ['Defective wagon', text(u.wagonNo), true],
+    ...text(u.wagonNo).split('\n').map((w) => w.trim()).filter(Boolean).map((w, i, all) => [all.length > 1 ? `Defective wagon ${i + 1}` : 'Defective wagon', w, true]),
     ['BPC No', text(u.bpcNo), true],
     ['Cause', text(o.cause), true],
     ['Incident type', text(o.type), false],
@@ -71,12 +71,15 @@ export function reportModel(u) {
   }
   if (text(o.previous)) remarks = [remarks, `Earlier incidents: ${text(o.previous)}`].filter(Boolean).join(' ');
 
+  // the plan of action, rows of a time and a step, like the events
+  const plan = parseEvents(u.plan);
+
   const asOn = text(u.repAsOn);
   const repercussions = parseRep(u.rep || o.repercussions).map((r) => ({ ...r, det: detOf(r, asOn), still: stillOn(r, asOn) }));
   return {
     title, subtitle, when: [dmy(u.day), text(u.time) && `${text(u.time)} HRS`].filter(Boolean).join('  ·  '),
     photos: photosOf(u), asOn: repercussions.some((r) => r.still) ? asOn : '',
-    details, events: events.map((e) => ({ ...e, hl: /stall|stopp|derail|burst|fail/i.test(e.text) })), remarks, repercussions,
+    details, events: events.map((e) => ({ ...e, hl: /stall|stopp|derail|burst|fail/i.test(e.text) })), plan, remarks, repercussions,
   };
 }
 
