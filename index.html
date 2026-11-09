@@ -158,6 +158,8 @@
       try { if (frame.contentWindow) frame.contentWindow.postMessage('scr-text-zoom', '*'); } catch (e) { /* not loaded yet */ }
     });
   }
+  // on a phone the parts fit the screen as they are, so the size buttons are hidden there
+  if (Math.min(screen.width, innerWidth) < 600) { ['smaller', 'bigger'].forEach(function (id) { document.getElementById(id).style.display = 'none'; }); }
   document.getElementById('smaller').addEventListener('click', function () { zoomStep(-1); });
   document.getElementById('bigger').addEventListener('click', function () { zoomStep(1); });
   APPS.forEach(function (name) { document.getElementById('f-' + name).addEventListener('load', applyZoom); });

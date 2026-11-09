@@ -611,7 +611,7 @@ table.cells tr.dayrow .count { margin-left: 8px; }
 .reprow .ins { width: 28px; height: 28px; padding: 0; border: 0; background: none; color: var(--soft); font-size: 20px; cursor: pointer; }
 
 td.c-reason .evbox { min-width: 300px; }
-@media (max-width: 520px) { .evrow { grid-template-columns: 84px minmax(0, 1fr) 34px 34px; } .evrow.lines { grid-template-columns: 22px minmax(0, 1fr) 34px 34px; } .evrow .x, .evrow .ins { width: 34px; height: 34px; } }
+@media (max-width: 520px) { .evrow { grid-template-columns: 70px minmax(0, 1fr) 34px 34px; gap: 6px; } .evrow.lines { grid-template-columns: 22px minmax(0, 1fr) 34px 34px; } .evrow .x, .evrow .ins { width: 34px; height: 34px; } }
 
 /* ---- DPWCS Locos: the attach box, and Add loco under the other divisions ---- */
 .attach-locos { margin: 0 0 12px; padding: 0; border: 0; background: none; }

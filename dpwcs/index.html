@@ -9,7 +9,7 @@
 <link rel="icon" href="../icons/icon-192.png">
 <link rel="apple-touch-icon" href="../icons/icon-192.png">
 <script>if (/[?&]embed/.test(location.search)) document.documentElement.className += " embed";</script>
-<script>(function () { function z() { try { var v = parseFloat(localStorage.getItem('scr-text-zoom')) || 1; var r = document.documentElement; r.style.zoom = v === 1 ? '' : v; r.style.width = ''; if (v !== 1) requestAnimationFrame(function () { /* browsers that zoom the page wider than the screen get the width taken back in */ if (r.getBoundingClientRect().width > innerWidth + 1) r.style.width = (100 / v) + '%'; }); } catch (e) { /* private mode */ } } z(); addEventListener('storage', function (e) { if (e.key === 'scr-text-zoom') z(); }); addEventListener('message', function (e) { if (e.data === 'scr-text-zoom') z(); }); })();</script>
+<script>(function () { function z() { try { var v = parseFloat(localStorage.getItem('scr-text-zoom')) || 1; if (Math.min(screen.width, innerWidth || screen.width) < 600) v = 1; /* phones use the phone layout as it is */ var r = document.documentElement; r.style.zoom = v === 1 ? '' : v; r.style.width = ''; if (v !== 1) requestAnimationFrame(function () { /* browsers that zoom the page wider than the screen get the width taken back in */ if (r.getBoundingClientRect().width > innerWidth + 1) r.style.width = (100 / v) + '%'; }); } catch (e) { /* private mode */ } } z(); addEventListener('storage', function (e) { if (e.key === 'scr-text-zoom') z(); }); addEventListener('message', function (e) { if (e.data === 'scr-text-zoom') z(); }); })();</script>
 <link rel="stylesheet" href="../styles.css">
 </head>
 <body>
