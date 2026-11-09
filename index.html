@@ -139,6 +139,8 @@
 
   var first = location.hash.slice(1);
   if (APPS.indexOf(first) < 0) { try { first = localStorage.getItem(KEY); } catch (e) { first = ''; } }
+  // on a phone a saved text size is dropped before the parts load: they fit the screen as they are
+  if (Math.min(screen.width, innerWidth) < 600) { try { localStorage.removeItem('scr-text-zoom'); } catch (e) { /* private mode */ } }
   show(first, false);
 
   // text size, for every part: saved on this device, the parts pick it up by themselves
