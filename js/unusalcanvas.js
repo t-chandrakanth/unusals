@@ -150,7 +150,7 @@ function paint(ctx, m, drawAll) {
     yl = table(M, yl, colW, m.details, hasEvents ? 0.42 : 0.25);
     let yr = y;
     if (hasEvents) {
-      yr = section('Sequence of events', rightX, y, W - M - rightX);
+      yr = section('Chronology of events', rightX, y, W - M - rightX);
       yr = table(rightX, yr, W - M - rightX, evRows, 0.27);
     }
     y = Math.max(yl, yr) + 28;
@@ -162,7 +162,7 @@ function paint(ctx, m, drawAll) {
     const a = table(M, top, half, left, 0.4);
     const b = table(M + half + GAP, top, half, right, 0.4);
     y = Math.max(a, b) + 28;
-    y = section('Sequence of events', M, y, W - 2 * M);
+    y = section('Chronology of events', M, y, W - 2 * M);
     y = table(M, y, W - 2 * M, evRows, 0.12) + 28;
   }
 
