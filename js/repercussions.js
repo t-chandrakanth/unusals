@@ -82,7 +82,7 @@ export function repEditor(h, text, onChange, { min = 3, asOn = '', onAsOn = () =
   const emit = () => onChange(formatRep(rows, as));
   const gapHint = (r) => {
     const g = gap(clock(r.arr), clock(String(r.dep || '').trim() ? r.dep : as));
-    return g === null ? 'DET min' : `${g} (auto)`;
+    return g === null ? 'DET' : `${g} (auto)`;
   };
   const hints = [];
   const draw = (focusRow) => {
