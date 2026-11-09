@@ -164,12 +164,34 @@ test('the text message of one report: heading, details, events one to a line, wa
     reason: '21:04 VKB DEP FROM LOOP LINE\n21:08 TRAIN STOPPED', wagonNo: 'SECR-12140893411', bpcNo: '50000951763/JSG/CKP/SER',
     rep: 'KPCC -GDQ- ARR: 21:53, NOT DEPARTED, DET: 327 MINS (UP TO 03:20 HRS)\nYTPY -VKB- ARR: 21:37, DEP: 01:09, DET: 212 MINS',
   };
+  // a report with a wagon is a C&W failure and takes the control-office format
   assert.equal(L.unusualMessage(u), [
-    'KPCC METAL ON TYRE', 'Location : VKB-GDQ', 'Train no : KPCC', 'Loco no : 60529/SBI/01/07', 'Load : 60/60/3365T', '',
-    '21:04-VKB DEP FROM LOOP LINE', '21:08-TRAIN STOPPED', '',
-    'Wagon no : SECR-12140893411', 'BPC no : 50000951763/JSG/CKP/SER', '',
-    'REP:', '1.KPCC -GDQ- ARR: 21:53, NOT DEPARTED, DET: 327 MINS (UP TO 03:20 HRS)', '2.YTPY -VKB- ARR: 21:37, DEP: 01:09, DET: 212 MINS',
+    '*KPCC METAL ON TYRE*', '', 'Location : VKB-GDQ', 'Train no : KPCC', 'Loco no : 60529/SBI/01/07', 'Load : 60/60/3365T', '',
+    'Wagon no : SECR-12140893411', 'BPC no : 50000951763/JSG/CKP/SER', '', '',
+    '*Sequence of Events:*', '- VKB DEP FROM LOOP LINE AT 21:04', '- TRAIN STOPPED AT 21:08', '', '',
+    '*Goods Repercussion:*', '1. KPCC -GDQ- ARR: 21:53, NOT DEPARTED, *DET: 327 MINS* (UP TO 03:20 HRS)', '2. YTPY -VKB- ARR: 21:37, DEP: 01:09, DET: 212 MINS',
   ].join('\n'));
   // boxes that were not written are left out
+  assert.equal(L.unusualMessage({ ...L.blankUnusual('2026-10-19'), title: 'HOT AXLE', trainNo: 'ABC' }), 'HOT AXLE\nTrain no : ABC');
+});
+
+test('a C&W failure is written in the control-office format with sections', () => {
+  const u = {
+    ...L.blankUnusual('2026-11-09'), type: 'cw', title: 'MLSW GOODS COUPLING/DROPPER BROKEN', location: 'ASAF-SKZR Section',
+    trainNo: 'MLSW X MTMI', locoNo: '31549+41307/KZJ/5-1', load: '60/60/5166 T',
+    wagonNo: '13 TH FROM LOCO ER BOXN M1 10020261350', bpcNo: 'PM 50000956129/28-10/JTJ',
+    reason: '10:00 TRAIN STOPPED B/W ASAF-SKZR IB UP MAIN LINE\nTRAIN PARTED B/W 12 & 13 WAGON',
+    plan: 'Front portion (LOCO+12 Wagons) cleared to SKZR, dep 11:35 Hrs.\nRelief loco 33111+43123 to attach from rear.',
+    rep: 'GZB -BPA- ARR: 09:14, DEP: 10:57, DET: 103 MINS\nFN NMG -MMZ- ARR: 09:44, DEP: 10:45, DET: 61 MINS',
+  };
+  assert.equal(L.unusualMessage(u), [
+    '*MLSW GOODS COUPLING/DROPPER BROKEN*', '',
+    'Location : ASAF-SKZR Section', 'Train no : MLSW X MTMI', 'Loco no : 31549+41307/KZJ/5-1', 'Load : 60/60/5166 T', '',
+    'Wagon no : 13 TH FROM LOCO ER BOXN M1 10020261350', 'BPC no : PM 50000956129/28-10/JTJ', '', '',
+    '*Sequence of Events:*', '- TRAIN STOPPED B/W ASAF-SKZR IB UP MAIN LINE AT 10:00', '- TRAIN PARTED B/W 12 & 13 WAGON', '',
+    '*Plan of action:*', '1. Front portion (LOCO+12 Wagons) cleared to SKZR, dep 11:35 Hrs.', '2. Relief loco 33111+43123 to attach from rear.', '', '',
+    '*Goods Repercussion:*', '1. GZB -BPA- ARR: 09:14, DEP: 10:57, *DET: 103 MINS*', '2. FN NMG -MMZ- ARR: 09:44, DEP: 10:45, DET: 61 MINS',
+  ].join('\n'));
+  // loco failures keep the old format
   assert.equal(L.unusualMessage({ ...L.blankUnusual('2026-10-19'), title: 'HOT AXLE', trainNo: 'ABC' }), 'HOT AXLE\nTrain no : ABC');
 });

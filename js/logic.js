@@ -8,7 +8,7 @@ export const FIELDS = [
   'hoTrain', 'hoPoint', 'hoTime', 'foisDate', 'working', 'remarks', 'sameSerial',
 ];
 
-export const UNUSUAL_FIELDS = ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'detFrom', 'detTo', 'rep', 'incident', 'official', 'type', 'wagonNo', 'bpcNo', 'app', 'block', 'stalling', 'photos', 'repAsOn'];
+export const UNUSUAL_FIELDS = ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'detFrom', 'detTo', 'rep', 'incident', 'official', 'type', 'wagonNo', 'bpcNo', 'plan', 'app', 'block', 'stalling', 'photos', 'repAsOn'];
 
 export const DIVISIONS ={ OTHER: 'Other division', SC: 'SC division' };
 
@@ -130,7 +130,7 @@ export function isUpdated(loco, since) {
 }
 
 export function blankUnusual(day) {
-  return { id: uid(), day, time: '', title: '', location: '', trainNo: '', locoNo: '', load: '', reason: '', det: '', detFrom: '', detTo: '', rep: '', incident: '', official: '', type: '', wagonNo: '', bpcNo: '', app: '', block: '', photos: '', repAsOn: '' };
+  return { id: uid(), day, time: '', title: '', location: '', trainNo: '', locoNo: '', load: '', reason: '', plan: '', det: '', detFrom: '', detTo: '', rep: '', incident: '', official: '', type: '', wagonNo: '', bpcNo: '', app: '', block: '', photos: '', repAsOn: '' };
 }
 
 /**
@@ -185,6 +185,7 @@ export function unusualsInOrder(list) {
  */
 export function unusualMessage(u) {
   const t = (v) => String(v == null ? '' : v).trim();
+  if (u.type === 'cw' || t(u.wagonNo) || t(u.bpcNo)) return cwMessage(u);
   const lines = [];
   if (t(u.title)) lines.push(t(u.title));
   [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load]].forEach(([k, v]) => { if (t(v)) lines.push(`${k} : ${t(v)}`); });
@@ -197,6 +198,33 @@ export function unusualMessage(u) {
   const rep = repLines(t(u.rep) || t(official.repercussions));
   if (rep.length) lines.push('', 'REP:', ...rep.map((r, n) => `${n + 1}.${r}`));
   return lines.join('\n');
+}
+
+/**
+ * A C&W failure as the control-office message: bold heading, the train, the wagon and BPC, then
+ * "Sequence of Events", "Plan of action" and "Goods Repercussion" as bold sections. The first
+ * repercussion (the failed train itself) carries its detention in bold.
+ */
+export function cwMessage(u) {
+  const t = (v) => String(v == null ? '' : v).trim();
+  const out = [];
+  if (t(u.title)) out.push(`*${t(u.title).toUpperCase()}*`, '');
+  const head = [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load]].filter(([, v]) => t(v));
+  if (head.length) out.push(...head.map(([k, v]) => `${k} : ${t(v)}`), '');
+  const wagon = [['Wagon no', u.wagonNo], ['BPC no', u.bpcNo]].filter(([, v]) => t(v));
+  if (wagon.length) out.push(...wagon.map(([k, v]) => `${k} : ${t(v)}`), '');
+  const events = parseEvents(u.reason).map((e) => (e.t && e.text ? `- ${e.text} AT ${e.t}` : `- ${e.text || e.t}`));
+  if (events.length) out.push('', '*Sequence of Events:*', ...events, '');
+  const plan = repLines(u.plan);
+  if (plan.length) out.push('*Plan of action:*', ...plan.map((p, n) => `${n + 1}. ${p}`), '');
+  let official = {};
+  try { official = JSON.parse(u.official) || {}; } catch { /* no official report */ }
+  const rep = repLines(t(u.rep) || t(official.repercussions));
+  if (rep.length) {
+    out.push('', '*Goods Repercussion:*', ...rep.map((r, n) => `${n + 1}. ${n === 0 ? r.replace(/(DET\s*:?\s*\d+\s*MINS?)/i, '*$1*') : r}`));
+  }
+  while (out.length && out[out.length - 1] === '') out.pop();
+  return out.join('\n');
 }
 
 /** The reports of a list as one message, each under its date, oldest day first. */
