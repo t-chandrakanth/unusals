@@ -143,7 +143,7 @@ function paint(ctx, s, imgs, draw) {
   yl = table(M, yl, colW, detailRows(s), 0.42, false);
 
   // right: sequence of events, then the detention
-  let yr = section('Sequence of events', rightX, y, rightW);
+  let yr = section('Chronology of events', rightX, y, rightW);
   const head = eventsHead(s);
   const evRows = eventsOf(s).map((e) => [e.t || '–', e.text, isStallEvent(e), true]);
   yr = table(rightX, yr, rightW, [...(head ? [[head[0], head[1], false, true]] : []), ...evRows], 0.27, false);
