@@ -4,6 +4,7 @@
 // app next door, and the shared database table of unusual reports.
 
 import * as L from '../js/logic.js';
+import { linesEditor, insertButton } from '../js/lines.js';
 import { createSync } from '../js/sync.js';
 import { diffOps } from '../js/syncdata.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
@@ -43,7 +44,7 @@ const FORM = {
 };
 const LABEL = {
   day: 'Date', time: 'Time', title: 'Train details (heading)', location: 'Location', trainNo: 'Train no',
-  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Sequence of events', plan: 'Plan of action (one line each)', rep: 'Repercussions',
+  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Sequence of events', plan: 'Plan of action', rep: 'Repercussions',
 };
 const HINT = {
   title: 'brake binding', location: 'TNGM-YP/GNN', trainNo: 'ICDT C/S', locoNo: '42821', load: '40/40/3910',
@@ -317,9 +318,10 @@ function openForm(type, existing) {
     const kind = kindOf(draft);
     const titles = [...new Set([...TYPES[kind].titles, ...rows().filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
     const field = (key) => {
+      if (key === 'plan') return h('div', { class: 'field wide' }, h('span', null, 'Plan of action'), linesEditor(h, draft.plan, (v) => { draft.plan = v; }, { placeholder: HINT.plan.split('\n')[0], label: 'Step', addText: '+ Add line' }));
       if (key === 'rep') return h('div', { class: 'field wide' }, h('span', null, 'Repercussions (leave empty if none)'), repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
-      const el = key === 'reason' || key === 'rep' || key === 'plan'
-        ? h('textarea', { rows: key === 'reason' ? 6 : 3, value: draft[key], placeholder: HINT[key] })
+      const el = key === 'reason' || key === 'rep'
+        ? h('textarea', { rows: key === 'rep' ? 3 : 6, value: draft[key], placeholder: HINT[key] })
         : h('input', {
           type: key === 'day' ? 'date' : (key === 'time' || key === 'detFrom' || key === 'detTo') ? 'time' : 'text', value: draft[key], placeholder: HINT[key] || '',
           autocapitalize: key === 'day' || key === 'time' || key === 'detFrom' || key === 'detTo' ? null : 'characters', autocomplete: 'off',
@@ -792,11 +794,15 @@ function newReportCard(view) {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Sequence of events'),
         eventsEditor(h, draft.reason, (v) => { draft.reason = v; }));
     }
+    if (key === 'plan') {
+      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Plan of action'),
+        linesEditor(h, draft.plan, (v) => { draft.plan = v; }, { placeholder: HINT.plan.split('\n')[0], label: 'Step', addText: '+ Add line' }));
+    }
     if (key === 'rep') {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Repercussions (leave empty if none)'),
         repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
     }
-    const isText = key === 'plan';
+    const isText = false;
     const el = isText
       ? h('textarea', { rows: 3, placeholder: HINT[key] || '' })
       : h('input', {
@@ -1109,11 +1115,13 @@ function openStallingForm(existing, from, inline) {
       s.events.map((e, i) => h('div', { class: 'ev-row' },
         bare(() => e.t, (v) => { e.t = v; }, 'Time', '19:06–19:27'),
         bare(() => e.text, (v) => { e.text = v; }, 'What happened', 'Backed up to km 479/01, but did not start'),
+        insertButton(h, `Add an event below event ${i + 1}`, () => { s.events.splice(i + 1, 0, { t: '', text: '' }); build(); }),
         h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.events.splice(i, 1); if (!s.events.length) s.events.push({ t: '', text: '' }); build(); } }, '×'))));
     const repRows = h('div', { class: 'ev-rows' },
       s.repercussions.map((r, i) => h('div', { class: 'ev-row rep' },
         h('span', { class: 'rn' }, String(i + 1)),
         bare(() => r, (v) => { s.repercussions[i] = v; }, 'Repercussion', 'MLSW – KMT ARR 19:33'),
+        insertButton(h, `Add a repercussion below ${i + 1}`, () => { s.repercussions.splice(i + 1, 0, ''); build(); }),
         h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.repercussions.splice(i, 1); if (!s.repercussions.length) s.repercussions.push(''); build(); } }, '×'))));
     const remarks = h('textarea', { rows: 4, value: s.remarks, placeholder: 'Left empty, the remarks are written from the train timings and the events.' });
     remarks.addEventListener('input', (e) => { s.remarks = e.target.value; });

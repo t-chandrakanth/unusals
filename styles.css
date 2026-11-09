@@ -585,7 +585,11 @@ table.cells tr.dayrow .count { margin-left: 8px; }
 
 /* ---- the sequence of events: a time and what happened, row by row ---- */
 .evbox { display: grid; gap: 6px; }
-.evrow { display: grid; grid-template-columns: 112px minmax(0, 1fr) 38px; gap: 6px; align-items: center; }
+.evrow { display: grid; grid-template-columns: 112px minmax(0, 1fr) 38px 38px; gap: 6px; align-items: center; }
+.evrow.lines { grid-template-columns: 26px minmax(0, 1fr) 38px 38px; }
+.evrow .rpn { text-align: center; color: var(--soft); }
+.ins { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--soft); font-size: 20px; line-height: 1; cursor: pointer; }
+.ins:hover { color: #fff; background: var(--green, #1c7a45); border-color: var(--green, #1c7a45); }
 .evrow input { width: 100%; padding: 10px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; font-weight: 500; text-transform: none; letter-spacing: 0; }
 .evrow input:focus { outline: 2px solid var(--amber); outline-offset: 0; background: var(--card); }
 .evrow .evt { font-variant-numeric: tabular-nums; }

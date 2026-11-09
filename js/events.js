@@ -34,6 +34,8 @@ export function formatEvents(rows) {
  * h: the app's element builder. text: the events as saved. onChange(text): called as they are typed.
  * Enter in the "what happened" box starts the next row.
  */
+import { insertButton } from './lines.js';
+
 export function eventsEditor(h, text, onChange, { min = 4 } = {}) {
   const rows = parseEvents(text);
   while (rows.length < min) rows.push({ t: '', text: '' });
@@ -52,7 +54,9 @@ export function eventsEditor(h, text, onChange, { min = 4 } = {}) {
           rows.splice(i + 1, 0, { t: '', text: '' });
           draw(i + 1);
         });
-        return h('div', { class: 'evrow' }, time, what, h('button', {
+        return h('div', { class: 'evrow' }, time, what,
+          insertButton(h, `Add an event below event ${i + 1}`, () => { rows.splice(i + 1, 0, { t: '', text: '' }); draw(i + 1); }),
+          h('button', {
           type: 'button', class: 'x', title: 'Remove this row', 'aria-label': `Remove event ${i + 1}`,
           onclick: () => { rows.splice(i, 1); if (!rows.length) rows.push({ t: '', text: '' }); emit(); draw(); },
         }, '×'));
