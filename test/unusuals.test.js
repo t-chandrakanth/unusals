@@ -172,7 +172,7 @@ test('the text message of one report: heading, details, events one to a line, wa
     '*Goods Repercussion:*', '1. KPCC -GDQ- ARR: 21:53, NOT DEPARTED, *DET: 327 MINS* (UP TO 03:20 HRS)', '2. YTPY -VKB- ARR: 21:37, DEP: 01:09, DET: 212 MINS',
   ].join('\n'));
   // boxes that were not written are left out
-  assert.equal(L.unusualMessage({ ...L.blankUnusual('2026-10-19'), title: 'HOT AXLE', trainNo: 'ABC' }), 'HOT AXLE\nTrain no : ABC');
+  assert.equal(L.unusualMessage({ ...L.blankUnusual('2026-10-19'), title: 'HOT AXLE', trainNo: 'ABC' }), '*HOT AXLE*\n\nTrain no : ABC');
 });
 
 test('a C&W failure is written in the control-office format with sections', () => {
@@ -193,5 +193,11 @@ test('a C&W failure is written in the control-office format with sections', () =
     '*Goods Repercussion:*', '1. GZB -BPA- ARR: 09:14, DEP: 10:57, *DET: 103 MINS*', '2. FN NMG -MMZ- ARR: 09:44, DEP: 10:45, DET: 61 MINS',
   ].join('\n'));
   // loco failures keep the old format
-  assert.equal(L.unusualMessage({ ...L.blankUnusual('2026-10-19'), title: 'HOT AXLE', trainNo: 'ABC' }), 'HOT AXLE\nTrain no : ABC');
+  assert.equal(L.unusualMessage({ ...L.blankUnusual('2026-10-19'), title: 'HOT AXLE', trainNo: 'ABC' }), '*HOT AXLE*\n\nTrain no : ABC');
+});
+
+test('a loco failure also carries the three sections', () => {
+  const u = { ...L.blankUnusual('2026-11-09'), type: 'loco', title: 'LOCO FAILURE', trainNo: 'ABC', det: '45 MINS', reason: '10:00 STOPPED', plan: 'Relief loco ordered', rep: 'ABC -KZJ- DET: 45 MINS' };
+  assert.equal(L.unusualMessage(u), ['*LOCO FAILURE*', '', 'Train no : ABC', 'DET : 45 MINS', '', '', '*Sequence of Events:*', '- STOPPED AT 10:00', '',
+    '*Plan of action:*', '1. Relief loco ordered', '', '', '*Goods Repercussion:*', '1. ABC -KZJ- *DET: 45 MINS*'].join('\n'));
 });

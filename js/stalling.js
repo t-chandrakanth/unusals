@@ -12,7 +12,7 @@ export function blankStalling(day = '') {
     station: '', arr: '', dep: '',
     events: Array.from({ length: 6 }, () => ({ t: '', text: '' })),
     stallAt: '', reliefAt: '', spotDep: '',
-    remarks: '', repercussions: ['', '', ''],
+    remarks: '', plan: ['', '', ''], repercussions: ['', '', ''],
     loadHead: '', loadNote: '', loadImg: '', profileHead: '', profileNote: '', profileImg: '', profFrom: '', profTo: '', markX: '', markOff: false,
   };
 }
@@ -25,6 +25,7 @@ export function readStalling(text, day = '') {
   return {
     ...b, ...o,
     events: Array.isArray(o.events) && o.events.length ? o.events.map((e) => ({ t: String(e.t || ''), text: String(e.text || '') })) : b.events,
+    plan: Array.isArray(o.plan) && o.plan.length ? o.plan.map(String) : b.plan,
     repercussions: Array.isArray(o.repercussions) && o.repercussions.length ? o.repercussions.map(String) : b.repercussions,
   };
 }
@@ -34,6 +35,7 @@ const text = (v) => String(v == null ? '' : v).trim();
 /** The events that were written, in the order they were written. */
 export const writtenEvents = (s) => s.events.map((e) => ({ t: text(e.t), text: text(e.text) })).filter((e) => e.t || e.text);
 export const writtenRepercussions = (s) => s.repercussions.map(text).filter(Boolean);
+export const writtenPlan = (s) => (s.plan || []).map(text).filter(Boolean);
 
 /**
  * The events as the report shows them: when the time of the incident is given and no
@@ -151,13 +153,15 @@ export function whatsappText(s) {
   for (const [label, value] of detailRows(s)) lines.push(`${label}: ${value}`);
   const ev = eventsOf(s);
   if (ev.length) {
-    lines.push('', '*Sequence of events*');
+    lines.push('', '*Sequence of Events:*');
     if (eventsHead(s)) lines.push(eventsHead(s).filter(Boolean).join(': '));
-    for (const e of ev) lines.push(`${e.t ? `${e.t} ` : ''}${e.text}`.trim());
+    for (const e of ev) lines.push(`- ${e.t && e.text ? `${e.text} AT ${e.t}` : e.text || e.t}`);
   }
+  const plan = writtenPlan(s);
+  if (plan.length) { lines.push('', '*Plan of action:*'); plan.forEach((r, i) => lines.push(`${i + 1}. ${r}`)); }
   if (detentionText(s)) lines.push('', `*${detentionText(s)}*`);
   const rep = writtenRepercussions(s);
-  if (rep.length) { lines.push('', '*Repercussions*'); rep.forEach((r, i) => lines.push(`${i + 1}. ${r}`)); }
+  if (rep.length) { lines.push('', '*Goods Repercussion:*'); rep.forEach((r, i) => lines.push(`${i + 1}. ${r}`)); }
   return lines.join('\n');
 }
 

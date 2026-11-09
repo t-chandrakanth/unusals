@@ -38,13 +38,13 @@ const TYPES = {
   other: { name: 'Others', accent: 'k-dpwcs', titles: [] },
 };
 const FORM = {
-  loco: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason', 'rep'],
+  loco: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason', 'plan', 'rep'],
   cw: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason', 'plan', 'rep'],
-  other: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason', 'rep'],
+  other: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason', 'plan', 'rep'],
 };
 const LABEL = {
   day: 'Date', time: 'Time', title: 'Train details (heading)', location: 'Location', trainNo: 'Train no',
-  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Sequence of events', plan: 'Plan of action', rep: 'Repercussions',
+  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Sequence of events', plan: 'Plan of action', rep: 'Goods repercussions',
 };
 const HINT = {
   title: 'brake binding', location: 'TNGM-YP/GNN', trainNo: 'ICDT C/S', locoNo: '42821', load: '40/40/3910',
@@ -319,7 +319,7 @@ function openForm(type, existing) {
     const titles = [...new Set([...TYPES[kind].titles, ...rows().filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
     const field = (key) => {
       if (key === 'plan') return h('div', { class: 'field wide' }, h('span', null, 'Plan of action'), linesEditor(h, draft.plan, (v) => { draft.plan = v; }, { placeholder: HINT.plan.split('\n')[0], label: 'Step', addText: '+ Add line' }));
-      if (key === 'rep') return h('div', { class: 'field wide' }, h('span', null, 'Repercussions (leave empty if none)'), repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
+      if (key === 'rep') return h('div', { class: 'field wide' }, h('span', null, 'Goods repercussions (leave empty if none)'), repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
       const el = key === 'reason' || key === 'rep'
         ? h('textarea', { rows: key === 'rep' ? 3 : 6, value: draft[key], placeholder: HINT[key] })
         : h('input', {
@@ -799,7 +799,7 @@ function newReportCard(view) {
         linesEditor(h, draft.plan, (v) => { draft.plan = v; }, { placeholder: HINT.plan.split('\n')[0], label: 'Step', addText: '+ Add line' }));
     }
     if (key === 'rep') {
-      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Repercussions (leave empty if none)'),
+      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Goods repercussions (leave empty if none)'),
         repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
     }
     const isText = false;
@@ -1123,6 +1123,12 @@ function openStallingForm(existing, from, inline) {
         bare(() => r, (v) => { s.repercussions[i] = v; }, 'Repercussion', 'MLSW – KMT ARR 19:33'),
         insertButton(h, `Add a repercussion below ${i + 1}`, () => { s.repercussions.splice(i + 1, 0, ''); build(); }),
         h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.repercussions.splice(i, 1); if (!s.repercussions.length) s.repercussions.push(''); build(); } }, '×'))));
+    const planRows = h('div', { class: 'ev-rows' },
+      s.plan.map((r, i) => h('div', { class: 'ev-row rep' },
+        h('span', { class: 'rn' }, String(i + 1)),
+        bare(() => r, (v) => { s.plan[i] = v; }, 'Plan of action', 'Relief loco 33111 to attach from rear'),
+        insertButton(h, `Add a step below ${i + 1}`, () => { s.plan.splice(i + 1, 0, ''); build(); }),
+        h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.plan.splice(i, 1); if (!s.plan.length) s.plan.push(''); build(); } }, '×'))));
     const remarks = h('textarea', { rows: 4, value: s.remarks, placeholder: 'Left empty, the remarks are written from the train timings and the events.' });
     remarks.addEventListener('input', (e) => { s.remarks = e.target.value; });
     const slider = h('input', {
@@ -1176,7 +1182,10 @@ function openStallingForm(existing, from, inline) {
         type: 'button', class: 'btn small',
         onclick: () => { const keep = s.remarks; s.remarks = ''; const text = remarksText(s); s.remarks = keep; remarks.value = text; s.remarks = text; },
       }, 'Write the remarks from the events')),
-      h('h3', { class: 'rep-title' }, 'Repercussions'),
+      h('h3', { class: 'rep-title' }, 'Plan of action'),
+      planRows,
+      h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.plan.push(''); build(); } }, '+ Add line')),
+      h('h3', { class: 'rep-title' }, 'Goods repercussions'),
       repRows,
       h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.repercussions.push(''); build(); } }, '+ Add a row')),
       h('h3', { class: 'rep-title' }, 'Load table'),

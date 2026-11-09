@@ -82,7 +82,7 @@ export function repEditor(h, text, onChange, { min = 3, asOn = '', onAsOn = () =
   const emit = () => onChange(formatRep(rows, as));
   const gapHint = (r) => {
     const g = gap(clock(r.arr), clock(String(r.dep || '').trim() ? r.dep : as));
-    return g === null ? 'minutes' : `${g} (auto)`;
+    return g === null ? 'DET min' : `${g} (auto)`;
   };
   const hints = [];
   const draw = (focusRow) => {
@@ -109,8 +109,8 @@ export function repEditor(h, text, onChange, { min = 3, asOn = '', onAsOn = () =
         });
         return h('div', { class: 'reprow' }, h('b', { class: 'rpn' }, String(i + 1)), tr,
           input('rps', 'STATION', `Station of train ${i + 1}`, r.st, (v) => { r.st = v; emit(); }),
-          input('rpa', '15:30', `Arrival of train ${i + 1}`, r.arr, (v) => { r.arr = v; refreshHint(); emit(); }),
-          input('rpe', '16:00', `Departure of train ${i + 1}`, r.dep, (v) => { r.dep = v; refreshHint(); emit(); }),
+          input('rpa', 'ARR 15:30', `Arrival of train ${i + 1}`, r.arr, (v) => { r.arr = v; refreshHint(); emit(); }),
+          input('rpe', 'DEP 16:00', `Departure of train ${i + 1}`, r.dep, (v) => { r.dep = v; refreshHint(); emit(); }),
           det,
           insertButton(h, `Add a train below train ${i + 1}`, () => { rows.splice(i + 1, 0, { tr: '', st: '', arr: '', dep: '', det: '' }); draw(i + 1); }),
           h('button', {

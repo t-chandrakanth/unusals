@@ -184,32 +184,20 @@ export function unusualsInOrder(list) {
  * written is left out.
  */
 export function unusualMessage(u) {
-  const t = (v) => String(v == null ? '' : v).trim();
-  if (u.type === 'cw' || t(u.wagonNo) || t(u.bpcNo)) return cwMessage(u);
-  const lines = [];
-  if (t(u.title)) lines.push(t(u.title));
-  [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load]].forEach(([k, v]) => { if (t(v)) lines.push(`${k} : ${t(v)}`); });
-  const events = parseEvents(u.reason).map((e) => (e.t && e.text ? `${e.t}-${e.text}` : e.text || e.t));
-  if (events.length) lines.push('', ...events);
-  const more = [['Wagon no', u.wagonNo], ['BPC no', u.bpcNo], ['DET', u.det]].filter(([, v]) => t(v));
-  if (more.length) lines.push('', ...more.map(([k, v]) => `${k} : ${t(v)}`));
-  let official = {};
-  try { official = JSON.parse(u.official) || {}; } catch { /* no official report */ }
-  const rep = repLines(t(u.rep) || t(official.repercussions));
-  if (rep.length) lines.push('', 'REP:', ...rep.map((r, n) => `${n + 1}.${r}`));
-  return lines.join('\n');
+  return cwMessage(u);
 }
 
 /**
- * A C&W failure as the control-office message: bold heading, the train, the wagon and BPC, then
- * "Sequence of Events", "Plan of action" and "Goods Repercussion" as bold sections. The first
- * repercussion (the failed train itself) carries its detention in bold.
+ * One report as the control-office message: bold heading; location, train, loco and load; the
+ * wagon and BPC when there are any; then the bold sections "Sequence of Events" (one dash per
+ * event, time at the end), "Plan of action" (numbered) and "Goods Repercussion" (numbered, the
+ * first train's detention in bold). A box that was not written is left out.
  */
 export function cwMessage(u) {
   const t = (v) => String(v == null ? '' : v).trim();
   const out = [];
   if (t(u.title)) out.push(`*${t(u.title).toUpperCase()}*`, '');
-  const head = [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load]].filter(([, v]) => t(v));
+  const head = [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load], ['DET', u.det]].filter(([, v]) => t(v));
   if (head.length) out.push(...head.map(([k, v]) => `${k} : ${t(v)}`), '');
   const wagon = [['Wagon no', u.wagonNo], ['BPC no', u.bpcNo]].filter(([, v]) => t(v));
   if (wagon.length) out.push(...wagon.map(([k, v]) => `${k} : ${t(v)}`), '');

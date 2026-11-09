@@ -5,7 +5,7 @@
 // preview, the WhatsApp / PNG image and, as a JPEG, the PDF.
 
 import {
-  reportTitle, reportSubtitle, detailRows, eventsHead, eventsOf, isStallEvent, detentionText, remarksText, writtenRepercussions, markPosition,
+  reportTitle, reportSubtitle, detailRows, eventsHead, eventsOf, isStallEvent, detentionText, remarksText, writtenRepercussions, writtenPlan, markPosition,
 } from './stalling.js';
 
 const W = 1240; // A4 at 150 dpi
@@ -153,10 +153,17 @@ function paint(ctx, s, imgs, draw) {
   lines(rem, M + PAD + 4, y + PAD - 2);
   y += remH + 28;
 
-  // repercussions
+  // plan of action and repercussions
+  const plan = writtenPlan(s);
+  if (plan.length) {
+    y = section('Plan of action', M, y, W - 2 * M);
+    font(BASE, false);
+    plan.forEach((r, i) => { y += lines(wrap(ctx, `${i + 1}. ${r}`, W - 2 * M), M, y); });
+    y += 22;
+  }
   const rep = writtenRepercussions(s);
   if (rep.length) {
-    y = section('Repercussions', M, y, W - 2 * M);
+    y = section('Goods repercussions', M, y, W - 2 * M);
     font(BASE, false);
     rep.forEach((r, i) => { y += lines(wrap(ctx, `${i + 1}. ${r}`, W - 2 * M), M, y); });
     y += 22;

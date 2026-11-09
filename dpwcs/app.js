@@ -1,4 +1,6 @@
 import { eventsEditor } from '../js/events.js';
+import { linesEditor } from '../js/lines.js';
+import { repEditor } from '../js/repercussions.js';
 import * as L from '../js/logic.js';
 import { loadState, saveState } from '../js/db.js';
 import { seedState } from '../js/seed.js';
@@ -1156,13 +1158,14 @@ function officialDetails(u) {
 const U_LABEL = {
   title: 'Train details (heading)', location: 'Location', trainNo: 'Train no', locoNo: 'Loco no', load: 'Load',
   detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Sequence of events',
+  plan: 'Plan of action', rep: 'Goods repercussions',
 };
 const U_HINT = {
   title: 'LOCO TROUBLE-DPWCS', location: 'PRLI-GTU', trainNo: 'KSNK/BOXNL', locoNo: '27592+27767/KZJ/DUE-11/11',
   load: '59/59/4882T', det: '06:39 HRS', reason: 'Times, km, what was done, relief loco, crew...',
 };
 const U_WIDE = new Set(['title', 'locoNo']);
-const U_BOXES = ['title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason'];
+const U_BOXES = ['title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason', 'plan', 'rep'];
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 /** "07-09-2026 (MONDAY)", the way a day is written on a report. */
 const officialDay = (key) => { const [y, m, d] = key.split('-').map(Number); return `${L.fmtDay(key)} (${WEEKDAYS[new Date(y, m - 1, d).getDay()]})`; };
@@ -1187,6 +1190,14 @@ function newUnusualCard() {
     if (key === 'reason') {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Sequence of events'),
         eventsEditor(h, draft.reason, (v) => { draft.reason = v; }));
+    }
+    if (key === 'plan') {
+      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Plan of action'),
+        linesEditor(h, draft.plan, (v) => { draft.plan = v; }, { placeholder: 'Relief loco 33111+43123 to attach from rear', label: 'Step', addText: '+ Add line' }));
+    }
+    if (key === 'rep') {
+      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Goods repercussions (leave empty if none)'),
+        repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
     }
     const isText = false;
     const el = isText
@@ -1304,6 +1315,8 @@ function unusualRows(items, label) {
         const tr = h('tr', { class: 'editing' }, h('td', { class: 'sr' }, String(n)));
         for (const key of U_BOXES) {
           if (key === 'reason') { tr.append(h('td', { class: 'c-reason' }, eventsEditor(h, buf.reason || '', (v) => { buf.reason = v; }, { min: 2 }))); continue; }
+          if (key === 'plan') { tr.append(h('td', { class: 'c-reason' }, linesEditor(h, buf.plan || '', (v) => { buf.plan = v; }, { min: 2, label: 'Step', addText: '+ Add line' }))); continue; }
+          if (key === 'rep') { tr.append(h('td', { class: 'c-reason' }, repEditor(h, buf.rep || '', (v) => { buf.rep = v; }))); continue; }
           const el = h('textarea', { rows: 1, class: 'cell', 'aria-label': U_LABEL[key], autocapitalize: key === 'reason' ? null : 'characters' });
           el.value = buf[key] || '';
           el.addEventListener('input', () => { buf[key] = el.value; grow(el); });
@@ -1317,7 +1330,7 @@ function unusualRows(items, label) {
         continue;
       }
       const tr = h('tr', null, h('td', { class: 'sr' }, String(n)));
-      for (const key of U_BOXES) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' ? 'c-reason' : ''}` }, String(u[key] || '')));
+      for (const key of U_BOXES) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' || key === 'plan' || key === 'rep' ? 'c-reason' : ''}` }, String(u[key] || '')));
       tr.append(h('td', { class: 'act' },
         h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: Object.fromEntries(U_BOXES.map((k) => [k, u[k] || ''])) }; render(); } }, 'Edit'),
         h('button', { class: 'link danger', onclick: () => {
