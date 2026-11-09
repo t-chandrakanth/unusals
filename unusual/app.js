@@ -879,7 +879,7 @@ function newReportCard(view) {
       h('button', { type: 'button', class: 'btn primary', onclick: doSave }, 'Save report'),
       h('button', { type: 'button', class: 'btn', onclick: doClear }, 'Clear'),
       h('span', { class: 'grow' }),
-      h('button', { type: 'button', class: 'btn', onclick: () => chooser.click() }, 'Attach a file or photo'),
+      h('button', { type: 'button', class: 'btn attach', title: 'Attach a file or photo', 'aria-label': 'Attach a file or photo', onclick: () => chooser.click() }, 'Attach a file or photo'),
       chooser),
     h('p', { class: 'hint' }, 'You can also paste a whole report anywhere in this box, or attach Word, PDF, Excel files or photos: the cells are filled for you. Ctrl+Enter saves.'));
 
