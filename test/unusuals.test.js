@@ -1,3 +1,4 @@
+import { reportModel } from '../js/unusalreport.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as L from '../js/logic.js';
@@ -209,4 +210,13 @@ test('the DPWCS copy: train no, details and location as the heading, then the se
     '*Sequence of Events:*', '08:30-KZJ YTPY ARR', '10:30-LOCO FAILED', '', '*Plan of action:*', '12:10-RELIEF LOCO 28305+27732 ORDERED', '1. LINE CLEAR TO BE GIVEN', '',
     '*Detention :* 05:00 HRS'].join('\n'));
   assert.doesNotMatch(L.dpwcsUnusualText([u]), /UNUSALS-DATE|DPWCS LOCO FAILURES/);
+});
+
+test('two or more wagons: one Wagon no line each in the message and in the report details', () => {
+  const u = { ...L.blankUnusual('2026-11-09'), type: 'cw', title: 'HOT AXLE', trainNo: 'MLSW', location: 'KZJ', wagonNo: 'BOXN 10020261350\nBOXN 10020261351', bpcNo: 'PM 500/JTJ', plan: '11:35 Front portion cleared\nRelief loco to attach' };
+  const m = L.unusualMessage(u);
+  assert.match(m, /Wagon no : BOXN 10020261350\nWagon no : BOXN 10020261351\nBPC no : PM 500\/JTJ/);
+  const r = reportModel(u);
+  assert.deepEqual(r.details.filter(([k]) => /wagon/i.test(k)).map(([k, v]) => `${k}=${v}`), ['Defective wagon 1=BOXN 10020261350', 'Defective wagon 2=BOXN 10020261351']);
+  assert.deepEqual(r.plan, [{ t: '11:35', text: 'Front portion cleared' }, { t: '', text: 'Relief loco to attach' }]);
 });

@@ -4,7 +4,7 @@
 // app next door, and the shared database table of unusual reports.
 
 import * as L from '../js/logic.js';
-import { insertButton } from '../js/lines.js';
+import { insertButton, linesEditor } from '../js/lines.js';
 import { createSync } from '../js/sync.js';
 import { diffOps } from '../js/syncdata.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
@@ -319,6 +319,7 @@ function openForm(type, existing) {
     const titles = [...new Set([...TYPES[kind].titles, ...rows().filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
     const field = (key) => {
       if (key === 'plan') return h('div', { class: 'field wide' }, h('span', null, 'Plan of action'), eventsEditor(h, draft.plan, (v) => { draft.plan = v; }, { min: 3 }));
+      if (key === 'wagonNo') return h('div', { class: 'field wide' }, h('span', null, 'Wagon no (one line per wagon)'), linesEditor(h, draft.wagonNo, (v) => { draft.wagonNo = v; }, { min: 1, placeholder: HINT.wagonNo, label: 'Wagon', addText: '+ Add a wagon' }));
       if (key === 'rep') return h('div', { class: 'field wide' }, h('span', null, 'Goods repercussions (leave empty if none)'), repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
       const el = key === 'reason' || key === 'rep'
         ? h('textarea', { rows: key === 'rep' ? 3 : 6, value: draft[key], placeholder: HINT[key] })
@@ -797,6 +798,10 @@ function newReportCard(view) {
     if (key === 'plan') {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Plan of action'),
         eventsEditor(h, draft.plan, (v) => { draft.plan = v; }, { min: 3 }));
+    }
+    if (key === 'wagonNo') {
+      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Wagon no (one line per wagon)'),
+        linesEditor(h, draft.wagonNo, (v) => { draft.wagonNo = v; }, { min: 1, placeholder: HINT.wagonNo, label: 'Wagon', addText: '+ Add a wagon' }));
     }
     if (key === 'rep') {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Goods repercussions (leave empty if none)'),
