@@ -811,7 +811,7 @@ function newReportCard(view) {
     const el = isText
       ? h('textarea', { rows: 3, placeholder: HINT[key] || '' })
       : h('input', {
-        type: key === 'detFrom' || key === 'detTo' ? 'time' : 'text', placeholder: HINT[key] && key !== 'detFrom' && key !== 'detTo' ? `e.g. ${HINT[key]}` : '',
+        type: key === 'detFrom' || key === 'detTo' ? 'time' : 'text', placeholder: HINT[key] && key !== 'detFrom' && key !== 'detTo' ? HINT[key] : '',
         autocapitalize: key === 'detFrom' || key === 'detTo' ? null : 'characters', autocomplete: 'off',
       });
     el.value = draft[key] || '';
