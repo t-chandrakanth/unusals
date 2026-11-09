@@ -193,26 +193,40 @@ export function unusualMessage(u) {
  * event, time at the end), "Plan of action" (numbered) and "Goods Repercussion" (numbered, the
  * first train's detention in bold). A box that was not written is left out.
  */
-export function cwMessage(u) {
+export function cwMessage(u, { dpwcs = false } = {}) {
   const t = (v) => String(v == null ? '' : v).trim();
   const out = [];
-  if (t(u.title)) out.push(`*${t(u.title).toUpperCase()}*`, '');
-  const head = [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load], ['DET', u.det]].filter(([, v]) => t(v));
-  if (head.length) out.push(...head.map(([k, v]) => `${k} : ${t(v)}`), '');
+  if (dpwcs) {
+    // DPWCS style: "TRAIN NO-TRAIN DETAILS@LOCATION" as the heading, the detention as its own line
+    const head = [t(u.trainNo), t(u.title).toUpperCase()].filter(Boolean).join('-') + (t(u.location) ? `@${t(u.location)}` : '');
+    if (head) out.push(`*${head}*`, '');
+    const rows = [['Loco no', u.locoNo], ['Load', u.load]].filter(([, v]) => t(v));
+    if (rows.length) out.push(...rows.map(([k, v]) => `${k} : ${t(v)}`), '');
+  } else {
+    if (t(u.title)) out.push(`*${t(u.title).toUpperCase()}*`, '');
+    const head = [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load], ['DET', u.det]].filter(([, v]) => t(v));
+    if (head.length) out.push(...head.map(([k, v]) => `${k} : ${t(v)}`), '');
+  }
   const wagon = [['Wagon no', u.wagonNo], ['BPC no', u.bpcNo]].filter(([, v]) => t(v));
   if (wagon.length) out.push(...wagon.map(([k, v]) => `${k} : ${t(v)}`), '');
   const events = parseEvents(u.reason).map((e) => (e.t && e.text ? `- ${e.text} AT ${e.t}` : `- ${e.text || e.t}`));
   if (events.length) out.push('', '*Sequence of Events:*', ...events, '');
   const plan = repLines(u.plan);
   if (plan.length) out.push('*Plan of action:*', ...plan.map((p, n) => `${n + 1}. ${p}`), '');
+  if (dpwcs && t(u.det)) out.push(`*Detention :* ${t(u.det)}`, '');
   let official = {};
   try { official = JSON.parse(u.official) || {}; } catch { /* no official report */ }
   const rep = repLines(t(u.rep) || t(official.repercussions));
   if (rep.length) {
-    out.push('', '*Goods Repercussion:*', ...rep.map((r, n) => `${n + 1}. ${n === 0 ? r.replace(/(DET\s*:?\s*\d+\s*MINS?)/i, '*$1*') : r}`));
+    out.push('', dpwcs ? '*Goods Repercussion (if any):*' : '*Goods Repercussion:*', ...rep.map((r, n) => `${n + 1}. ${n === 0 ? r.replace(/(DET\s*:?\s*\d+\s*MINS?)/i, '*$1*') : r}`));
   }
   while (out.length && out[out.length - 1] === '') out.pop();
   return out.join('\n');
+}
+
+/** The DPWCS loco failures of a list as one message: each report in the DPWCS style, one after another, oldest day first. */
+export function dpwcsUnusualText(list) {
+  return unusualsInOrder(list).map((u) => cwMessage(u, { dpwcs: true })).join('\n\n\n');
 }
 
 /** The reports of a list as one message, each under its date, oldest day first. */

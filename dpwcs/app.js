@@ -1344,7 +1344,7 @@ function unusualRows(items, label) {
   }
   const head = h('thead', null, h('tr', null, h('th', { class: 'sr' }, '#'), U_BOXES.map((k) => h('th', null, U_LABEL[k])), h('th', { class: 'act' }, '')));
   const heading = `DPWCS LOCO FAILURES ${label}`;
-  const text = () => `*${heading}*\n\n${L.unusualText(items)}`;
+  const text = () => L.dpwcsUnusualText(items);
   const r = ui.span.unusuals || {};
   return h('div', null,
     items.length > 0 && exportBar(unusualSheet(items, 'Unusals'), `DPWCS-loco-failures-${label.replace(/[^0-9A-Za-z]+/g, '-')}`, heading, text),

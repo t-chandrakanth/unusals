@@ -201,3 +201,12 @@ test('a loco failure also carries the three sections', () => {
   assert.equal(L.unusualMessage(u), ['*LOCO FAILURE*', '', 'Train no : ABC', 'DET : 45 MINS', '', '', '*Sequence of Events:*', '- STOPPED AT 10:00', '',
     '*Plan of action:*', '1. Relief loco ordered', '', '', '*Goods Repercussion:*', '1. ABC -KZJ- *DET: 45 MINS*'].join('\n'));
 });
+
+test('the DPWCS copy: train no, details and location as the heading, then the sections and the detention', () => {
+  const u = { ...L.blankUnusual('2026-11-09'), title: 'LOCO FAILED-DPWCS', location: 'KZJ', trainNo: 'YTPY', locoNo: '28073+28526/KZJ 26-11',
+    reason: '08:30 KZJ YTPY ARR\n10:30 LOCO FAILED', plan: 'RELIEF LOCO 28305+27732 ORDERED', det: '05:00 HRS' };
+  assert.equal(L.dpwcsUnusualText([u]), ['*YTPY-LOCO FAILED-DPWCS@KZJ*', '', 'Loco no : 28073+28526/KZJ 26-11', '', '',
+    '*Sequence of Events:*', '- KZJ YTPY ARR AT 08:30', '- LOCO FAILED AT 10:30', '', '*Plan of action:*', '1. RELIEF LOCO 28305+27732 ORDERED', '',
+    '*Detention :* 05:00 HRS'].join('\n'));
+  assert.doesNotMatch(L.dpwcsUnusualText([u]), /UNUSALS-DATE|DPWCS LOCO FAILURES/);
+});
