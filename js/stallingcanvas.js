@@ -28,11 +28,23 @@ function wrap(ctx, str, width) {
     let line = '';
     for (const word of para.split(' ')) {
       const test = line ? `${line} ${word}` : word;
-      if (ctx.measureText(test).width > width && line) { out.push(line); line = word; } else line = test;
+      if (ctx.measureText(test).width <= width || !line) { line = test; continue; }
+      out.push(line);
+      line = word;
     }
     out.push(line);
   }
-  return out;
+  // a word wider than the cell (a BPC number, a wagon number) is broken wherever it runs out of room
+  const fit = [];
+  for (const line of out) {
+    if (ctx.measureText(line).width <= width) { fit.push(line); continue; }
+    let cur = '';
+    for (const ch of line) {
+      if (ctx.measureText(cur + ch).width > width && cur) { fit.push(cur); cur = ch; } else cur += ch;
+    }
+    fit.push(cur);
+  }
+  return fit;
 }
 
 const loadImage = (src) => new Promise((resolve) => {
