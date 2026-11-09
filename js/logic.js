@@ -193,6 +193,15 @@ export function unusualMessage(u) {
  * event, time at the end), "Plan of action" (numbered) and "Goods Repercussion" (numbered, the
  * first train's detention in bold). A box that was not written is left out.
  */
+/**
+ * Plan of action lines for a message: a line written with a time at the start keeps it
+ * ("12:10-RELIEF LOCO ORDERED"); the lines without a time are numbered 1., 2. in their own order.
+ */
+export function planLines(plan) {
+  let n = 0;
+  return plan.map((p) => (/^\d{1,2}[:.]\d{2}\b/.test(p) ? p.replace(/^(\d{1,2}[:.]\d{2})\s*[-:]?\s*/, '$1-') : `${++n}. ${p}`));
+}
+
 export function cwMessage(u, { dpwcs = false } = {}) {
   const t = (v) => String(v == null ? '' : v).trim();
   const out = [];
@@ -214,7 +223,7 @@ export function cwMessage(u, { dpwcs = false } = {}) {
   if (events.length) out.push('', '*Sequence of Events:*', ...events, '');
   // plan lines keep a leading time if one was written, otherwise they are numbered
   const plan = repLines(u.plan);
-  if (plan.length) out.push('*Plan of action:*', ...plan.map((p, n) => (/^\d{1,2}[:.]\d{2}\b/.test(p) ? p.replace(/^(\d{1,2}[:.]\d{2})\s*[-:]?\s*/, '$1-') : `${n + 1}. ${p}`)), '');
+  if (plan.length) out.push('*Plan of action:*', ...planLines(plan), '');
   if (dpwcs && t(u.det)) out.push(`*Detention :* ${t(u.det)}`, '');
   let official = {};
   try { official = JSON.parse(u.official) || {}; } catch { /* no official report */ }

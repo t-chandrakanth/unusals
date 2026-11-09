@@ -206,7 +206,7 @@ test('the DPWCS copy: train no, details and location as the heading, then the se
   const u = { ...L.blankUnusual('2026-11-09'), title: 'LOCO FAILED-DPWCS', location: 'KZJ', trainNo: 'YTPY', locoNo: '28073+28526/KZJ 26-11',
     reason: '08:30 KZJ YTPY ARR\n10:30 LOCO FAILED', plan: '12:10 RELIEF LOCO 28305+27732 ORDERED\nLINE CLEAR TO BE GIVEN', det: '05:00 HRS' };
   assert.equal(L.dpwcsUnusualText([u]), ['*YTPY-LOCO FAILED-DPWCS@KZJ*', '', 'Loco no : 28073+28526/KZJ 26-11', '', '',
-    '*Sequence of Events:*', '08:30-KZJ YTPY ARR', '10:30-LOCO FAILED', '', '*Plan of action:*', '12:10-RELIEF LOCO 28305+27732 ORDERED', '2. LINE CLEAR TO BE GIVEN', '',
+    '*Sequence of Events:*', '08:30-KZJ YTPY ARR', '10:30-LOCO FAILED', '', '*Plan of action:*', '12:10-RELIEF LOCO 28305+27732 ORDERED', '1. LINE CLEAR TO BE GIVEN', '',
     '*Detention :* 05:00 HRS'].join('\n'));
   assert.doesNotMatch(L.dpwcsUnusualText([u]), /UNUSALS-DATE|DPWCS LOCO FAILURES/);
 });

@@ -1,3 +1,4 @@
+import { planLines } from './logic.js';
 // Stalling reports: a train that stalled in a section, written up in the layout of
 // the one-page stalling report (train and stalling details, sequence of events,
 // detention, remarks, repercussions, load table and section profile). Everything
@@ -158,7 +159,7 @@ export function whatsappText(s) {
     for (const e of ev) lines.push(e.t && e.text ? `${e.t}-${e.text}` : e.text || e.t);
   }
   const plan = writtenPlan(s);
-  if (plan.length) { lines.push('', '*Plan of action:*'); plan.forEach((r, i) => lines.push(/^\d{1,2}[:.]\d{2}\b/.test(r) ? r.replace(/^(\d{1,2}[:.]\d{2})\s*[-:]?\s*/, '$1-') : `${i + 1}. ${r}`)); }
+  if (plan.length) { lines.push('', '*Plan of action:*'); lines.push(...planLines(plan)); }
   if (detentionText(s)) lines.push('', `*${detentionText(s)}*`);
   const rep = writtenRepercussions(s);
   if (rep.length) { lines.push('', '*Goods Repercussion:*'); rep.forEach((r, i) => lines.push(`${i + 1}. ${r}`)); }
