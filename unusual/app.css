@@ -382,7 +382,6 @@ html.embed main { padding-top: 14px; }
 
 /* phones: a tidier, friendlier form. Nothing can scroll sideways. */
 @media (max-width: 520px) {
-  html, body { overflow-x: hidden; }
   .newcard { padding: 14px 12px 12px; border-radius: 16px; border-top-width: 4px; box-shadow: 0 10px 30px rgba(18, 38, 63, 0.10); }
   .newcard h2, .newcard .u-title { font-size: 19px; margin-bottom: 10px; }
   .ngrid, .u-form .grid { gap: 12px 10px; }
