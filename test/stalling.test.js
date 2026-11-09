@@ -80,7 +80,7 @@ test('remarks: written ones are kept, otherwise made from the events', () => {
 
 test('the WhatsApp message carries the table, the events, the detention and the repercussions', () => {
   const m = whatsappText(drta());
-  assert.match(m, /^\*STALLING REPORT – TRAIN DRTA\*/);
+  assert.match(m, /^\*DRTA-STALLING@KMT – MLMG\*/);
   assert.match(m, /Stalled at: KM 478\/01/);
   assert.match(m, /20:46-Relief loco arrived/);
   assert.match(m, /\*Detention: 1 hr 51 min/);

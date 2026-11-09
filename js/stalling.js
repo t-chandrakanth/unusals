@@ -149,8 +149,10 @@ export function remarksText(s) {
 
 /** The message for WhatsApp: the report in a few lines. */
 export function whatsappText(s) {
-  const lines = [`*${reportTitle(s)}*`];
-  if (reportSubtitle(s)) lines.push(reportSubtitle(s));
+  // "*DRTA-STALLING@KMT - MLMG*": train no, STALLING and the section or km as one bold heading
+  const where = text(s.section) || (text(s.km) && `KM ${text(s.km)}`);
+  const lines = [`*${[text(s.trainNo).toUpperCase(), 'STALLING'].filter(Boolean).join('-')}${where ? `@${where}` : ''}*`];
+  if (text(s.cause)) lines.push(`Cause: ${text(s.cause)}`);
   lines.push('');
   for (const [label, value] of detailRows(s)) lines.push(`${label}: ${value}`);
   const ev = eventsOf(s);
