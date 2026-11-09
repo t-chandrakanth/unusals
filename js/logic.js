@@ -8,7 +8,7 @@ export const FIELDS = [
   'hoTrain', 'hoPoint', 'hoTime', 'foisDate', 'working', 'remarks', 'sameSerial',
 ];
 
-export const UNUSUAL_FIELDS = ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'detFrom', 'detTo', 'rep', 'incident', 'official', 'type', 'wagonNo', 'bpcNo', 'app', 'block', 'stalling', 'photos', 'repAsOn'];
+export const UNUSUAL_FIELDS = ['day', 'time', 'title', 'location', 'trainNo', 'locoNo', 'load', 'reason', 'det', 'detFrom', 'detTo', 'rep', 'incident', 'official', 'type', 'wagonNo', 'bpcNo', 'plan', 'app', 'block', 'stalling', 'photos', 'repAsOn'];
 
 export const DIVISIONS ={ OTHER: 'Other division', SC: 'SC division' };
 
@@ -130,7 +130,7 @@ export function isUpdated(loco, since) {
 }
 
 export function blankUnusual(day) {
-  return { id: uid(), day, time: '', title: '', location: '', trainNo: '', locoNo: '', load: '', reason: '', det: '', detFrom: '', detTo: '', rep: '', incident: '', official: '', type: '', wagonNo: '', bpcNo: '', app: '', block: '', photos: '', repAsOn: '' };
+  return { id: uid(), day, time: '', title: '', location: '', trainNo: '', locoNo: '', load: '', reason: '', plan: '', det: '', detFrom: '', detTo: '', rep: '', incident: '', official: '', type: '', wagonNo: '', bpcNo: '', app: '', block: '', photos: '', repAsOn: '' };
 }
 
 /**
@@ -184,19 +184,60 @@ export function unusualsInOrder(list) {
  * written is left out.
  */
 export function unusualMessage(u) {
+  return cwMessage(u);
+}
+
+/**
+ * One report as the control-office message: bold heading; location, train, loco and load; the
+ * wagon and BPC when there are any; then the bold sections "Sequence of Events" (one dash per
+ * event, time at the end), "Plan of action" (numbered) and "Goods Repercussion" (numbered, the
+ * first train's detention in bold). A box that was not written is left out.
+ */
+/**
+ * Plan of action lines for a message: a line written with a time at the start keeps it
+ * ("12:10-RELIEF LOCO ORDERED"); the lines without a time are numbered 1., 2. in their own order.
+ */
+export function planLines(plan) {
+  let n = 0;
+  return plan.map((p) => (/^\d{1,2}[:.]\d{2}\b/.test(p) ? p.replace(/^(\d{1,2}[:.]\d{2})\s*[-:]?\s*/, '$1-') : `${++n}. ${p}`));
+}
+
+export function cwMessage(u, { dpwcs = false } = {}) {
   const t = (v) => String(v == null ? '' : v).trim();
-  const lines = [];
-  if (t(u.title)) lines.push(t(u.title));
-  [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load]].forEach(([k, v]) => { if (t(v)) lines.push(`${k} : ${t(v)}`); });
+  const out = [];
+  if (dpwcs) {
+    // DPWCS style: "TRAIN NO-TRAIN DETAILS@LOCATION" as the heading, the detention as its own line
+    const head = [t(u.trainNo), t(u.title).toUpperCase()].filter(Boolean).join('-') + (t(u.location) ? `@${t(u.location)}` : '');
+    if (head) out.push(`*${head}*`, '');
+    const rows = [['Loco no', u.locoNo], ['Load', u.load]].filter(([, v]) => t(v));
+    if (rows.length) out.push(...rows.map(([k, v]) => `${k} : ${t(v)}`), '');
+  } else {
+    if (t(u.title)) out.push(`*${t(u.title).toUpperCase()}*`, '');
+    const head = [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load], ['DET', u.det]].filter(([, v]) => t(v));
+    if (head.length) out.push(...head.map(([k, v]) => `${k} : ${t(v)}`), '');
+  }
+  const wagon = [['Wagon no', u.wagonNo], ['BPC no', u.bpcNo]].filter(([, v]) => t(v));
+  if (wagon.length) out.push(...wagon.map(([k, v]) => `${k} : ${t(v)}`), '');
+  // time first on every line: "08:30-KZJ YTPY ARR"
   const events = parseEvents(u.reason).map((e) => (e.t && e.text ? `${e.t}-${e.text}` : e.text || e.t));
-  if (events.length) lines.push('', ...events);
-  const more = [['Wagon no', u.wagonNo], ['BPC no', u.bpcNo], ['DET', u.det]].filter(([, v]) => t(v));
-  if (more.length) lines.push('', ...more.map(([k, v]) => `${k} : ${t(v)}`));
+  if (events.length) out.push('', '*Sequence of Events:*', ...events, '');
+  // plan lines keep a leading time if one was written, otherwise they are numbered
+  const plan = repLines(u.plan);
+  if (plan.length) out.push('*Plan of action:*', ...planLines(plan), '');
+  if (dpwcs && t(u.det)) out.push(`*Detention :* ${t(u.det)}`, '');
   let official = {};
   try { official = JSON.parse(u.official) || {}; } catch { /* no official report */ }
   const rep = repLines(t(u.rep) || t(official.repercussions));
-  if (rep.length) lines.push('', 'REP:', ...rep.map((r, n) => `${n + 1}.${r}`));
-  return lines.join('\n');
+  if (rep.length) {
+    out.push('', dpwcs ? '*Goods Repercussion (if any):*' : '*Goods Repercussion:*', ...rep.map((r, n) => `${n + 1}. ${n === 0 ? r.replace(/(DET\s*:?\s*\d+\s*MINS?)/i, '*$1*') : r}`));
+  }
+  while (out.length && out[out.length - 1] === '') out.pop();
+  return out.join('\n');
+}
+
+/** The DPWCS loco failures of a list as one message: each report in the DPWCS style, one after another, oldest day first. */
+export function dpwcsUnusualText(list) {
+  return unusualsInOrder(list).map((u) => cwMessage(u, { dpwcs: true })).join('\n\n\n');
 }
 
 /** The reports of a list as one message, each under its date, oldest day first. */

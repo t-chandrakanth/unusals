@@ -5,6 +5,7 @@
 // repEditor, which builds the boxes with the app's element builder.
 
 import { gap } from './block.js';
+import { insertButton } from './lines.js';
 
 const CLOCK = '(\\d{1,2}[:.]\\d{2})';
 const ARR = new RegExp(`\\bARR(?:IVED|IVAL)?\\b[\\s:.\\-]*${CLOCK}`, 'i');
@@ -81,7 +82,7 @@ export function repEditor(h, text, onChange, { min = 3, asOn = '', onAsOn = () =
   const emit = () => onChange(formatRep(rows, as));
   const gapHint = (r) => {
     const g = gap(clock(r.arr), clock(String(r.dep || '').trim() ? r.dep : as));
-    return g === null ? 'minutes' : `${g} (auto)`;
+    return g === null ? 'DET min' : `${g} (auto)`;
   };
   const hints = [];
   const draw = (focusRow) => {
@@ -108,9 +109,10 @@ export function repEditor(h, text, onChange, { min = 3, asOn = '', onAsOn = () =
         });
         return h('div', { class: 'reprow' }, h('b', { class: 'rpn' }, String(i + 1)), tr,
           input('rps', 'STATION', `Station of train ${i + 1}`, r.st, (v) => { r.st = v; emit(); }),
-          input('rpa', '15:30', `Arrival of train ${i + 1}`, r.arr, (v) => { r.arr = v; refreshHint(); emit(); }),
-          input('rpe', '16:00', `Departure of train ${i + 1}`, r.dep, (v) => { r.dep = v; refreshHint(); emit(); }),
+          input('rpa', 'ARR 15:30', `Arrival of train ${i + 1}`, r.arr, (v) => { r.arr = v; refreshHint(); emit(); }),
+          input('rpe', 'DEP 16:00', `Departure of train ${i + 1}`, r.dep, (v) => { r.dep = v; refreshHint(); emit(); }),
           det,
+          insertButton(h, `Add a train below train ${i + 1}`, () => { rows.splice(i + 1, 0, { tr: '', st: '', arr: '', dep: '', det: '' }); draw(i + 1); }),
           h('button', {
             type: 'button', class: 'x', title: 'Remove this row', 'aria-label': `Remove train ${i + 1}`,
             onclick: () => { rows.splice(i, 1); if (!rows.length) rows.push({ tr: '', st: '', arr: '', dep: '', det: '' }); emit(); draw(); },

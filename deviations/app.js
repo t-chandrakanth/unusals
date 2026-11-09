@@ -78,7 +78,7 @@ function renderGrid() {
         <td class="n">${i + 1}</td>
         <td class="tr"><input data-i="${idx}" data-f="train" value="${esc(r.train)}" placeholder="Train" autocapitalize="characters"></td>
         <td><input data-i="${idx}" data-f="remark" value="${esc(r.remark)}" placeholder="Remark" autocapitalize="characters"></td>
-        <td><button class="btn x del" tabindex="-1" data-i="${idx}" title="Remove">×</button></td>
+        <td class="rb"><button class="btn x ins" tabindex="-1" data-i="${idx}" title="Add a train below this one">+</button><button class="btn x del" tabindex="-1" data-i="${idx}" title="Remove">×</button></td>
       </tr>`;
     });
   }
@@ -152,6 +152,16 @@ $('grid').addEventListener('click', (e) => {
     const inputs = $('grid').querySelectorAll(`input[data-f="train"]`);
     const last = [...inputs].find((el) => Number(el.dataset.i) === rows.length - 1);
     if (last) last.focus();
+  }
+  const ins = e.target.closest('button.ins');
+  if (ins) {
+    remember();
+    const at = Number(ins.dataset.i);
+    rows.splice(at + 1, 0, { point: rows[at].point, train: '', remark: '' });
+    save(); render();
+    const box = [...$('grid').querySelectorAll('input[data-f="train"]')].find((el) => Number(el.dataset.i) === at + 1);
+    if (box) box.focus();
+    return;
   }
   const del = e.target.closest('button.del');
   if (del) { remember(); rows.splice(Number(del.dataset.i), 1); save(); render(); }

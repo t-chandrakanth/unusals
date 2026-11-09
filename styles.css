@@ -585,15 +585,33 @@ table.cells tr.dayrow .count { margin-left: 8px; }
 
 /* ---- the sequence of events: a time and what happened, row by row ---- */
 .evbox { display: grid; gap: 6px; }
-.evrow { display: grid; grid-template-columns: 112px minmax(0, 1fr) 38px; gap: 6px; align-items: center; }
+.evrow { display: grid; grid-template-columns: 112px minmax(0, 1fr) 38px 38px; gap: 6px; align-items: center; }
+.evrow.lines { grid-template-columns: 26px minmax(0, 1fr) 38px 38px; }
+.evrow .rpn { text-align: center; color: var(--soft); }
+.ins { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--soft); font-size: 20px; line-height: 1; cursor: pointer; }
+.ins:hover { color: #fff; background: var(--green, #1c7a45); border-color: var(--green, #1c7a45); }
 .evrow input { width: 100%; padding: 10px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; font-weight: 500; text-transform: none; letter-spacing: 0; }
 .evrow input:focus { outline: 2px solid var(--amber); outline-offset: 0; background: var(--card); }
 .evrow .evt { font-variant-numeric: tabular-nums; }
 .evrow .x { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--soft); font-size: 18px; cursor: pointer; }
 .evrow .x:hover { color: #fff; background: var(--k-fail); border-color: var(--k-fail); }
 .evbox .btn.small { justify-self: start; }
+
+/* repercussions table (shared by every app) */
+.repbox { display: grid; gap: 6px; }
+.reprow { display: grid; grid-template-columns: 34px minmax(60px, 1.2fr) minmax(60px, 1.2fr) 62px 62px minmax(60px, 1fr) 28px 28px; gap: 6px; align-items: center; }
+.reprow input { min-width: 0; width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); color: inherit; font: inherit; font-size: 14px; }
+.rephead { font-size: 11px; font-weight: 700; color: var(--soft); text-transform: uppercase; }
+.rpn { text-align: center; color: var(--soft); }
+.reprow .x { padding: 0; border: 0; background: none; color: var(--soft); font-size: 18px; cursor: pointer; }
+
+.repas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; font-size: 13px; font-weight: 600; color: var(--soft); }
+.repas input { width: 130px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); color: inherit; font: inherit; }
+
+.reprow .ins { width: 28px; height: 28px; padding: 0; border: 0; background: none; color: var(--soft); font-size: 20px; cursor: pointer; }
+
 td.c-reason .evbox { min-width: 300px; }
-@media (max-width: 520px) { .evrow { grid-template-columns: 92px minmax(0, 1fr) 38px; } }
+@media (max-width: 520px) { .evrow { grid-template-columns: 84px minmax(0, 1fr) 34px 34px; } .evrow.lines { grid-template-columns: 22px minmax(0, 1fr) 34px 34px; } .evrow .x, .evrow .ins { width: 34px; height: 34px; } }
 
 /* ---- DPWCS Locos: the attach box, and Add loco under the other divisions ---- */
 .attach-locos { margin: 0 0 12px; padding: 0; border: 0; background: none; }
@@ -654,3 +672,18 @@ table.rtable th:nth-child(4), table.rtable th:nth-child(3) { white-space: nowrap
 @media (max-width: 759px) { .card .wk-pair { display: none; } }
 .rcell.wk-sel { min-width: 150px; padding-right: 4px; }
 .report-edit th { white-space: nowrap; }
+
+/* phones: a repercussion row takes two lines, train and station above, the times and detention below */
+@media (max-width: 520px) {
+  .reprow { grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1fr) 28px 28px; grid-template-areas: "n tr st ins x" ". arr dep det det"; row-gap: 4px; }
+  .reprow > :nth-child(1) { grid-area: n; }
+  .reprow > :nth-child(2) { grid-area: tr; }
+  .reprow > :nth-child(3) { grid-area: st; }
+  .reprow > :nth-child(4) { grid-area: arr; }
+  .reprow > :nth-child(5) { grid-area: dep; }
+  .reprow > :nth-child(6) { grid-area: det; }
+  .reprow > :nth-child(7) { grid-area: ins; }
+  .reprow > :nth-child(8) { grid-area: x; }
+  .reprow.rephead { display: none; }
+  .reprow input::placeholder { font-style: italic; }
+}

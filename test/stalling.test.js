@@ -82,7 +82,7 @@ test('the WhatsApp message carries the table, the events, the detention and the 
   const m = whatsappText(drta());
   assert.match(m, /^\*STALLING REPORT – TRAIN DRTA\*/);
   assert.match(m, /Stalled at: KM 478\/01/);
-  assert.match(m, /20:46 Relief loco arrived/);
+  assert.match(m, /20:46-Relief loco arrived/);
   assert.match(m, /\*Detention: 1 hr 51 min/);
   assert.match(m, /3\. VSPG – CKN ARR 19:41/);
 });
@@ -103,7 +103,7 @@ test('the time of the incident gives the first row by itself, once', () => {
   const own = { ...s, events: [{ t: '19:06', text: 'Loco stalled' }] };
   assert.equal(eventsOf(own).length, 1);
   assert.equal(detention({ ...s, events: [...s.events, { t: '20:57', text: 'Spot departure' }] }).total, 111);
-  assert.match(whatsappText(s), /19:06 Loco stalled at km 478\/01/);
+  assert.match(whatsappText(s), /19:06-Loco stalled at km 478\/01/);
 });
 
 test('a km is read with its post, and the stall is placed on the profile by it', () => {
@@ -118,4 +118,11 @@ test('a km is read with its post, and the stall is placed on the profile by it',
   assert.equal(markPosition({ ...s, markOff: true }), null, 'switched off');
   assert.equal(markPosition({ ...s, km: '470', profFrom: '479', profTo: '465' }) > 60, true, 'a picture that runs the other way');
   assert.equal(markPosition({ ...s, km: '600' }), 100, 'outside the picture it is held at the edge');
+});
+
+test('the plan of action is its own numbered section, before the goods repercussions', () => {
+  const s = readStalling(JSON.stringify({ trainNo: 'DRTA', plan: ['Relief loco 33111 to attach from rear', '', 'Line clear to be given'], repercussions: ['XYZ -KMT- DET: 40 MINS'] }));
+  const m = whatsappText(s);
+  assert.match(m, /\*Plan of action:\*\n1\. Relief loco 33111 to attach from rear\n2\. Line clear to be given\n\n\*Goods Repercussion:\*\n1\. XYZ/);
+  assert.equal(readStalling('').plan.length, 3);
 });

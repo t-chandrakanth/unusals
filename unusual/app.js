@@ -4,6 +4,7 @@
 // app next door, and the shared database table of unusual reports.
 
 import * as L from '../js/logic.js';
+import { linesEditor, insertButton } from '../js/lines.js';
 import { createSync } from '../js/sync.js';
 import { diffOps } from '../js/syncdata.js';
 import { SUPABASE_URL, SUPABASE_KEY, REQUIRE_LOGIN } from '../js/config.js';
@@ -37,21 +38,22 @@ const TYPES = {
   other: { name: 'Others', accent: 'k-dpwcs', titles: [] },
 };
 const FORM = {
-  loco: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason', 'rep'],
-  cw: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason', 'rep'],
-  other: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason', 'rep'],
+  loco: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'det', 'reason', 'plan', 'rep'],
+  cw: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason', 'plan', 'rep'],
+  other: ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'det', 'reason', 'plan', 'rep'],
 };
 const LABEL = {
   day: 'Date', time: 'Time', title: 'Train details (heading)', location: 'Location', trainNo: 'Train no',
-  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Sequence of events', rep: 'Repercussions',
+  locoNo: 'Loco no', load: 'Load', wagonNo: 'Wagon no', bpcNo: 'BPC no', detFrom: 'DET from', detTo: 'DET to', det: 'DET (detention)', reason: 'Sequence of events', plan: 'Plan of action', rep: 'Goods repercussions',
 };
 const HINT = {
   title: 'brake binding', location: 'TNGM-YP/GNN', trainNo: 'ICDT C/S', locoNo: '42821', load: '40/40/3910',
   wagonNo: 'CNCR 6125060159 BLCM', bpcNo: '70000102716 TKD/25-03/CC', det: 'AT GNN 03:20 HRS',
   reason: 'Times, km, what was done, relief loco, TXR fit...',
+  plan: 'Front portion being cleared to SKZR, dep 11:35\nRelief loco 33111+43123 to attach from rear',
   rep: '1. 17030 - VKB ARR 22:47 (leave empty if none)',
 };
-const WIDE = new Set(['title', 'locoNo', 'wagonNo', 'bpcNo', 'reason', 'rep']);
+const WIDE = new Set(['title', 'locoNo', 'wagonNo', 'bpcNo', 'reason', 'plan', 'rep']);
 const FILE_TYPES = 'image/*,.docx,.pdf,.xlsx,.csv,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 // The DPWCS LOCO app keeps a list of its own (app = 'dpwcs'); it is not part of this register.
 const rows = () => state.unusuals.filter((u) => u.app !== 'dpwcs' && u.type !== 'block' && u.type !== 'stalling');
@@ -259,7 +261,7 @@ async function readFiles(list, { draft, rebuild, close } = {}) {
 }
 
 function fillForm(draft, r, rebuild) {
-  for (const key of ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'reason', 'det', 'detFrom', 'detTo', 'rep']) {
+  for (const key of ['day', 'title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo', 'reason', 'plan', 'det', 'detFrom', 'detTo', 'rep']) {
     if (r[key] && (key === 'day' || !String(draft[key] || '').trim())) draft[key] = r[key];
   }
   if (r.type && !draft.type) draft.type = r.type;
@@ -316,7 +318,8 @@ function openForm(type, existing) {
     const kind = kindOf(draft);
     const titles = [...new Set([...TYPES[kind].titles, ...rows().filter((u) => kindOf(u) === kind).map((u) => u.title).filter(Boolean)])];
     const field = (key) => {
-      if (key === 'rep') return h('div', { class: 'field wide' }, h('span', null, 'Repercussions (leave empty if none)'), repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
+      if (key === 'plan') return h('div', { class: 'field wide' }, h('span', null, 'Plan of action'), linesEditor(h, draft.plan, (v) => { draft.plan = v; }, { placeholder: HINT.plan.split('\n')[0], label: 'Step', addText: '+ Add line' }));
+      if (key === 'rep') return h('div', { class: 'field wide' }, h('span', null, 'Goods repercussions (leave empty if none)'), repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
       const el = key === 'reason' || key === 'rep'
         ? h('textarea', { rows: key === 'rep' ? 3 : 6, value: draft[key], placeholder: HINT[key] })
         : h('input', {
@@ -367,7 +370,7 @@ function openForm(type, existing) {
           render();
         },
       },
-      h('div', { class: 'grid' }, [...FORM[kind].filter((k) => k !== 'reason' && k !== 'rep'), ...['load', 'wagonNo', 'bpcNo'].filter((k) => !FORM[kind].includes(k) && String(draft[k] || '').trim()), 'reason', 'rep']
+      h('div', { class: 'grid' }, [...FORM[kind].filter((k) => k !== 'reason' && k !== 'rep' && k !== 'plan'), ...['load', 'wagonNo', 'bpcNo'].filter((k) => !FORM[kind].includes(k) && String(draft[k] || '').trim()), 'reason', ...(FORM[kind].includes('plan') ? ['plan'] : []), 'rep']
         .map((k) => (k === 'det' ? h('div', { class: 'det-row' }, field('detFrom'), field('detTo'), field('det')) : field(k)))),
       h('div', { id: 'repeat-hint', class: 'repeat-hint', style: 'display:none' }),
       photoStrip(draft, build),
@@ -791,8 +794,12 @@ function newReportCard(view) {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Sequence of events'),
         eventsEditor(h, draft.reason, (v) => { draft.reason = v; }));
     }
+    if (key === 'plan') {
+      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Plan of action'),
+        linesEditor(h, draft.plan, (v) => { draft.plan = v; }, { placeholder: HINT.plan.split('\n')[0], label: 'Step', addText: '+ Add line' }));
+    }
     if (key === 'rep') {
-      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Repercussions (leave empty if none)'),
+      return h('div', { class: 'ncell s4 events' }, h('span', null, 'Goods repercussions (leave empty if none)'),
         repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }));
     }
     const isText = false;
@@ -815,7 +822,7 @@ function newReportCard(view) {
       }
     });
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doSave(); } });
-    return h('label', { class: `ncell ${key === 'reason' || key === 'rep' ? 's4' : WIDE.has(key) ? 's2' : ''}` }, h('span', null, LABEL[key]), el);
+    return h('label', { class: `ncell ${key === 'reason' || key === 'rep' || key === 'plan' ? 's4' : WIDE.has(key) ? 's2' : ''}` }, h('span', null, LABEL[key]), el);
   };
 
   const doSave = () => {
@@ -1108,12 +1115,20 @@ function openStallingForm(existing, from, inline) {
       s.events.map((e, i) => h('div', { class: 'ev-row' },
         bare(() => e.t, (v) => { e.t = v; }, 'Time', '19:06–19:27'),
         bare(() => e.text, (v) => { e.text = v; }, 'What happened', 'Backed up to km 479/01, but did not start'),
+        insertButton(h, `Add an event below event ${i + 1}`, () => { s.events.splice(i + 1, 0, { t: '', text: '' }); build(); }),
         h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.events.splice(i, 1); if (!s.events.length) s.events.push({ t: '', text: '' }); build(); } }, '×'))));
     const repRows = h('div', { class: 'ev-rows' },
       s.repercussions.map((r, i) => h('div', { class: 'ev-row rep' },
         h('span', { class: 'rn' }, String(i + 1)),
         bare(() => r, (v) => { s.repercussions[i] = v; }, 'Repercussion', 'MLSW – KMT ARR 19:33'),
+        insertButton(h, `Add a repercussion below ${i + 1}`, () => { s.repercussions.splice(i + 1, 0, ''); build(); }),
         h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.repercussions.splice(i, 1); if (!s.repercussions.length) s.repercussions.push(''); build(); } }, '×'))));
+    const planRows = h('div', { class: 'ev-rows' },
+      s.plan.map((r, i) => h('div', { class: 'ev-row rep' },
+        h('span', { class: 'rn' }, String(i + 1)),
+        bare(() => r, (v) => { s.plan[i] = v; }, 'Plan of action', 'Relief loco 33111 to attach from rear'),
+        insertButton(h, `Add a step below ${i + 1}`, () => { s.plan.splice(i + 1, 0, ''); build(); }),
+        h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.plan.splice(i, 1); if (!s.plan.length) s.plan.push(''); build(); } }, '×'))));
     const remarks = h('textarea', { rows: 4, value: s.remarks, placeholder: 'Left empty, the remarks are written from the train timings and the events.' });
     remarks.addEventListener('input', (e) => { s.remarks = e.target.value; });
     const slider = h('input', {
@@ -1167,7 +1182,10 @@ function openStallingForm(existing, from, inline) {
         type: 'button', class: 'btn small',
         onclick: () => { const keep = s.remarks; s.remarks = ''; const text = remarksText(s); s.remarks = keep; remarks.value = text; s.remarks = text; },
       }, 'Write the remarks from the events')),
-      h('h3', { class: 'rep-title' }, 'Repercussions'),
+      h('h3', { class: 'rep-title' }, 'Plan of action'),
+      planRows,
+      h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.plan.push(''); build(); } }, '+ Add line')),
+      h('h3', { class: 'rep-title' }, 'Goods repercussions'),
       repRows,
       h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.repercussions.push(''); build(); } }, '+ Add a row')),
       h('h3', { class: 'rep-title' }, 'Load table'),
