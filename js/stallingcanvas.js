@@ -157,7 +157,7 @@ function paint(ctx, s, imgs, draw) {
   y = Math.max(yl, yr) + 28;
 
   // remarks
-  y = section('Remarks', M, y, W - 2 * M);
+  y = section('Brief of the incident', M, y, W - 2 * M);
   font(BASE, false);
   const rem = wrap(ctx, remarksText(s), W - 2 * M - 2 * PAD - 8);
   const remH = rem.length * LH + 2 * PAD;

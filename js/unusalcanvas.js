@@ -173,7 +173,7 @@ function paint(ctx, m, drawAll) {
   }
 
   if (m.remarks) {
-    y = section('Remarks', M, y, W - 2 * M);
+    y = section('Brief of the incident', M, y, W - 2 * M);
     font(BASE, false);
     const rem = wrap(ctx, m.remarks, W - 2 * M - 2 * PAD - 8);
     const remH = rem.length * LH + 2 * PAD;
