@@ -4,6 +4,7 @@
 // profile (pictures) and the date and signature line. The picture is the
 // preview, the WhatsApp / PNG image and, as a JPEG, the PDF.
 
+import { planLines } from './logic.js';
 import {
   reportTitle, reportSubtitle, detailRows, eventsHead, eventsOf, isStallEvent, detentionText, remarksText, writtenRepercussions, writtenPlan, markPosition,
 } from './stalling.js';
@@ -158,7 +159,7 @@ function paint(ctx, s, imgs, draw) {
   if (plan.length) {
     y = section('Plan of action', M, y, W - 2 * M);
     font(BASE, false);
-    plan.forEach((r, i) => { y += lines(wrap(ctx, `${i + 1}. ${r}`, W - 2 * M), M, y); });
+    for (const r of planLines(plan)) y += lines(wrap(ctx, r, W - 2 * M), M, y);
     y += 22;
   }
   const rep = writtenRepercussions(s);

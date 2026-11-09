@@ -13,7 +13,7 @@ export function blankStalling(day = '') {
     station: '', arr: '', dep: '',
     events: Array.from({ length: 6 }, () => ({ t: '', text: '' })),
     stallAt: '', reliefAt: '', spotDep: '',
-    remarks: '', plan: ['', '', ''], repercussions: ['', '', ''],
+    remarks: '', plan: [{ t: '', text: '' }, { t: '', text: '' }, { t: '', text: '' }], repercussions: ['', '', ''],
     loadHead: '', loadNote: '', loadImg: '', profileHead: '', profileNote: '', profileImg: '', profFrom: '', profTo: '', markX: '', markOff: false,
   };
 }
@@ -26,7 +26,7 @@ export function readStalling(text, day = '') {
   return {
     ...b, ...o,
     events: Array.isArray(o.events) && o.events.length ? o.events.map((e) => ({ t: String(e.t || ''), text: String(e.text || '') })) : b.events,
-    plan: Array.isArray(o.plan) && o.plan.length ? o.plan.map(String) : b.plan,
+    plan: Array.isArray(o.plan) && o.plan.length ? o.plan.map((e) => (typeof e === 'string' ? { t: '', text: e } : { t: String(e.t || ''), text: String(e.text || '') })) : b.plan,
     repercussions: Array.isArray(o.repercussions) && o.repercussions.length ? o.repercussions.map(String) : b.repercussions,
   };
 }
@@ -36,7 +36,8 @@ const text = (v) => String(v == null ? '' : v).trim();
 /** The events that were written, in the order they were written. */
 export const writtenEvents = (s) => s.events.map((e) => ({ t: text(e.t), text: text(e.text) })).filter((e) => e.t || e.text);
 export const writtenRepercussions = (s) => s.repercussions.map(text).filter(Boolean);
-export const writtenPlan = (s) => (s.plan || []).map(text).filter(Boolean);
+/** The plan lines as written, time first: "12:10 Relief loco ordered" or just the text. */
+export const writtenPlan = (s) => (s.plan || []).map((e) => [text(e.t), text(e.text)].filter(Boolean).join(' ')).filter(Boolean);
 
 /**
  * The events as the report shows them: when the time of the incident is given and no
@@ -148,8 +149,10 @@ export function remarksText(s) {
 
 /** The message for WhatsApp: the report in a few lines. */
 export function whatsappText(s) {
-  const lines = [`*${reportTitle(s)}*`];
-  if (reportSubtitle(s)) lines.push(reportSubtitle(s));
+  // "*DRTA-STALLING@KMT - MLMG*": train no, STALLING and the section or km as one bold heading
+  const where = text(s.section) || (text(s.km) && `KM ${text(s.km)}`);
+  const lines = [`*${[text(s.trainNo).toUpperCase(), 'STALLING'].filter(Boolean).join('-')}${where ? `@${where}` : ''}*`];
+  if (text(s.cause)) lines.push(`Cause: ${text(s.cause)}`);
   lines.push('');
   for (const [label, value] of detailRows(s)) lines.push(`${label}: ${value}`);
   const ev = eventsOf(s);

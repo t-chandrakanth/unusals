@@ -1,5 +1,4 @@
 import { eventsEditor } from '../js/events.js';
-import { linesEditor } from '../js/lines.js';
 import { repEditor } from '../js/repercussions.js';
 import * as L from '../js/logic.js';
 import { loadState, saveState } from '../js/db.js';
@@ -1193,7 +1192,7 @@ function newUnusualCard() {
     }
     if (key === 'plan') {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Plan of action'),
-        linesEditor(h, draft.plan, (v) => { draft.plan = v; }, { placeholder: 'Relief loco 33111+43123 to attach from rear', label: 'Step', addText: '+ Add line' }));
+        eventsEditor(h, draft.plan, (v) => { draft.plan = v; }, { min: 3 }));
     }
     if (key === 'rep') {
       return h('div', { class: 'ncell s4 events' }, h('span', null, 'Goods repercussions (leave empty if none)'),
@@ -1315,7 +1314,7 @@ function unusualRows(items, label) {
         const tr = h('tr', { class: 'editing' }, h('td', { class: 'sr' }, String(n)));
         for (const key of U_BOXES) {
           if (key === 'reason') { tr.append(h('td', { class: 'c-reason' }, eventsEditor(h, buf.reason || '', (v) => { buf.reason = v; }, { min: 2 }))); continue; }
-          if (key === 'plan') { tr.append(h('td', { class: 'c-reason' }, linesEditor(h, buf.plan || '', (v) => { buf.plan = v; }, { min: 2, label: 'Step', addText: '+ Add line' }))); continue; }
+          if (key === 'plan') { tr.append(h('td', { class: 'c-reason' }, eventsEditor(h, buf.plan || '', (v) => { buf.plan = v; }, { min: 3 }))); continue; }
           if (key === 'rep') { tr.append(h('td', { class: 'c-reason' }, repEditor(h, buf.rep || '', (v) => { buf.rep = v; }))); continue; }
           const el = h('textarea', { rows: 1, class: 'cell', 'aria-label': U_LABEL[key], autocapitalize: key === 'reason' ? null : 'characters' });
           el.value = buf[key] || '';

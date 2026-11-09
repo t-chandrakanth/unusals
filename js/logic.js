@@ -188,7 +188,7 @@ export function unusualMessage(u) {
 }
 
 /**
- * One report as the control-office message: bold heading; location, train, loco and load; the
+ * One report as the control-office message: bold "TRAIN NO-TRAIN DETAILS@LOCATION" heading; loco and load; the
  * wagon and BPC when there are any; then the bold sections "Sequence of Events" (one dash per
  * event, time at the end), "Plan of action" (numbered) and "Goods Repercussion" (numbered, the
  * first train's detention in bold). A box that was not written is left out.
@@ -202,20 +202,24 @@ export function planLines(plan) {
   return plan.map((p) => (/^\d{1,2}[:.]\d{2}\b/.test(p) ? p.replace(/^(\d{1,2}[:.]\d{2})\s*[-:]?\s*/, '$1-') : `${++n}. ${p}`));
 }
 
-export function cwMessage(u, { dpwcs = false } = {}) {
+/** "*YTPY-LOCO FAILED@KZJ*": the train no, the train details and the location as one bold heading. */
+export function messageHeading(u) {
+  const t = (v) => String(v == null ? '' : v).trim();
+  const title = t(u.title).toUpperCase();
+  const train = t(u.trainNo).toUpperCase();
+  // a heading that already starts with the train no is not given it twice
+  const parts = title.startsWith(train) && train ? [title] : [train, title];
+  const head = parts.filter(Boolean).join('-') + (t(u.location) ? `@${t(u.location)}` : '');
+  return head ? `*${head}*` : '';
+}
+
+export function cwMessage(u) {
   const t = (v) => String(v == null ? '' : v).trim();
   const out = [];
-  if (dpwcs) {
-    // DPWCS style: "TRAIN NO-TRAIN DETAILS@LOCATION" as the heading, the detention as its own line
-    const head = [t(u.trainNo), t(u.title).toUpperCase()].filter(Boolean).join('-') + (t(u.location) ? `@${t(u.location)}` : '');
-    if (head) out.push(`*${head}*`, '');
-    const rows = [['Loco no', u.locoNo], ['Load', u.load]].filter(([, v]) => t(v));
-    if (rows.length) out.push(...rows.map(([k, v]) => `${k} : ${t(v)}`), '');
-  } else {
-    if (t(u.title)) out.push(`*${t(u.title).toUpperCase()}*`, '');
-    const head = [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load], ['DET', u.det]].filter(([, v]) => t(v));
-    if (head.length) out.push(...head.map(([k, v]) => `${k} : ${t(v)}`), '');
-  }
+  const head = messageHeading(u);
+  if (head) out.push(head, '');
+  const rows = [['Loco no', u.locoNo], ['Load', u.load]].filter(([, v]) => t(v));
+  if (rows.length) out.push(...rows.map(([k, v]) => `${k} : ${t(v)}`), '');
   const wagon = [['Wagon no', u.wagonNo], ['BPC no', u.bpcNo]].filter(([, v]) => t(v));
   if (wagon.length) out.push(...wagon.map(([k, v]) => `${k} : ${t(v)}`), '');
   // time first on every line: "08:30-KZJ YTPY ARR"
@@ -224,12 +228,12 @@ export function cwMessage(u, { dpwcs = false } = {}) {
   // plan lines keep a leading time if one was written, otherwise they are numbered
   const plan = repLines(u.plan);
   if (plan.length) out.push('*Plan of action:*', ...planLines(plan), '');
-  if (dpwcs && t(u.det)) out.push(`*Detention :* ${t(u.det)}`, '');
+  if (t(u.det)) out.push(`*Detention :* ${t(u.det)}`, '');
   let official = {};
   try { official = JSON.parse(u.official) || {}; } catch { /* no official report */ }
   const rep = repLines(t(u.rep) || t(official.repercussions));
   if (rep.length) {
-    out.push('', dpwcs ? '*Goods Repercussion (if any):*' : '*Goods Repercussion:*', ...rep.map((r, n) => `${n + 1}. ${n === 0 ? r.replace(/(DET\s*:?\s*\d+\s*MINS?)/i, '*$1*') : r}`));
+    out.push('', '*Goods Repercussion (if any):*', ...rep.map((r, n) => `${n + 1}. ${n === 0 ? r.replace(/(DET\s*:?\s*\d+\s*MINS?)/i, '*$1*') : r}`));
   }
   while (out.length && out[out.length - 1] === '') out.pop();
   return out.join('\n');
@@ -237,7 +241,7 @@ export function cwMessage(u, { dpwcs = false } = {}) {
 
 /** The DPWCS loco failures of a list as one message: each report in the DPWCS style, one after another, oldest day first. */
 export function dpwcsUnusualText(list) {
-  return unusualsInOrder(list).map((u) => cwMessage(u, { dpwcs: true })).join('\n\n\n');
+  return unusualsInOrder(list).map((u) => cwMessage(u)).join('\n\n\n');
 }
 
 /** The reports of a list as one message, each under its date, oldest day first. */
