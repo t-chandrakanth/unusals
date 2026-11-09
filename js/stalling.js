@@ -152,6 +152,8 @@ export function whatsappText(s) {
   // "*DRTA-STALLING@KMT - MLMG*": train no, STALLING and the section or km as one bold heading
   const where = text(s.section) || (text(s.km) && `KM ${text(s.km)}`);
   const lines = [`*${[text(s.trainNo).toUpperCase(), 'STALLING'].filter(Boolean).join('-')}${where ? `@${where}` : ''}*`];
+  if (where) lines.push('', `Location : ${where}`);
+  if (text(s.trainNo)) lines.push(`Train no : ${text(s.trainNo).toUpperCase()}`);
   if (text(s.cause)) lines.push(`Cause: ${text(s.cause)}`);
   lines.push('');
   for (const [label, value] of detailRows(s)) lines.push(`${label}: ${value}`);

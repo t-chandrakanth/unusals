@@ -218,7 +218,7 @@ export function cwMessage(u) {
   const out = [];
   const head = messageHeading(u);
   if (head) out.push(head, '');
-  const rows = [['Loco no', u.locoNo], ['Load', u.load]].filter(([, v]) => t(v));
+  const rows = [['Location', u.location], ['Train no', u.trainNo], ['Loco no', u.locoNo], ['Load', u.load]].filter(([, v]) => t(v));
   if (rows.length) out.push(...rows.map(([k, v]) => `${k} : ${t(v)}`), '');
   const wagons = t(u.wagonNo).split('\n').map((w) => w.trim()).filter(Boolean);
   const wagon = [...wagons.map((w) => ['Wagon no', w]), ['BPC no', u.bpcNo]].filter(([, v]) => t(v));

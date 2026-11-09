@@ -167,13 +167,13 @@ test('the text message of one report: heading, details, events one to a line, wa
   };
   // a report with a wagon is a C&W failure and takes the control-office format
   assert.equal(L.unusualMessage(u), [
-    '*KPCC METAL ON TYRE@VKB-GDQ*', '', 'Loco no : 60529/SBI/01/07', 'Load : 60/60/3365T', '',
+    '*KPCC METAL ON TYRE@VKB-GDQ*', '', 'Location : VKB-GDQ', 'Train no : KPCC', 'Loco no : 60529/SBI/01/07', 'Load : 60/60/3365T', '',
     'Wagon no : SECR-12140893411', 'BPC no : 50000951763/JSG/CKP/SER', '', '',
     '*Sequence of Events:*', '21:04-VKB DEP FROM LOOP LINE', '21:08-TRAIN STOPPED', '', '',
     '*Goods Repercussion (if any):*', '1. KPCC -GDQ- ARR: 21:53, NOT DEPARTED, *DET: 327 MINS* (UP TO 03:20 HRS)', '2. YTPY -VKB- ARR: 21:37, DEP: 01:09, DET: 212 MINS',
   ].join('\n'));
   // boxes that were not written are left out
-  assert.equal(L.unusualMessage({ ...L.blankUnusual('2026-10-19'), title: 'HOT AXLE', trainNo: 'ABC' }), '*ABC-HOT AXLE*');
+  assert.equal(L.unusualMessage({ ...L.blankUnusual('2026-10-19'), title: 'HOT AXLE', trainNo: 'ABC' }), '*ABC-HOT AXLE*\n\nTrain no : ABC');
 });
 
 test('a C&W failure is written in the control-office format with sections', () => {
@@ -187,26 +187,26 @@ test('a C&W failure is written in the control-office format with sections', () =
   };
   assert.equal(L.unusualMessage(u), [
     '*MLSW X MTMI-MLSW GOODS COUPLING/DROPPER BROKEN@ASAF-SKZR Section*', '',
-    'Loco no : 31549+41307/KZJ/5-1', 'Load : 60/60/5166 T', '',
+    'Location : ASAF-SKZR Section', 'Train no : MLSW X MTMI', 'Loco no : 31549+41307/KZJ/5-1', 'Load : 60/60/5166 T', '',
     'Wagon no : 13 TH FROM LOCO ER BOXN M1 10020261350', 'BPC no : PM 50000956129/28-10/JTJ', '', '',
     '*Sequence of Events:*', '10:00-TRAIN STOPPED B/W ASAF-SKZR IB UP MAIN LINE', 'TRAIN PARTED B/W 12 & 13 WAGON', '',
     '*Plan of action:*', '1. Front portion (LOCO+12 Wagons) cleared to SKZR, dep 11:35 Hrs.', '2. Relief loco 33111+43123 to attach from rear.', '', '',
     '*Goods Repercussion (if any):*', '1. GZB -BPA- ARR: 09:14, DEP: 10:57, *DET: 103 MINS*', '2. FN NMG -MMZ- ARR: 09:44, DEP: 10:45, DET: 61 MINS',
   ].join('\n'));
   // the heading alone when nothing else is written
-  assert.equal(L.unusualMessage({ ...L.blankUnusual('2026-10-19'), title: 'HOT AXLE', trainNo: 'ABC' }), '*ABC-HOT AXLE*');
+  assert.equal(L.unusualMessage({ ...L.blankUnusual('2026-10-19'), title: 'HOT AXLE', trainNo: 'ABC' }), '*ABC-HOT AXLE*\n\nTrain no : ABC');
 });
 
 test('a loco failure also carries the three sections', () => {
   const u = { ...L.blankUnusual('2026-11-09'), type: 'loco', title: 'LOCO FAILURE', trainNo: 'ABC', det: '45 MINS', reason: '10:00 STOPPED', plan: 'Relief loco ordered', rep: 'ABC -KZJ- DET: 45 MINS' };
-  assert.equal(L.unusualMessage(u), ['*ABC-LOCO FAILURE*', '', '', '*Sequence of Events:*', '10:00-STOPPED', '',
+  assert.equal(L.unusualMessage(u), ['*ABC-LOCO FAILURE*', '', 'Train no : ABC', '', '', '*Sequence of Events:*', '10:00-STOPPED', '',
     '*Plan of action:*', '1. Relief loco ordered', '', '*Detention :* 45 MINS', '', '', '*Goods Repercussion (if any):*', '1. ABC -KZJ- *DET: 45 MINS*'].join('\n'));
 });
 
 test('the DPWCS copy: train no, details and location as the heading, then the sections and the detention', () => {
   const u = { ...L.blankUnusual('2026-11-09'), title: 'LOCO FAILED-DPWCS', location: 'KZJ', trainNo: 'YTPY', locoNo: '28073+28526/KZJ 26-11',
     reason: '08:30 KZJ YTPY ARR\n10:30 LOCO FAILED', plan: '12:10 RELIEF LOCO 28305+27732 ORDERED\nLINE CLEAR TO BE GIVEN', det: '05:00 HRS' };
-  assert.equal(L.dpwcsUnusualText([u]), ['*YTPY-LOCO FAILED-DPWCS@KZJ*', '', 'Loco no : 28073+28526/KZJ 26-11', '', '',
+  assert.equal(L.dpwcsUnusualText([u]), ['*YTPY-LOCO FAILED-DPWCS@KZJ*', '', 'Location : KZJ', 'Train no : YTPY', 'Loco no : 28073+28526/KZJ 26-11', '', '',
     '*Sequence of Events:*', '08:30-KZJ YTPY ARR', '10:30-LOCO FAILED', '', '*Plan of action:*', '12:10-RELIEF LOCO 28305+27732 ORDERED', '1. LINE CLEAR TO BE GIVEN', '',
     '*Detention :* 05:00 HRS'].join('\n'));
   assert.doesNotMatch(L.dpwcsUnusualText([u]), /UNUSALS-DATE|DPWCS LOCO FAILURES/);
