@@ -1,7 +1,7 @@
 // Offline support for the combined app (SCR TI GOODS): its two tabs are the apps in
 // dpwcs/ and unusual/, which keep their own copies for offline use. This one keeps
 // the page around them. Network first, the last saved copy when there is no network.
-const CACHE = 'scr-ti-goods-v3';
+const CACHE = 'scr-ti-goods-v4';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/logo.png'];
 
 self.addEventListener('install', (e) => {

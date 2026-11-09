@@ -155,7 +155,7 @@
     // the shell's own bar stays as it is; the parts are zoomed from inside (see their pages)
     APPS.forEach(function (name) {
       var frame = document.getElementById('f-' + name);
-      try { if (frame.contentDocument) frame.contentDocument.documentElement.style.zoom = zoomNow() === 1 ? '' : zoomNow(); } catch (e) { /* not loaded yet */ }
+      try { if (frame.contentWindow) frame.contentWindow.postMessage('scr-text-zoom', '*'); } catch (e) { /* not loaded yet */ }
     });
   }
   document.getElementById('smaller').addEventListener('click', function () { zoomStep(-1); });
