@@ -441,3 +441,10 @@ html.embed main { padding-top: 14px; }
 
 .newactions .btn.primary, .btn.primary { background: linear-gradient(135deg, #0f766e, #14a89a); border-color: transparent; color: #fff; }
 @media (prefers-color-scheme: dark) { .btn.primary, .newactions .btn.primary { color: #0c1a19; } }
+
+/* wide screens: the form and the lists keep a comfortable width instead of stretching across the page */
+@media (min-width: 900px) {
+  #app > main { max-width: 1240px; }
+  .newcard { max-width: 940px; }
+  .failures > .section-title, .failures > .notice { max-width: 940px; }
+}
