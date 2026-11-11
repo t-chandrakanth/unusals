@@ -215,26 +215,31 @@ function paint(ctx, m, drawAll) {
     y += 28;
   }
 
-  // photographs: all in one line, side by side at one height, as large as the width allows
+  // photographs: all in one line, every one in a box of the same size (a photo is cropped to fill its box)
   const pics = m.pics || [];
   if (pics.length) {
     y = section('Photographs', M, y, W - 2 * M);
     const gap = 16;
-    const avail = W - 2 * M - gap * (pics.length - 1);
-    const h = Math.min(520, avail / pics.reduce((t, img) => t + img.width / img.height, 0));
-    const total = pics.reduce((t, img) => t + (img.width / img.height) * h, 0) + gap * (pics.length - 1);
-    let x = M + (W - 2 * M - total) / 2;
-    for (const img of pics) {
-      const iw = (img.width / img.height) * h;
+    const n = pics.length;
+    const bw = Math.floor((W - 2 * M - gap * (n - 1)) / n);
+    const bh = Math.min(Math.round(bw * 1.1), 460);
+    pics.forEach((img, i) => {
+      const col = i % n;
+      const row = Math.floor(i / n);
+      const x = M + col * (bw + gap);
+      const yy = y + row * (bh + gap);
       if (draw) {
-        ctx.drawImage(img, x, y, iw, h);
+        // the part of the photo that fills the box
+        const k = Math.max(bw / img.width, bh / img.height);
+        const sw = bw / k;
+        const sh = bh / k;
+        ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, yy, bw, bh);
         ctx.strokeStyle = LINE;
         ctx.lineWidth = 1.4;
-        ctx.strokeRect(x + 0.5, y + 0.5, iw, h);
+        ctx.strokeRect(x + 0.5, yy + 0.5, bw, bh);
       }
-      x += iw + gap;
-    }
-    y += h + 28;
+    });
+    y += Math.ceil(pics.length / n) * (bh + gap) + 12;
   }
 
   return y + 20;
