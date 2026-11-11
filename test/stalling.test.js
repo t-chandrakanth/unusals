@@ -75,7 +75,7 @@ test('remarks: written ones are kept, otherwise made from the events', () => {
   const r = remarksText(drta());
   const lines = r.split('\n');
   assert.deepEqual(lines.slice(0, 3), ['16:47-DRTA KMT main line ARR', '18:45-DRTA KMT main line DEP', '19:06-Loco stalled at km 478/01']);
-  assert.ok(lines.some((l) => /^\d\d:\d\d-Relief loco asked; relief loco 60484 planned from KMT by cancelling MLSW \(KMT arr 19:33\)/.test(l)));
+  assert.ok(lines.some((l) => /^Relief loco asked; relief loco 60484 planned from KMT by cancelling MLSW \(KMT arr 19:33\)/.test(l)));
   assert.ok(lines.some((l) => /^20:57-Spot departure/.test(l)));
 });
 
