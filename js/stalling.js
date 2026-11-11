@@ -142,11 +142,11 @@ export const isStallEvent = (e) => /stall/i.test(e.text);
  */
 export function remarksText(s) {
   if (text(s.remarks)) return text(s.remarks);
+  // a line for each, the time first: "13:39-MSIR GDQ DEP", then the events as "14:26-16594 VKB arrival"
   const who = [text(s.trainNo).toUpperCase(), text(s.station)].filter(Boolean).join(' ');
-  const times = [text(s.arr) && `ARR ${text(s.arr)}`, text(s.dep) && `DEP ${text(s.dep)}`].filter(Boolean).join(', ');
-  const first = [who, times].filter(Boolean).join(' ');
-  const events = eventsOf(s).map((e) => (e.t && e.text ? `${e.text} at ${e.t}.` : `${e.text || e.t}.`));
-  return [first && `${first}.`, ...events].filter(Boolean).join(' ');
+  const first = [text(s.arr) && `${text(s.arr)}-${who} ARR`, text(s.dep) && `${text(s.dep)}-${who} DEP`];
+  const events = eventsOf(s).map((e) => [e.t, e.text].filter(Boolean).join('-'));
+  return [...first, ...events].filter(Boolean).join('\n');
 }
 
 /** The message for WhatsApp: the report in a few lines. */

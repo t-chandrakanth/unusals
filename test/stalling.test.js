@@ -73,9 +73,10 @@ test('blank rows are dropped; the stalling event is the highlighted one', () => 
 test('remarks: written ones are kept, otherwise made from the events', () => {
   assert.equal(remarksText({ ...drta(), remarks: 'as written' }), 'as written');
   const r = remarksText(drta());
-  assert.match(r, /^DRTA KMT main line ARR 16:47, DEP 18:45\. Loco stalled at km 478\/01 at 19:06\. /);
-  assert.match(r, /Relief loco asked; relief loco 60484 planned from KMT by cancelling MLSW \(KMT arr 19:33\)\./);
-  assert.match(r, /Spot departure at 20:57\./);
+  const lines = r.split('\n');
+  assert.deepEqual(lines.slice(0, 3), ['16:47-DRTA KMT main line ARR', '18:45-DRTA KMT main line DEP', '19:06-Loco stalled at km 478/01']);
+  assert.ok(lines.some((l) => /^\d\d:\d\d-Relief loco asked; relief loco 60484 planned from KMT by cancelling MLSW \(KMT arr 19:33\)/.test(l)));
+  assert.ok(lines.some((l) => /^20:57-Spot departure/.test(l)));
 });
 
 test('the WhatsApp message carries the table, the events, the detention and the repercussions', () => {
