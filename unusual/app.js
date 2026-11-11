@@ -1134,12 +1134,6 @@ function openStallingForm(existing, from, inline) {
         bare(() => e.text, (v) => { e.text = v; }, 'Plan of action', 'Relief loco 33111 to attach from rear'),
         insertButton(h, `Add a step below ${i + 1}`, () => { s.plan.splice(i + 1, 0, { t: '', text: '' }); build(); }),
         h('button', { type: 'button', class: 'x', 'aria-label': 'Remove this row', onclick: () => { s.plan.splice(i, 1); if (!s.plan.length) s.plan.push({ t: '', text: '' }); build(); } }, '×'))));
-    const remarks = h('textarea', { rows: 4, value: s.remarks, placeholder: 'Left empty, the remarks are written from the train timings and the events.' });
-    remarks.addEventListener('input', (e) => { s.remarks = e.target.value; });
-    const slider = h('input', {
-      type: 'range', min: 0, max: 100, value: String(s.markX) !== '' ? s.markX : (markPosition(s) ?? 95), 'aria-label': 'Move the red line along the picture',
-      oninput: (e) => { s.markX = e.target.value; refresh(); },
-    });
 
     dlg.replaceChildren(h('div', { class: inline ? 'editor inline-form' : 'editor' },
       !inline && h('div', { class: 'dlg-head stalling' }, existing ? 'Edit stalling report' : 'New stalling report'),
@@ -1171,22 +1165,13 @@ function openStallingForm(existing, from, inline) {
         box('gradient', 'Gradient', 'text', '1 in 106 (rising for UP train)'),
         box('speed', 'Loco speed at stalling point', 'text', 'Normal'),
         box('signals', 'Signal aspects', 'text', 'Through'),
+        box('weather', 'Weather', 'text', 'Clear / Drizzling / Fog'),
+        box('caution', 'Caution order (if any)', 'text', 'Nil, or the caution order and its speed'),
         box('cause', 'Cause of stalling', 'text', 'Drizzling weather', true)),
       h('h3', { class: 'rep-title' }, 'Sequence of events'),
       h('div', { class: 'grid three' }, box('station', 'Previous station and line', 'text', 'KMT main line'), box('arr', 'Arr', 'time'), box('dep', 'Dep', 'time')),
       eventRows,
       h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.events.push({ t: '', text: '' }); build(); } }, '+ Add a row')),
-      h('p', { class: 'rep-note' }, 'The time of the incident becomes the first row ("Loco stalled at km ...") by itself. Write the rest: backed up, relief loco asked, relief loco arrived, EOT, spot departure, and so on.'),
-      h('div', { class: 'auto-det' }, (autoEl = h('b'))),
-      h('details', { class: 'o-panel' },
-        h('summary', null, 'Relief loco arrived / spot departure times, if they are not written in the events'),
-        h('div', { class: 'grid' }, box('reliefAt', 'Relief loco arrived', 'time'), box('spotDep', 'Spot departure', 'time'))),
-      h('h3', { class: 'rep-title' }, 'Remarks'),
-      remarks,
-      h('div', { class: 'rep-foot' }, h('button', {
-        type: 'button', class: 'btn small',
-        onclick: () => { const keep = s.remarks; s.remarks = ''; const text = remarksText(s); s.remarks = keep; remarks.value = text; s.remarks = text; },
-      }, 'Write the remarks from the events')),
       h('h3', { class: 'rep-title' }, 'Plan of action'),
       planRows,
       h('div', { class: 'rep-foot' }, h('button', { type: 'button', class: 'btn small', onclick: () => { s.plan.push({ t: '', text: '' }); build(); } }, '+ Add line')),
@@ -1199,17 +1184,6 @@ function openStallingForm(existing, from, inline) {
         h('div', { class: 'grid' }, box('loadHead', 'Heading', 'text', 'Load table (BZA–KZJ: 220 km, ruling gradient 1 in 150)', true), box('loadNote', 'Note', 'text', 'Single WAG-9 is P* for 45 BLC. The train had 47 BLC, 2 wagons above.', true))),
       h('h3', { class: 'rep-title' }, 'Section profile at the stalling point'),
       picture('profileImg', 'Section profile'),
-      h('div', { class: 'grid' },
-        box('profFrom', 'Km at the left edge of the picture', 'text', '465'),
-        box('profTo', 'Km at the right edge of the picture', 'text', '479')),
-      h('div', { class: 'auto-det' }, (markEl = h('b'))),
-      h('label', { class: 'check' }, h('input', {
-        type: 'checkbox', checked: !s.markOff,
-        onchange: (e) => { s.markOff = !e.target.checked; refresh(); },
-      }), 'Mark the stall km on the profile with a red line'),
-      h('div', { class: 'mark-tune' },
-        h('span', null, 'Fine-tune'), slider,
-        h('button', { type: 'button', class: 'btn small', onclick: () => { s.markX = ''; build(); } }, 'Place by km')),
       h('details', { class: 'o-panel' }, h('summary', null, 'Heading and note under the profile (optional)'),
         h('div', { class: 'grid' }, box('profileHead', 'Heading', 'text', 'Section profile at the stalling point (UP line, Warangal–Vijayawada)', true), box('profileNote', 'Note', 'text', 'At km 478/01 the profile is F 106 (1 in 106), steeper than 1 in 150.', true))),
       h('datalist', { id: 'st-locos' }, locos.map((t) => h('option', { value: t }))),

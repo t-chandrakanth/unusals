@@ -126,3 +126,12 @@ test('the plan of action is its own numbered section, before the goods repercuss
   assert.match(m, /\*Plan of action:\*\n1\. Relief loco 33111 to attach from rear\n2\. Line clear to be given\n\n\*Goods Repercussion:\*\n1\. XYZ/);
   assert.equal(readStalling('').plan.length, 3);
 });
+
+test('weather and the caution order are rows of the details table when written, and left out when not', () => {
+  const s = { ...blankStalling('2026-11-12'), trainNo: 'DRTA', signals: 'Through', weather: 'Drizzling', caution: '' };
+  const labels = (x) => detailRows(x).map((r) => r[0]);
+  assert.deepEqual(labels(s).slice(-2), ['Signal aspects', 'Weather']);
+  assert.ok(!labels(s).includes('Caution order'));
+  const rows = detailRows({ ...s, caution: 'CO 30 KMPH AT KM 478' });
+  assert.deepEqual(rows.slice(-2).map((r) => [r[0], r[1]]), [['Weather', 'Drizzling'], ['Caution order', 'CO 30 KMPH AT KM 478']]);
+});

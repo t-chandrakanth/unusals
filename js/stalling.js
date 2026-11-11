@@ -9,7 +9,7 @@ import { toMin, gap } from './block.js';
 
 export function blankStalling(day = '') {
   return {
-    day, trainNo: '', locoNo: '', load: '', section: '', km: '', gradient: '', speed: '', signals: '', cause: '',
+    day, trainNo: '', locoNo: '', load: '', section: '', km: '', gradient: '', speed: '', signals: '', weather: '', caution: '', cause: '',
     station: '', arr: '', dep: '',
     events: Array.from({ length: 6 }, () => ({ t: '', text: '' })),
     stallAt: '', reliefAt: '', spotDep: '',
@@ -121,6 +121,8 @@ export function detailRows(s) {
     ['Gradient', text(s.gradient), true],
     ['Loco speed at stalling point', text(s.speed), false],
     ['Signal aspects', text(s.signals), false],
+    ['Weather', text(s.weather), false],
+    ['Caution order', text(s.caution), false],
     ['Cause of stalling', text(s.cause), true],
   ].filter(([, v]) => v);
 }
