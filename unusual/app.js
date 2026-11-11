@@ -968,7 +968,7 @@ function viewList() {
 // ---------- stalling reports ----------
 
 const stallings = () => state.unusuals.filter((u) => u.type === 'stalling');
-const readStallingOf = (u) => readStalling(u.stalling, u.day);
+const readStallingOf = (u) => ({ ...readStalling(u.stalling, u.day), photos: photosOf(u) });
 const stallingFile = (s, ext) => `Stalling-${L.fmtDay(s.day)}-${String(s.trainNo || 'report').replace(/[^0-9A-Za-z]+/g, '-')}.${ext}`;
 
 /** A picture chosen on this device, made small enough to be kept with the report. */
@@ -1044,9 +1044,11 @@ function stallingCard(u) {
     h('div', { class: 'ucard-actions' },
       h('button', { class: 'link', onclick: () => openStallingReport(u) }, 'Open report'),
       h('button', { class: 'link', onclick: () => openStallingForm(u) }, 'Edit'),
-      h('button', { class: 'link', onclick: () => sendWhatsApp(whatsappText(s)) }, 'Send on WhatsApp'),
+      h('button', { class: 'link', onclick: run(async () => shareOrDownload(await stallingBlob(s, 'png'), stallingFile(s, 'png'), reportTitle(s))) }, 'Share'),
       h('button', { class: 'link', onclick: run(async () => shareOrDownload(await stallingBlob(s, 'pdf'), stallingFile(s, 'pdf'), reportTitle(s))) }, 'PDF'),
-      h('button', { class: 'link', onclick: run(async () => shareOrDownload(await stallingBlob(s, 'png'), stallingFile(s, 'png'), reportTitle(s))) }, 'Image'),
+      h('button', { class: 'link', onclick: run(() => copyText(whatsappText(s))) }, 'Copy text'),
+      h('button', { class: 'link', onclick: () => sendWhatsApp(whatsappText(s)) }, 'WhatsApp'),
+      h('button', { class: 'link', onclick: () => openPhotos(u) }, photosOf(u).length ? `Photos (${photosOf(u).length})` : 'Photos'),
       h('button', {
         class: 'link danger',
         onclick: () => {
