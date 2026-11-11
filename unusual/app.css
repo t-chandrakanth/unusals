@@ -405,3 +405,36 @@ html.embed main { padding-top: 14px; }
   .newcard { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
   .newactions { box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.3); }
 }
+
+/* ---- theme: a deeper blue, and every heading at the left behind a small round symbol ---- */
+:root { --navy: #1f4fa3; --navy-2: #3f74d0; --tint: #e8effb; --bg: #f1f4f9; --line: #d9e2ee; --ink: #17243a; }
+@media (prefers-color-scheme: dark) { :root { --navy: #7ea8f2; --navy-2: #5b8fe0; --tint: #1b2b44; --bg: #0f1722; --line: #243449; } }
+.top { background: linear-gradient(120deg, #1f4fa3 0%, #14305f 100%); border-bottom: 0; }
+.top h1, .top p, .top .brand-sub, .top .clock, .top .count-line { color: #fff; }
+.top .sync, .top .sync.syncing { color: #bfe9df; }
+.tabs { background: var(--card); }
+.tabs button { gap: 6px; }
+.tabs button .ico { font-size: 14px; line-height: 1; font-style: normal; }
+.tabs button.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+@media (prefers-color-scheme: dark) { .tabs button.on { color: #0f1722; } }
+.tabs button.on .n { background: rgba(255, 255, 255, 0.22); color: inherit; }
+.hd { display: flex !important; align-items: center; justify-content: flex-start; gap: 8px; text-align: left; font-weight: 800; letter-spacing: 0.3px; text-transform: uppercase; color: var(--ink) !important; }
+.hd::before { display: none !important; }
+.hd .ico { flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: var(--tint); font-size: 13px; font-style: normal; line-height: 1; box-shadow: 0 1px 2px rgba(20, 40, 80, 0.14), inset 0 0 0 1px rgba(31, 79, 163, 0.14); }
+.hd-big { margin: 16px 0 8px; padding: 0 0 8px; font-size: 13px; border-bottom: 2px solid color-mix(in srgb, var(--navy) 24%, transparent); }
+.hd-big .ico { width: 30px; height: 30px; border-radius: 10px; background: var(--navy); font-size: 15px; box-shadow: 0 3px 8px rgba(31, 79, 163, 0.3); }
+.newhead h2.hd { margin: 0; padding: 0; border: 0; }
+.newhead h2.hd .ico { width: 34px; height: 34px; font-size: 17px; }
+
+/* ---- wide screens: the headings of the app (the tabs) stand in a column at the left, each a button with its symbol ---- */
+@media (min-width: 900px) {
+  #app { display: grid; grid-template-columns: 236px minmax(0, 1fr); grid-template-rows: auto 1fr; align-items: start; }
+  #app > header.top { grid-column: 1 / -1; }
+  #app > nav.tabs { grid-column: 1; grid-row: 2; position: sticky; top: 0; flex-direction: column; align-items: stretch; gap: 8px; overflow: visible; min-height: calc(100vh - 150px); padding: 18px 14px; border-right: 1px solid var(--line); border-bottom: 0; background: var(--card); }
+  html.embed #app > nav.tabs { min-height: 100vh; }
+  #app > main { grid-column: 2; grid-row: 2; max-width: none; margin: 0; padding-left: 28px; padding-right: 28px; }
+  .tabs button { width: 100%; justify-content: flex-start; gap: 10px; padding: 9px 12px; border-radius: 14px; font-size: 14px; text-align: left; }
+  .tabs button .ico { flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: var(--tint); font-size: 15px; }
+  .tabs button.on .ico { background: rgba(255, 255, 255, 0.2); }
+  .tabs button .n { margin-left: auto; }
+}
