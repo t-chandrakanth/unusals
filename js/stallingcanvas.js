@@ -1,7 +1,7 @@
 // Draws a stalling report on a canvas in the layout of the one-page report: a blue
 // heading, the train and stalling details beside the sequence of events, the
 // detention, remarks, repercussions, then the load table and the section
-// profile (pictures) and the date and signature line. The picture is the
+// profile (pictures). The picture is the
 // preview, the WhatsApp / PNG image and, as a JPEG, the PDF.
 
 import { planLines } from './logic.js';
@@ -61,9 +61,8 @@ const loadImage = (src) => new Promise((resolve) => {
  */
 export async function drawStalling(s, scale = 1) {
   const [loadImg, profileImg] = await Promise.all([loadImage(s.loadImg), loadImage(s.profileImg)]);
-  const photos = (await Promise.all((s.photos || []).map(loadImage))).filter(Boolean);
   const probe = document.createElement('canvas').getContext('2d');
-  const height = paint(probe, s, { loadImg, profileImg, photos }, false);
+  const height = paint(probe, s, { loadImg, profileImg }, false);
   const canvas = document.createElement('canvas');
   canvas.width = W * scale;
   canvas.height = Math.max(height, 1754) * scale;
@@ -71,7 +70,7 @@ export async function drawStalling(s, scale = 1) {
   ctx.scale(scale, scale);
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, canvas.height / scale);
-  paint(ctx, s, { loadImg, profileImg, photos }, true);
+  paint(ctx, s, { loadImg, profileImg }, true);
   return canvas;
 }
 
@@ -218,37 +217,8 @@ function paint(ctx, s, imgs, draw) {
   };
   const km = String(s.km || '').trim();
   picture(String(s.loadHead || '').trim() || 'Load table', s.loadNote, imgs.loadImg, null);
-  picture(String(s.profileHead || '').trim() || 'Section profile at the stalling point', s.profileNote, imgs.profileImg,
+  picture(String(s.profileHead || '').trim() || 'Gradient chart', s.profileNote, imgs.profileImg,
     imgs.profileImg && markPosition(s) !== null ? { x: markPosition(s), label: `Stall km ${km}`.trim() } : null);
 
-  // photographs: all in one line, every one in a box of the same size (a photo is cropped to fill its box)
-  const pics = imgs.photos || [];
-  if (pics.length) {
-    y = section('Photographs', M, y, W - 2 * M);
-    const gap = 16;
-    const n = pics.length;
-    const bw = Math.floor((W - 2 * M - gap * (n - 1)) / n);
-    const bh = Math.min(Math.round(bw * 1.1), 460);
-    pics.forEach((img, i) => {
-      const x = M + i * (bw + gap);
-      if (draw) {
-        const k = Math.max(bw / img.width, bh / img.height);
-        const sw = bw / k;
-        const sh = bh / k;
-        ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, bw, bh);
-        ctx.strokeStyle = LINE;
-        ctx.lineWidth = 1.4;
-        ctx.strokeRect(x + 0.5, y + 0.5, bw, bh);
-      }
-    });
-    y += bh + 28;
-  }
-
-  // date and signature
-  y += 6;
-  font(19, false);
-  put('Date: ____________', M, y);
-  put('Signature: ______________________', W - M, y, INK, 'right');
-  y += LH + 36;
-  return y;
+  return y + 20;
 }

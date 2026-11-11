@@ -968,7 +968,7 @@ function viewList() {
 // ---------- stalling reports ----------
 
 const stallings = () => state.unusuals.filter((u) => u.type === 'stalling');
-const readStallingOf = (u) => ({ ...readStalling(u.stalling, u.day), photos: photosOf(u) });
+const readStallingOf = (u) => readStalling(u.stalling, u.day);
 const stallingFile = (s, ext) => `Stalling-${L.fmtDay(s.day)}-${String(s.trainNo || 'report').replace(/[^0-9A-Za-z]+/g, '-')}.${ext}`;
 
 /** A picture chosen on this device, made small enough to be kept with the report. */
@@ -1048,7 +1048,6 @@ function stallingCard(u) {
       h('button', { class: 'link', onclick: run(async () => shareOrDownload(await stallingBlob(s, 'pdf'), stallingFile(s, 'pdf'), reportTitle(s))) }, 'PDF'),
       h('button', { class: 'link', onclick: run(() => copyText(whatsappText(s))) }, 'Copy text'),
       h('button', { class: 'link', onclick: () => sendWhatsApp(whatsappText(s)) }, 'WhatsApp'),
-      h('button', { class: 'link', onclick: () => openPhotos(u) }, photosOf(u).length ? `Photos (${photosOf(u).length})` : 'Photos'),
       h('button', {
         class: 'link danger',
         onclick: () => {
@@ -1184,10 +1183,10 @@ function openStallingForm(existing, from, inline) {
       picture('loadImg', 'Load table'),
       h('details', { class: 'o-panel' }, h('summary', null, 'Heading and note under the load table (optional)'),
         h('div', { class: 'grid' }, box('loadHead', 'Heading', 'text', 'Load table (BZA–KZJ: 220 km, ruling gradient 1 in 150)', true), box('loadNote', 'Note', 'text', 'Single WAG-9 is P* for 45 BLC. The train had 47 BLC, 2 wagons above.', true))),
-      h('h3', { class: 'rep-title' }, 'Section profile at the stalling point'),
-      picture('profileImg', 'Section profile'),
+      h('h3', { class: 'rep-title' }, 'Gradient chart'),
+      picture('profileImg', 'Gradient chart'),
       h('details', { class: 'o-panel' }, h('summary', null, 'Heading and note under the profile (optional)'),
-        h('div', { class: 'grid' }, box('profileHead', 'Heading', 'text', 'Section profile at the stalling point (UP line, Warangal–Vijayawada)', true), box('profileNote', 'Note', 'text', 'At km 478/01 the profile is F 106 (1 in 106), steeper than 1 in 150.', true))),
+        h('div', { class: 'grid' }, box('profileHead', 'Heading', 'text', 'Gradient chart (UP line, Warangal–Vijayawada)', true), box('profileNote', 'Note', 'text', 'At km 478/01 the profile is F 106 (1 in 106), steeper than 1 in 150.', true))),
       h('datalist', { id: 'st-locos' }, locos.map((t) => h('option', { value: t }))),
       h('div', { class: 'editor-actions' },
         h('button', { type: 'submit', class: 'btn primary' }, 'Save and show the report'),
