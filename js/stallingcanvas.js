@@ -1,7 +1,7 @@
 // Draws a stalling report on a canvas in the layout of the one-page report: a blue
 // heading, the train and stalling details beside the sequence of events, the
 // detention, remarks, repercussions, then the load table and the section
-// profile (pictures). The picture is the
+// profile (pictures) and the date and signature line. The picture is the
 // preview, the WhatsApp / PNG image and, as a JPEG, the PDF.
 
 import { planLines } from './logic.js';
@@ -220,5 +220,11 @@ function paint(ctx, s, imgs, draw) {
   picture(String(s.profileHead || '').trim() || 'Section profile at the stalling point', s.profileNote, imgs.profileImg,
     imgs.profileImg && markPosition(s) !== null ? { x: markPosition(s), label: `Stall km ${km}`.trim() } : null);
 
-  return y + 20;
+  // date and signature
+  y += 6;
+  font(19, false);
+  put('Date: ____________', M, y);
+  put('Signature: ______________________', W - M, y, INK, 'right');
+  y += LH + 36;
+  return y;
 }
