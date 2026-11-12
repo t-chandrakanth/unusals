@@ -963,8 +963,9 @@ function viewList() {
     SHARED && status.unusualsMissing && h('p', { class: 'notice' },
       'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase (steps are in the README). Nothing is lost meanwhile.'),
     newReportCard(view),
-    h('h2', { class: 'section-title saved-title' }, 'Saved reports'),
-    dayShell(view, pool, (items, label) => dayRecords(view, items, label)));
+    h('aside', { class: 'saved-col' },
+      h('h2', { class: 'section-title saved-title' }, 'Saved reports'),
+      dayShell(view, pool, (items, label) => dayRecords(view, items, label))));
 }
 
 // ---------- stalling reports ----------
