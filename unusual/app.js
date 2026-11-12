@@ -724,8 +724,9 @@ function viewBlocks() {
   return h('div', { class: 'failures' },
     SHARED && status.unusualsMissing && h('p', { class: 'notice' }, 'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase.'),
     card,
-    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'today to begin with')),
-    dayShell('block', list, (items) => [messageBar(items, (u) => blockMessage(readBlock(u))), groupedCards(items, blockCard)]));
+    h('aside', { class: 'saved-col' },
+      h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'today to begin with')),
+      dayShell('block', list, (items) => [messageBar(items, (u) => blockMessage(readBlock(u))), groupedCards(items, blockCard)])));
 }
 
 // ---------- by date ----------
@@ -1207,8 +1208,9 @@ function viewStalling() {
   return h('div', { class: 'failures' },
     SHARED && status.unusualsMissing && h('p', { class: 'notice' }, 'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase.'),
     card,
-    h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'today to begin with')),
-    dayShell('stalling', list, (items) => [messageBar(items, (u) => whatsappText(readStallingOf(u))), groupedCards(items, stallingCard)]));
+    h('aside', { class: 'saved-col' },
+      h('h2', { class: 'section-title saved-title' }, 'Saved reports', h('small', null, 'today to begin with')),
+      dayShell('stalling', list, (items) => [messageBar(items, (u) => whatsappText(readStallingOf(u))), groupedCards(items, stallingCard)])));
 }
 
 // ---------- install as an app ----------

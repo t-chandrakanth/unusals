@@ -448,3 +448,12 @@ html.embed main { padding-top: 14px; }
   .newcard { max-width: 940px; }
   .failures > .section-title, .failures > .notice { max-width: 940px; }
 }
+
+/* wide screens: the saved reports of Stalling and Block detention stand at the right of the form, with a line between */
+@media (min-width: 1280px) {
+  .failures:has(> .saved-col) { display: grid; grid-template-columns: minmax(0, 940px) minmax(380px, 1fr); column-gap: 0; align-items: start; }
+  .failures:has(> .saved-col) > .notice { grid-column: 1 / -1; }
+  .failures:has(> .saved-col) > .newcard { grid-column: 1; max-width: none; }
+  .failures > .saved-col { grid-column: 2; margin-left: 28px; padding-left: 28px; border-left: 2px solid var(--line); min-height: 60vh; }
+  .failures > .saved-col > .saved-title { margin-top: 0; }
+}
