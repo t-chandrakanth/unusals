@@ -1269,7 +1269,7 @@ function searchBar() {
     oninput: (e) => { ui.query = e.target.value; showSearch(); },
   });
   return h('div', { class: 'searchbar' },
-    h('i', { class: 'sicon', 'aria-hidden': 'true' }, '\u{1F50D}'), input,
+    input,
     h('button', { type: 'button', class: 'sclear', 'aria-label': 'Clear the search', onclick: () => { ui.query = ''; input.value = ''; showSearch(); input.focus(); } }, '\u00d7'));
 }
 
