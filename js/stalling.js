@@ -133,6 +133,15 @@ export function eventsHead(s) {
   return text(s.station) || when ? [text(s.station) || 'Train', when] : null;
 }
 
+/** The first rows of the chronology, the time first like every other row: [{ t: '13:39', text: 'GDQ DEP' }]. */
+export function headRows(s) {
+  const at = text(s.station) || 'Train';
+  return [
+    text(s.arr) && { t: text(s.arr), text: `${at} ARR` },
+    text(s.dep) && { t: text(s.dep), text: `${at} DEP` },
+  ].filter(Boolean);
+}
+
 /** An event is highlighted when it is the stalling itself. */
 export const isStallEvent = (e) => /stall/i.test(e.text);
 
@@ -162,7 +171,7 @@ export function whatsappText(s) {
   const ev = eventsOf(s);
   if (ev.length) {
     lines.push('', '*Sequence of Events:*');
-    if (eventsHead(s)) lines.push(eventsHead(s).filter(Boolean).join(': '));
+    for (const r of headRows(s)) lines.push(`${r.t}-${r.text}`);
     for (const e of ev) lines.push(e.t && e.text ? `${e.t}-${e.text}` : e.text || e.t);
   }
   const plan = writtenPlan(s);

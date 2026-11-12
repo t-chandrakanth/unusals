@@ -6,7 +6,7 @@
 
 import { planLines } from './logic.js';
 import {
-  reportTitle, reportSubtitle, detailRows, eventsHead, eventsOf, isStallEvent, detentionText, remarksText, writtenRepercussions, writtenPlan, markPosition,
+  reportTitle, reportSubtitle, detailRows, headRows, eventsOf, isStallEvent, detentionText, remarksText, writtenRepercussions, writtenPlan, markPosition,
 } from './stalling.js';
 
 const W = 1240; // A4 at 150 dpi
@@ -144,9 +144,8 @@ function paint(ctx, s, imgs, draw) {
 
   // right: sequence of events, then the detention
   let yr = section('Chronology of events', rightX, y, rightW);
-  const head = eventsHead(s);
   const evRows = eventsOf(s).map((e) => [e.t || '–', e.text, isStallEvent(e), true]);
-  yr = table(rightX, yr, rightW, [...(head ? [[head[0], head[1], false, true]] : []), ...evRows], 0.27, false);
+  yr = table(rightX, yr, rightW, [...headRows(s).map((r) => [r.t, r.text, false, true]), ...evRows], 0.27, false);
   const det = detentionText(s);
   if (det) {
     font(BASE, true);

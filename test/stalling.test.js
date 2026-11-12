@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   blankStalling, readStalling, keyTimes, fmtDuration, detention, detentionText, detShort, reportTitle, reportSubtitle,
-  detailRows, eventsHead, remarksText, whatsappText, writtenEvents, isStallEvent, eventsOf, kmValue, markPosition,
+  detailRows, eventsHead, headRows, remarksText, whatsappText, writtenEvents, isStallEvent, eventsOf, kmValue, markPosition,
 } from '../js/stalling.js';
 
 // the DRTA report
@@ -135,4 +135,11 @@ test('weather and the caution order are rows of the details table when written, 
   assert.ok(!labels(s).includes('Caution order'));
   const rows = detailRows({ ...s, caution: 'CO 30 KMPH AT KM 478' });
   assert.deepEqual(rows.slice(-2).map((r) => [r[0], r[1]]), [['Weather', 'Drizzling'], ['Caution order', 'CO 30 KMPH AT KM 478']]);
+});
+
+test('the first rows of the chronology have the time first: 13:39 and GDQ DEP', () => {
+  assert.deepEqual(headRows({ ...blankStalling('2026-11-12'), station: 'GDQ', dep: '13:39' }), [{ t: '13:39', text: 'GDQ DEP' }]);
+  assert.deepEqual(headRows(drta()), [{ t: '16:47', text: 'KMT main line ARR' }, { t: '18:45', text: 'KMT main line DEP' }]);
+  assert.deepEqual(headRows(blankStalling('x')), []);
+  assert.match(whatsappText(drta()), /16:47-KMT main line ARR\n18:45-KMT main line DEP/);
 });
