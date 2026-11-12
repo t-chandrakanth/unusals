@@ -12,6 +12,7 @@ import { unusualSheet, blockSheet } from '../js/sheet.js';
 import { blankBlock, blankRow, computeBlock, blockMessage, blockTitle, rowDetention, longMins } from '../js/block.js';
 import { buildPdf, buildPdfPages } from '../js/pdf.js';
 import { drawReport } from '../js/unusalcanvas.js';
+import { searchReports } from '../js/search.js';
 import { photosOf, reportFile } from '../js/unusalreport.js';
 import { eventsEditor } from '../js/events.js';
 import { repEditor } from '../js/repercussions.js';
@@ -102,7 +103,7 @@ const NO_SYNC = { outbox: [], cursor: {}, linked: false };
 let state = L.emptyState();
 let sync = null;
 let status = { phase: SHARED ? 'syncing' : 'local', pending: 0, email: '', error: '', unusualsMissing: false };
-const ui = { view: 'loco', search: '', month: 'all', range: 'all', from: '', to: '', sumDay: '', span: {}, focusNew: false, drafts: {}, edit: null };
+const ui = { view: 'loco', query: '', search: '', month: 'all', range: 'all', from: '', to: '', sumDay: '', span: {}, focusNew: false, drafts: {}, edit: null };
 let repeatMap = new Map(); // loco number -> reports in the last 90 days, when more than one
 
 const who = () => (sync && sync.email ? sync.email.split('@')[0] : '');
@@ -1259,6 +1260,38 @@ function statusText() {
   }
 }
 
+/** The search box at the top of every tab. */
+function searchBar() {
+  const input = h('input', {
+    type: 'search', class: 'gsearch', id: 'gsearch', value: ui.query, autocomplete: 'off', 'aria-label': 'Search all reports',
+    placeholder: 'Search all reports: a train, loco, location, date or any word',
+    oninput: (e) => { ui.query = e.target.value; showSearch(); },
+  });
+  return h('div', { class: 'searchbar' },
+    h('i', { class: 'sicon', 'aria-hidden': 'true' }, '\u{1F50D}'), input,
+    h('button', { type: 'button', class: 'sclear', 'aria-label': 'Clear the search', onclick: () => { ui.query = ''; input.value = ''; showSearch(); input.focus(); } }, '\u00d7'));
+}
+
+const searchCard = (u) => (u.type === 'stalling' ? stallingCard(u) : u.type === 'block' ? blockCard(u) : card(u, true));
+
+/** With words in the search box, the reports that have them are listed by date in place of the tab's own page. */
+function showSearch() {
+  const page = document.getElementById('view-content');
+  const res = document.getElementById('search-results');
+  if (!page || !res) return;
+  const q = ui.query.trim();
+  page.hidden = !!q;
+  res.hidden = !q;
+  if (!q) { res.replaceChildren(); return; }
+  const found = searchReports(state.unusuals.filter((u) => u.app !== 'dpwcs'), q);
+  const shown = found.slice(0, 200);
+  res.replaceChildren(
+    h('p', { class: 'found' }, found.length
+      ? `${found.length} report${found.length === 1 ? '' : 's'} found for "${q}"${found.length > shown.length ? `, the newest ${shown.length} are shown` : ''}`
+      : 'No report found. Try fewer or shorter words.'),
+    ...(shown.length ? [].concat(groupedCards(shown, searchCard)) : []));
+}
+
 function render() {
   const count = (t) => rows().filter((u) => kindOf(u) === t).length;
   const tabs = [['loco', 'Loco failures', count('loco')], ['stalling', 'Stalling', stallings().length], ['cw', 'C&W failures', count('cw')], ['all', 'All', rows().length], ['block', 'Block detention', blocks().length]];
@@ -1289,7 +1322,10 @@ function render() {
       class: ui.view === id ? 'on' : '',
       onclick: () => { ui.view = id; ui.month = 'all'; ui.search = ''; ui.range = 'all'; ui.from = ''; ui.to = ''; render(); window.scrollTo(0, 0); },
     }, h('i', { class: 'dot-k', style: `--c:${dots[id]}` }), text, n != null && h('span', { class: 'n' }, String(n))))),
-    h('main', null, ui.view === 'block' ? viewBlocks() : ui.view === 'stalling' ? viewStalling() : viewList()));
+    h('main', null, searchBar(),
+      h('div', { id: 'view-content' }, ui.view === 'block' ? viewBlocks() : ui.view === 'stalling' ? viewStalling() : viewList()),
+      h('div', { id: 'search-results' })));
+  showSearch();
   if (ui.focusNew) { ui.focusNew = false; const first = document.querySelector('tr.newrow textarea'); if (first) first.focus(); }
 }
 

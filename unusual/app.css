@@ -457,3 +457,24 @@ html.embed main { padding-top: 14px; }
   .failures > .saved-col { grid-column: 2; margin-left: 28px; padding-left: 28px; border-left: 2px solid var(--line); min-height: 60vh; }
   .failures > .saved-col > .saved-title { margin-top: 0; }
 }
+
+/* the search box over every tab, and the reports it finds */
+.searchbar { position: relative; display: flex; align-items: center; max-width: 940px; margin: 0 0 14px; }
+.searchbar .sicon { position: absolute; left: 14px; font-style: normal; font-size: 16px; pointer-events: none; }
+.searchbar .gsearch { width: 100%; min-height: 46px; padding: 10px 44px 10px 42px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); font: inherit; font-size: 15px; box-shadow: var(--shadow); }
+.searchbar .gsearch:focus { outline: 2px solid var(--navy); outline-offset: 1px; }
+.searchbar .sclear { position: absolute; right: 8px; width: 30px; height: 30px; border: 0; border-radius: 50%; background: var(--tint); color: var(--soft); font-size: 18px; line-height: 1; cursor: pointer; }
+.searchbar .gsearch:placeholder-shown ~ .sclear { display: none; }
+#search-results .found { margin: 4px 2px 12px; font-size: 14px; font-weight: 700; color: var(--soft); }
+#search-results[hidden], #view-content[hidden] { display: none; }
+
+/* the title block of the header: centred, neat and bold, with or without the logos at its sides */
+html.embed .top .top-wide { display: flex; justify-content: center; }
+html.embed .top .top-center { width: 100%; }
+.top .top-center { text-align: center; justify-items: center; }
+.top .top-center h1 { font-weight: 900; font-size: clamp(20px, 3vw, 26px); letter-spacing: 2px; text-align: center; }
+html.embed .top h1 { font-size: 22px; letter-spacing: 2px; }
+.top .clock { font-weight: 900; font-size: 14px; letter-spacing: 1px; text-align: center; }
+html.embed .top .clock { font-size: 14px; margin-top: 4px; }
+.top .count-line, .top .top-meta, .top .top-meta .sync { font-weight: 800; text-align: center; justify-content: center; }
+html.embed .top .top-meta { margin-top: 4px; }
