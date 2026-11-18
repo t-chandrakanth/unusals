@@ -687,3 +687,7 @@ table.rtable th:nth-child(4), table.rtable th:nth-child(3) { white-space: nowrap
   .reprow.rephead { display: none; }
   .reprow input::placeholder { font-style: italic; }
 }
+
+/* what is written is shown in capital letters (and turned into them as it is typed: js/uppercase.js) */
+input:not([type]), input[type="text"], textarea { text-transform: uppercase; }
+input::placeholder, textarea::placeholder { text-transform: none; }
