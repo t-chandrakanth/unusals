@@ -79,9 +79,10 @@ test('remarks: written ones are kept, otherwise made from the events', () => {
   assert.match(r, /RELIEF LOCO ASKED; RELIEF LOCO 60484 PLANNED FROM KMT BY CANCELLING MLSW \(KMT ARR 19:33\), RELIEF LOCO ARRIVED AT 20:46 HRS/);
   assert.match(r, /SPOT DEPARTURE AT 20:57 HRS/);
   assert.equal(r, r.toUpperCase());
-  // the plan of action follows, then the detention
+  // the plan of action is its own section, not said again in the brief
   const withPlan = remarksText({ ...drta(), plan: [{ t: '12:30', text: 'Relief loco to attach from rear' }, { t: '', text: 'EOT to be fitted' }] });
-  assert.match(withPlan, /PLAN OF ACTION: RELIEF LOCO TO ATTACH FROM REAR AT 12:30 HRS, EOT TO BE FITTED\./);
+  assert.doesNotMatch(withPlan, /PLAN OF ACTION|ATTACH FROM REAR/);
+  assert.equal(withPlan, remarksText(drta()));
   assert.match(remarksText({ ...blankStalling('x'), trainNo: 'KPCC', station: 'MLYG', arr: '09:45', events: [{ t: '09:45', text: 'Crew on duty@MLYG' }] }), /^KPCC MLYG ARR AT 09:45 HRS, CREW ON DUTY @ MLYG AT 09:45 HRS\.$/);
 });
 

@@ -152,8 +152,8 @@ export const isStallEvent = (e) => /stall/i.test(e.text);
 export function remarksText(s) {
   if (text(s.remarks)) return text(s.remarks);
   // The whole incident as one official paragraph, in capitals, each happening with its time:
-  // "KPCC MLYG ARR AT 09:45 HRS, CREW ON DUTY @MLYG AT 09:45 HRS, READY AT 10:20 HRS ...", then the plan of
-  // action, then the detention.
+  // "KPCC MLYG ARR AT 09:45 HRS, CREW ON DUTY @MLYG AT 09:45 HRS, READY AT 10:20 HRS ...", then the detention.
+  // (The plan of action has its own section above it, so it is not said again here.)
   const who = [text(s.trainNo), text(s.station)].filter(Boolean).join(' ');
   const hrs = (t) => (/hrs?\b/i.test(t) ? t : `${t} HRS`);
   const at = (what, t) => {
@@ -170,10 +170,8 @@ export function remarksText(s) {
     text(s.dep) && at(`${who} DEP`, s.dep),
     ...eventsOf(s).map((e) => at(e.text || '', e.t)),
   ].filter(Boolean);
-  const plan = (s.plan || []).map((e) => at(e.text || '', e.t)).filter(Boolean);
   const sentences = [
     incident.length && `${incident.join(', ')}.`,
-    plan.length && `PLAN OF ACTION: ${plan.join(', ')}.`,
     detentionText(s),
   ].filter(Boolean);
   return sentences.join(' ').toUpperCase();
