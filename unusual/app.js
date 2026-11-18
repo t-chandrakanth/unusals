@@ -13,6 +13,7 @@ import { blankBlock, blankRow, computeBlock, blockMessage, blockTitle, rowDetent
 import { buildPdf, buildPdfPages } from '../js/pdf.js';
 import { drawReport } from '../js/unusalcanvas.js';
 import { searchReports } from '../js/search.js';
+import { capitaliseUnusual } from '../js/capitalise.js';
 import { photosOf, reportFile } from '../js/unusalreport.js';
 import { eventsEditor } from '../js/events.js';
 import { repEditor } from '../js/repercussions.js';
@@ -129,6 +130,24 @@ function save(unusual) {
   commit(L.reduce(state, { type: 'saveUnusual', unusual: { ...unusual, time: '' }, now: new Date().toISOString(), by: who() }));
 }
 
+/**
+ * The reports saved before are put in the same sentence style as what is typed now (js/uppercase.js). A report is
+ * saved again only when it changes, so this is done once for each, on every device that sees it. Each keeps its place
+ * in its day: it is saved a moment after the time it had.
+ */
+function capitaliseSaved() {
+  const changes = state.unusuals.map((u) => [u, capitaliseUnusual(u)]).filter(([, c]) => c)
+    .sort((a, b) => String(a[0].updatedAt || '').localeCompare(String(b[0].updatedAt || '')));
+  if (!changes.length) return false;
+  let next = state;
+  for (const [u, c] of changes) {
+    const at = Date.parse(u.updatedAt);
+    next = L.reduce(next, { type: 'saveUnusual', unusual: c, now: new Date((Number.isNaN(at) ? Date.now() : at) + 1).toISOString(), by: u.updatedBy || who() });
+  }
+  commit(next);
+  return true;
+}
+
 // The older reports, loaded once. With a shared database this waits until the
 // device is in step with it, so reports another device loaded are not repeated.
 function seed() {
@@ -141,7 +160,9 @@ function seed() {
       .map((r) => ({ ...L.pickUnusual(r), id: r.id, updatedAt: now, updatedBy: 'record' }));
     next = { ...next, unusuals: [...next.unusuals, ...added], extraSeeded: true };
   }
-  if (next !== state) { commit(next); render(); }
+  const seeded = next !== state;
+  if (seeded) commit(next);
+  if (capitaliseSaved() || seeded) render();
 }
 
 // ---------- small helpers ----------
