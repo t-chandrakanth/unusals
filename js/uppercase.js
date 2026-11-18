@@ -1,14 +1,14 @@
-// What is typed or pasted into a text box or a notes box gets a capital letter at the start of each word, as it
-// goes in: "brake binding at kzj" becomes "Brake Binding At Kzj". The other letters are left as they were typed,
-// so a code typed in capitals (KPCC, GDQ) stays in capitals. The cursor stays where it was. It runs before the app
-// reads the box, so this is what is saved. The search box, dates, times, numbers, files and boxes marked
-// data-keepcase are left alone.
+// Sentence style: what is typed or pasted into a text box or a notes box gets a capital letter at the start of each
+// sentence and each line, as it goes in: "brake binding at KZJ. relief loco asked" becomes "Brake binding at KZJ.
+// Relief loco asked". Every other letter is left exactly as it was typed, so you decide where the other capitals
+// go (KPCC, GDQ, Vijayawada). The cursor stays where it was. It runs before the app reads the box, so this is what
+// is saved. The search box, dates, times, numbers, files and boxes marked data-keepcase are left alone.
 
 const SKIP = new Set(['search', 'email', 'url', 'password', 'number', 'date', 'time', 'datetime-local', 'month', 'week', 'file', 'checkbox', 'radio', 'range', 'color', 'hidden', 'button', 'submit']);
 
-/** "brake binding at kzj" -> "Brake Binding At Kzj"; a word starts after a space, a new line, "(", "/", "-" or "@". */
-export function firstLetters(value) {
-  return String(value).replace(/(^|[\s(/\-@])([a-zà-ÿ])/g, (_, before, letter) => before + letter.toUpperCase());
+/** A capital at the start of the text, after ". ", "! " or "? ", and at the start of each line. */
+export function sentenceStart(value) {
+  return String(value).replace(/(^|[.!?]\s+|\n\s*)([a-zà-ÿ])/g, (_, before, letter) => before + letter.toUpperCase());
 }
 
 /** Whether a box takes the capitals. */
@@ -23,7 +23,7 @@ if (typeof document !== 'undefined') {
     const el = e.target;
     if (e.isComposing || !takesCapitals(el)) return;
     const v = el.value;
-    const fixed = firstLetters(v);
+    const fixed = sentenceStart(v);
     if (v === fixed) return;
     const a = el.selectionStart;
     const b = el.selectionEnd;

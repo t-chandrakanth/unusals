@@ -688,6 +688,5 @@ table.rtable th:nth-child(4), table.rtable th:nth-child(3) { white-space: nowrap
   .reprow input::placeholder { font-style: italic; }
 }
 
-/* what is written starts each word with a capital (and is turned into that as it is typed: js/uppercase.js) */
-input:not([type]), input[type="text"], textarea { text-transform: capitalize; }
+/* what is written gets a capital at the start of each sentence as it is typed (js/uppercase.js); the rest is as typed */
 input::placeholder, textarea::placeholder { text-transform: none; }
