@@ -86,6 +86,16 @@ test('remarks: written ones are kept, otherwise made from the events', () => {
   assert.match(remarksText({ ...blankStalling('x'), trainNo: 'KPCC', station: 'MLYG', arr: '09:45', events: [{ t: '09:45', text: 'Crew on duty@MLYG' }] }), /^KPCC MLYG ARR AT 09:45 HRS, CREW ON DUTY @ MLYG AT 09:45 HRS\.$/);
 });
 
+test('the detention runs between the From and To written for it, else from the incident to the spot departure', () => {
+  const s = { ...drta(), detFrom: '19:00', detTo: '21:30' };
+  assert.equal(detention(s).total, 150);
+  assert.match(detentionText(s), /^Detention: 2 hr 30 min from 19:00 to 21:30 hrs\./);
+  assert.equal(detShort(s), '2 HR 30 MIN');
+  assert.equal(detention({ ...drta(), detFrom: '19:00' }).total, 117);
+  assert.match(detentionText(drta()), /from 19:06 to 20:57 hrs/);
+  assert.equal(detentionText({ ...blankStalling('x'), detFrom: '10:00', detTo: '11:15' }), 'Detention: 1 hr 15 min from 10:00 to 11:15 hrs.');
+});
+
 test('the WhatsApp message carries the table, the events, the detention and the repercussions', () => {
   const m = whatsappText(drta());
   assert.match(m, /^\*DRTA-STALLING@KMT – MLMG\*/);

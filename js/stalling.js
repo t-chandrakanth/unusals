@@ -9,7 +9,7 @@ import { toMin, gap } from './block.js';
 
 export function blankStalling(day = '') {
   return {
-    day, trainNo: '', locoNo: '', load: '', section: '', km: '', gradient: '', speed: '', signals: '', weather: '', caution: '', cause: '',
+    day, trainNo: '', locoNo: '', load: '', section: '', km: '', gradient: '', speed: '', signals: '', weather: '', caution: '', cause: '', detFrom: '', detTo: '',
     station: '', arr: '', dep: '',
     events: Array.from({ length: 6 }, () => ({ t: '', text: '' })),
     stallAt: '', reliefAt: '', spotDep: '',
@@ -79,22 +79,25 @@ export function fmtDuration(mins) {
 /** The detention the train suffered and how long the relief loco took, from the key times. */
 export function detention(s) {
   const k = keyTimes(s);
-  const total = k.stall && k.spot ? gap(k.stall, k.spot) : null;
+  // the detention runs between the two times written for it; left empty, from the time of the incident to the spot departure
+  const from = text(s.detFrom) || k.stall;
+  const to = text(s.detTo) || k.spot;
+  const total = from && to ? gap(from, to) : null;
   const wait = k.stall && k.relief ? gap(k.stall, k.relief) : null;
-  return { ...k, total, wait };
+  return { ...k, from, to, total, wait };
 }
 
 /** "Detention: 1 hr 51 min from 19:06 to 20:57 hrs. Relief loco arrived after 1 hr 40 min at 20:46 hrs." */
 export function detentionText(s) {
   const d = detention(s);
   const parts = [];
-  if (d.total !== null) parts.push(`Detention: ${fmtDuration(d.total)} from ${d.stall} to ${d.spot} hrs.`);
+  if (d.total !== null) parts.push(`Detention: ${fmtDuration(d.total)} from ${d.from} to ${d.to} hrs.`);
   if (d.wait !== null) parts.push(`Relief loco arrived after ${fmtDuration(d.wait)} at ${d.relief} hrs.`);
   return parts.join(' ');
 }
 
 /** The detention as lines for the block under the brief: ['Detention: 1 hr 51 min from 19:06 to 20:57 hrs.', 'Relief loco arrived ...']. */
-export const detentionLines = (s) => { const d = detention(s); return [d.total !== null && `Detention: ${fmtDuration(d.total)} from ${d.stall} to ${d.spot} hrs.`, d.wait !== null && `Relief loco arrived after ${fmtDuration(d.wait)} at ${d.relief} hrs.`].filter(Boolean); };
+export const detentionLines = (s) => { const d = detention(s); return [d.total !== null && `Detention: ${fmtDuration(d.total)} from ${d.from} to ${d.to} hrs.`, d.wait !== null && `Relief loco arrived after ${fmtDuration(d.wait)} at ${d.relief} hrs.`].filter(Boolean); };
 
 /** The short form kept in the register's DET box: "1 HR 51 MIN". */
 export const detShort = (s) => { const d = detention(s); return d.total === null ? '' : fmtDuration(d.total).toUpperCase(); };

@@ -1194,6 +1194,8 @@ function openStallingForm(existing, from, inline) {
         box('weather', 'Weather', 'text', 'Clear / Drizzling / Fog'),
         box('caution', 'Caution order (if any)', 'text', 'Nil, or the caution order and its speed'),
         box('cause', 'Cause of stalling', 'text', 'Drizzling weather', true)),
+      h('div', { class: 'grid' }, box('detFrom', 'Detention from', 'time'), box('detTo', 'Detention to', 'time')),
+      h('div', { class: 'auto-det' }, (autoEl = h('b'))),
       h('h3', { class: 'rep-title' }, 'Sequence of events'),
       h('div', { class: 'grid three' }, box('station', 'Previous station and line', 'text', 'KMT main line'), box('arr', 'Arr', 'time'), box('dep', 'Dep', 'time')),
       eventRows,
