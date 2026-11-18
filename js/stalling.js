@@ -151,11 +151,32 @@ export const isStallEvent = (e) => /stall/i.test(e.text);
  */
 export function remarksText(s) {
   if (text(s.remarks)) return text(s.remarks);
-  // a line for each, the time first: "13:39-MSIR GDQ DEP", then the events as "14:26-16594 VKB arrival"
-  const who = [text(s.trainNo).toUpperCase(), text(s.station)].filter(Boolean).join(' ');
-  const first = [text(s.arr) && `${text(s.arr)}-${who} ARR`, text(s.dep) && `${text(s.dep)}-${who} DEP`];
-  const events = eventsOf(s).map((e) => [e.t, e.text].filter(Boolean).join('-'));
-  return [...first, ...events].filter(Boolean).join('\n');
+  // The whole incident as one official paragraph, in capitals, each happening with its time:
+  // "KPCC MLYG ARR AT 09:45 HRS, CREW ON DUTY @MLYG AT 09:45 HRS, READY AT 10:20 HRS ...", then the plan of
+  // action, then the detention.
+  const who = [text(s.trainNo), text(s.station)].filter(Boolean).join(' ');
+  const hrs = (t) => (/hrs?\b/i.test(t) ? t : `${t} HRS`);
+  const at = (what, t) => {
+    const w = text(what).replace(/[.;,\s]+$/, '').replace(/\s*@\s*/g, ' @ ');
+    const when = text(t);
+    if (!when) return w;
+    if (w.includes(when.split(/[\u2013-]/)[0].trim()) && /\d\d[:.]\d\d/.test(w)) return w; // the words already carry the time
+    const range = /^(\d{1,2}[:.]\d{2})\s*[\u2013-]\s*(\d{1,2}[:.]\d{2})$/.exec(when);
+    if (range) return `${w} FROM ${range[1]} TO ${hrs(range[2])}`;
+    return `${w} AT ${hrs(when)}`;
+  };
+  const incident = [
+    text(s.arr) && at(`${who} ARR`, s.arr),
+    text(s.dep) && at(`${who} DEP`, s.dep),
+    ...eventsOf(s).map((e) => at(e.text || '', e.t)),
+  ].filter(Boolean);
+  const plan = (s.plan || []).map((e) => at(e.text || '', e.t)).filter(Boolean);
+  const sentences = [
+    incident.length && `${incident.join(', ')}.`,
+    plan.length && `PLAN OF ACTION: ${plan.join(', ')}.`,
+    detentionText(s),
+  ].filter(Boolean);
+  return sentences.join(' ').toUpperCase();
 }
 
 /** The message for WhatsApp: the report in a few lines. */

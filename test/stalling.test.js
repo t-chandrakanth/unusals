@@ -73,10 +73,16 @@ test('blank rows are dropped; the stalling event is the highlighted one', () => 
 test('remarks: written ones are kept, otherwise made from the events', () => {
   assert.equal(remarksText({ ...drta(), remarks: 'as written' }), 'as written');
   const r = remarksText(drta());
-  const lines = r.split('\n');
-  assert.deepEqual(lines.slice(0, 3), ['16:47-DRTA KMT main line ARR', '18:45-DRTA KMT main line DEP', '19:06-Loco stalled at km 478/01']);
-  assert.ok(lines.some((l) => /^Relief loco asked; relief loco 60484 planned from KMT by cancelling MLSW \(KMT arr 19:33\)/.test(l)));
-  assert.ok(lines.some((l) => /^20:57-Spot departure/.test(l)));
+  // one official paragraph in capitals, every happening with its time
+  assert.match(r, /^DRTA KMT MAIN LINE ARR AT 16:47 HRS, DRTA KMT MAIN LINE DEP AT 18:45 HRS, LOCO STALLED AT KM 478\/01 AT 19:06 HRS, /);
+  assert.match(r, /BACKED UP TO KM 479\/01, BUT DID NOT START FROM 19:06 TO 19:27 HRS/);
+  assert.match(r, /RELIEF LOCO ASKED; RELIEF LOCO 60484 PLANNED FROM KMT BY CANCELLING MLSW \(KMT ARR 19:33\), RELIEF LOCO ARRIVED AT 20:46 HRS/);
+  assert.match(r, /SPOT DEPARTURE AT 20:57 HRS/);
+  assert.equal(r, r.toUpperCase());
+  // the plan of action follows, then the detention
+  const withPlan = remarksText({ ...drta(), plan: [{ t: '12:30', text: 'Relief loco to attach from rear' }, { t: '', text: 'EOT to be fitted' }] });
+  assert.match(withPlan, /PLAN OF ACTION: RELIEF LOCO TO ATTACH FROM REAR AT 12:30 HRS, EOT TO BE FITTED\./);
+  assert.match(remarksText({ ...blankStalling('x'), trainNo: 'KPCC', station: 'MLYG', arr: '09:45', events: [{ t: '09:45', text: 'Crew on duty@MLYG' }] }), /^KPCC MLYG ARR AT 09:45 HRS, CREW ON DUTY @ MLYG AT 09:45 HRS\.$/);
 });
 
 test('the WhatsApp message carries the table, the events, the detention and the repercussions', () => {
