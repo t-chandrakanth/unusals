@@ -949,6 +949,24 @@ function dayRecords(view, items, label) {
       }
       const tr = h('tr', null, h('td', { class: 'sr' }, String(n)));
       for (const key of order) tr.append(h('td', { class: `ro ${key === 'title' ? 'c-title strong' : key === 'reason' ? 'c-reason' : ''}` }, String((key === 'rep' ? repOf(u) : u[key]) || '')));
+      if (u.type === 'stalling') {
+        const sr = readStallingOf(u);
+        tr.append(h('td', { class: 'act' },
+          h('button', { class: 'link', onclick: () => openStallingReport(u) }, 'Open report'),
+          h('button', { class: 'link', onclick: () => openStallingForm(u) }, 'Edit'),
+          h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await stallingBlob(sr, 'png'), stallingFile(sr, 'png'), reportTitle(sr))) }, 'Share'),
+          h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await stallingBlob(sr, 'pdf'), stallingFile(sr, 'pdf'), reportTitle(sr))) }, 'PDF'),
+          h('button', { class: 'link', onclick: runSafe(() => copyText(whatsappText(sr))) }, 'Copy text'),
+          h('button', { class: 'link', onclick: () => sendWhatsApp(whatsappText(sr)) }, 'WhatsApp'),
+          h('button', { class: 'link danger', onclick: () => {
+            if (!confirm(`Delete the stalling report of ${L.fmtDay(u.day)} (train ${sr.trainNo || ''})?`)) return;
+            commit(L.reduce(state, { type: 'removeUnusual', id: u.id }));
+            toast('Deleted');
+            render();
+          } }, 'Delete')));
+        body.append(tr);
+        continue;
+      }
       tr.append(h('td', { class: 'act' },
         h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: { ...Object.fromEntries(order.map((k) => [k, (k === 'rep' ? repOf(u) : u[k]) || ''])), repAsOn: u.repAsOn || '' } }; render(); } }, 'Edit'),
         h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await canvasToBlob(await drawReport(u, 1)), `${reportFile(u)}.png`, u.title || 'Unusal')) }, 'Share'),
@@ -979,7 +997,7 @@ function dayRecords(view, items, label) {
 
 function viewList() {
   const view = ['loco', 'cw', 'all'].includes(ui.view) ? ui.view : 'all';
-  const pool = view === 'all' ? rows() : rows().filter((u) => kindOf(u) === view);
+  const pool = view === 'all' ? [...rows(), ...stallings()] : rows().filter((u) => kindOf(u) === view);
   return h('div', { class: 'failures' },
     SHARED && status.unusualsMissing && h('p', { class: 'notice' },
       'Reports are being kept on this device only for now. To share them with everyone, run supabase/setup-unusuals.sql once in Supabase (steps are in the README). Nothing is lost meanwhile.'),
@@ -1340,7 +1358,7 @@ function showSearch() {
 
 function render() {
   const count = (t) => rows().filter((u) => kindOf(u) === t).length;
-  const tabs = [['loco', 'Loco failures', count('loco')], ['stalling', 'Stalling', stallings().length], ['cw', 'C&W failures', count('cw')], ['all', 'All', rows().length], ['block', 'Block detention', blocks().length]];
+  const tabs = [['loco', 'Loco failures', count('loco')], ['stalling', 'Stalling', stallings().length], ['cw', 'C&W failures', count('cw')], ['all', 'All', rows().length + stallings().length], ['block', 'Block detention', blocks().length]];
   const dots = { stalling: 'var(--k-stall)', loco: 'var(--k-fail)', cw: 'var(--k-other)', other: 'var(--k-dpwcs)', all: 'var(--navy)', overview: 'var(--navy)', block: '#6f8bff' };
   repeatMap = new Map(repeatLocos(rows(), addDays(today(), -90)).map((r) => [r.loco, r.count]));
   document.getElementById('app').replaceChildren(
