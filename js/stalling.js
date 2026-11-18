@@ -84,14 +84,17 @@ export function detention(s) {
   return { ...k, total, wait };
 }
 
-/** "Detention: 1 hr 51 min (19:06 to 20:57). Relief loco arrived after 1 hr 40 min (20:46)." */
+/** "Detention: 1 hr 51 min from 19:06 to 20:57 hrs. Relief loco arrived after 1 hr 40 min at 20:46 hrs." */
 export function detentionText(s) {
   const d = detention(s);
   const parts = [];
-  if (d.total !== null) parts.push(`Detention: ${fmtDuration(d.total)} (${d.stall} to ${d.spot}).`);
-  if (d.wait !== null) parts.push(`Relief loco arrived after ${fmtDuration(d.wait)} (${d.relief}).`);
+  if (d.total !== null) parts.push(`Detention: ${fmtDuration(d.total)} from ${d.stall} to ${d.spot} hrs.`);
+  if (d.wait !== null) parts.push(`Relief loco arrived after ${fmtDuration(d.wait)} at ${d.relief} hrs.`);
   return parts.join(' ');
 }
+
+/** The detention as lines for the block under the brief: ['Detention: 1 hr 51 min from 19:06 to 20:57 hrs.', 'Relief loco arrived ...']. */
+export const detentionLines = (s) => { const d = detention(s); return [d.total !== null && `Detention: ${fmtDuration(d.total)} from ${d.stall} to ${d.spot} hrs.`, d.wait !== null && `Relief loco arrived after ${fmtDuration(d.wait)} at ${d.relief} hrs.`].filter(Boolean); };
 
 /** The short form kept in the register's DET box: "1 HR 51 MIN". */
 export const detShort = (s) => { const d = detention(s); return d.total === null ? '' : fmtDuration(d.total).toUpperCase(); };
@@ -153,7 +156,7 @@ export function remarksText(s) {
   if (text(s.remarks)) return text(s.remarks);
   // The whole incident as one official paragraph, in capitals, each happening with its time:
   // "KPCC MLYG ARR AT 09:45 HRS, CREW ON DUTY @MLYG AT 09:45 HRS, READY AT 10:20 HRS ...", then the steps of the
-  // plan of action in the same way (without a label), then the detention.
+  // plan of action in the same way (without a label). The detention is shown in a block below it.
   const who = [text(s.trainNo), text(s.station)].filter(Boolean).join(' ');
   const hrs = (t) => (/hrs?\b/i.test(t) ? t : `${t} HRS`);
   const at = (what, t) => {
@@ -174,7 +177,6 @@ export function remarksText(s) {
   const sentences = [
     incident.length && `${incident.join(', ')}.`,
     plan.length && `${plan.join(', ')}.`,
-    detentionText(s),
   ].filter(Boolean);
   return sentences.join(' ').toUpperCase();
 }

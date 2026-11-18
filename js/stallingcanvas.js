@@ -6,7 +6,7 @@
 
 import { planLines } from './logic.js';
 import {
-  reportTitle, reportSubtitle, detailRows, headRows, eventsOf, isStallEvent, detentionText, remarksText, writtenRepercussions, writtenPlan, markPosition,
+  reportTitle, reportSubtitle, detailRows, headRows, eventsOf, isStallEvent, detentionLines, remarksText, writtenRepercussions, writtenPlan, markPosition,
 } from './stalling.js';
 
 const W = 1240; // A4 at 150 dpi
@@ -146,13 +146,6 @@ function paint(ctx, s, imgs, draw) {
   let yr = section('Chronology of events', rightX, y, rightW);
   const evRows = eventsOf(s).map((e) => [e.t || '–', e.text, isStallEvent(e), true]);
   yr = table(rightX, yr, rightW, [...headRows(s).map((r) => [r.t, r.text, false, true]), ...evRows], 0.27, false);
-  const det = detentionText(s);
-  if (det) {
-    font(BASE, true);
-    const a = wrap(ctx, det, rightW);
-    yr += 12;
-    yr += lines(a, rightX, yr);
-  }
   y = Math.max(yl, yr) + 28;
 
   // plan of action, then the brief of the incident below it, then the repercussions
@@ -171,7 +164,21 @@ function paint(ctx, s, imgs, draw) {
   rect(M, y, W - 2 * M, remH, '#f7f7f7', LINE);
   font(BASE, false);
   lines(rem, M + PAD + 4, y + PAD - 2);
-  y += remH + 28;
+  y += remH + 14;
+
+  // the detention, in bold in a block of its own below the brief: from and to, and the relief loco's wait
+  const det = detentionLines(s);
+  if (det.length) {
+    font(24, true);
+    const dl = det.flatMap((l) => wrap(ctx, l.toUpperCase(), W - 2 * M - 2 * PAD - 24));
+    const dh = dl.length * 34 + 2 * PAD + 6;
+    rect(M, y, W - 2 * M, dh, '#fff6d6', '#d9a400');
+    rect(M, y, 8, dh, '#d9a400');
+    font(24, true);
+    dl.forEach((l, i) => put(l, M + PAD + 20, y + PAD + 5 + i * 34, '#5c3b00'));
+    y += dh + 14;
+  }
+  y += 14;
 
   const rep = writtenRepercussions(s);
   if (rep.length) {

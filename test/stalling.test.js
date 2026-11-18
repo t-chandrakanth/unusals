@@ -43,7 +43,7 @@ test('detention and the relief loco\'s wait, as in the example report', () => {
   const d = detention(drta());
   assert.equal(d.total, 111);
   assert.equal(d.wait, 100);
-  assert.equal(detentionText(drta()), 'Detention: 1 hr 51 min (19:06 to 20:57). Relief loco arrived after 1 hr 40 min (20:46).');
+  assert.equal(detentionText(drta()), 'Detention: 1 hr 51 min from 19:06 to 20:57 hrs. Relief loco arrived after 1 hr 40 min at 20:46 hrs.');
   assert.equal(detShort(drta()), '1 HR 51 MIN');
 });
 
