@@ -480,3 +480,9 @@ html.embed .top h1 { font-size: 22px; letter-spacing: 2px; }
 html.embed .top .clock { font-size: 14px; margin-top: 4px; }
 .top .count-line, .top .top-meta, .top .top-meta .sync { font-weight: 800; text-align: center; justify-content: center; }
 html.embed .top .top-meta { margin-top: 4px; }
+
+/* the picture boxes of the stalling form take a pasted screenshot */
+.pic-holder { padding: 12px; border: 2px dashed var(--line); border-radius: 14px; background: color-mix(in srgb, var(--bg) 60%, var(--card)); cursor: pointer; }
+.pic-holder:focus { outline: 0; border-color: var(--navy); box-shadow: 0 0 0 3px color-mix(in srgb, var(--navy) 22%, transparent); }
+.pic-holder .nothing { color: var(--soft); font-size: 14px; }
+.pic-actions { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -1110,9 +1110,31 @@ function openStallingForm(existing, from, inline) {
         try { s[imgKey] = await pictureData(f); show(); } catch { toast('That picture could not be read.'); }
       },
     });
+    // a screenshot copied from a PDF goes straight in: click the box and press Ctrl+V, or press Paste picture
+    const take = async (file) => {
+      try { s[imgKey] = await pictureData(file, 1400); show(); toast('Picture added'); } catch { toast('That picture could not be read.'); }
+    };
+    const pasteButton = async () => {
+      try {
+        for (const item of await navigator.clipboard.read()) {
+          const type = item.types.find((t) => t.startsWith('image/'));
+          if (type) { await take(new File([await item.getType(type)], 'pasted.png', { type })); return; }
+        }
+        toast('There is no picture on the clipboard. Copy the picture first.');
+      } catch { toast('Click the picture box, then press Ctrl+V to paste.'); }
+    };
+    holder.setAttribute('tabindex', '0');
+    holder.addEventListener('click', (e) => { if (!e.target.closest('button')) holder.focus(); });
+    holder.addEventListener('paste', (e) => {
+      const cd = e.clipboardData;
+      const file = [...((cd && cd.files) || [])].find((f) => /^image\//.test(f.type))
+        || [...((cd && cd.items) || [])].map((i) => (i.kind === 'file' ? i.getAsFile() : null)).find((f) => f && /^image\//.test(f.type));
+      if (file) { e.preventDefault(); take(file); }
+    });
     const show = () => holder.replaceChildren(
-      s[imgKey] ? h('img', { src: s[imgKey], alt: label, class: 'pic-thumb' }) : h('span', { class: 'nothing' }, 'No picture yet. Take a photo of the page or choose one.'),
+      s[imgKey] ? h('img', { src: s[imgKey], alt: label, class: 'pic-thumb' }) : h('span', { class: 'nothing' }, 'No picture yet. Click here and press Ctrl+V to paste a screenshot, or add one.'),
       h('div', { class: 'pic-actions' },
+        h('button', { type: 'button', class: 'btn small', onclick: pasteButton }, 'Paste picture'),
         h('button', { type: 'button', class: 'btn small', onclick: () => chooser.click() }, s[imgKey] ? 'Change picture' : 'Add picture'),
         s[imgKey] && h('button', { type: 'button', class: 'btn small', onclick: () => { s[imgKey] = ''; show(); } }, 'Remove')));
     show();
