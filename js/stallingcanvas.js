@@ -155,6 +155,14 @@ function paint(ctx, s, imgs, draw) {
   }
   y = Math.max(yl, yr) + 28;
 
+  // plan of action, then the brief of the incident below it, then the repercussions
+  const plan = writtenPlan(s);
+  if (plan.length) {
+    y = section('Plan of action', M, y, W - 2 * M);
+    font(BASE, false);
+    for (const r of planLines(plan)) y += lines(wrap(ctx, r, W - 2 * M), M, y);
+    y += 22;
+  }
   // remarks
   y = section('Brief of the incident', M, y, W - 2 * M);
   font(BASE, false);
@@ -165,14 +173,6 @@ function paint(ctx, s, imgs, draw) {
   lines(rem, M + PAD + 4, y + PAD - 2);
   y += remH + 28;
 
-  // plan of action and repercussions
-  const plan = writtenPlan(s);
-  if (plan.length) {
-    y = section('Plan of action', M, y, W - 2 * M);
-    font(BASE, false);
-    for (const r of planLines(plan)) y += lines(wrap(ctx, r, W - 2 * M), M, y);
-    y += 22;
-  }
   const rep = writtenRepercussions(s);
   if (rep.length) {
     y = section('Goods repercussions', M, y, W - 2 * M);
