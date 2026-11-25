@@ -968,7 +968,8 @@ function dayRecords(view, items, label) {
         continue;
       }
       tr.append(h('td', { class: 'act' },
-        h('button', { class: 'link', onclick: () => { ui.edit = { id: u.id, buf: { ...Object.fromEntries(order.map((k) => [k, (k === 'rep' ? repOf(u) : u[k]) || ''])), repAsOn: u.repAsOn || '' } }; render(); } }, 'Edit'),
+        // Edit opens the report in a window of its own, like a stalling report, and not in the table row
+        h('button', { class: 'link', onclick: () => openForm(kindOf(u), u) }, 'Edit'),
         h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await canvasToBlob(await drawReport(u, 1)), `${reportFile(u)}.png`, u.title || 'Unusal')) }, 'Share'),
         h('button', { class: 'link', onclick: runSafe(async () => shareOrDownload(await reportPdfBlob([u]), `${reportFile(u)}.pdf`, u.title || 'Unusal')) }, 'PDF'),
         h('button', { class: 'link', onclick: runSafe(() => copyText(L.unusualMessage(u))) }, 'Copy text'),
