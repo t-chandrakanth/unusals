@@ -377,9 +377,12 @@ function openForm(type, existing) {
     attach.addEventListener('dragleave', () => attach.classList.remove('over'));
     attach.addEventListener('drop', (e) => { e.preventDefault(); attach.classList.remove('over'); take(e.dataTransfer.files); });
 
+    // The window is laid out like the stalling report's: a heading, then a section for each part of the report.
+    const sec = (title) => h('h3', { class: 'rep-title' }, title);
+    const detailKeys = ['title', 'location', 'trainNo', 'locoNo', 'load', 'wagonNo', 'bpcNo']
+      .filter((k) => FORM[kind].includes(k) || String(draft[k] || '').trim());
     dlg.replaceChildren(h('div', { class: 'editor' },
       h('div', { class: `dlg-head ${kind}` }, existing ? `Edit ${TYPES[kind].name.toLowerCase()} report, ${L.fmtDay(existing.day)}` : `New report: ${TYPES[kind].name}`),
-      attach, chooser, paste, pasteRow,
       draft.official && h('p', { class: 'okline' }, `✓ Official Sr.DEE report attached${draft.incident ? `, incident ${draft.incident}` : ''}`),
       h('form', {
         class: 'u-form',
@@ -393,10 +396,21 @@ function openForm(type, existing) {
           render();
         },
       },
-      h('div', { class: 'grid' }, [...FORM[kind].filter((k) => k !== 'reason' && k !== 'rep' && k !== 'plan'), ...['load', 'wagonNo', 'bpcNo'].filter((k) => !FORM[kind].includes(k) && String(draft[k] || '').trim()), 'reason', ...(FORM[kind].includes('plan') ? ['plan'] : []), 'rep']
-        .map((k) => (k === 'det' ? h('div', { class: 'det-row' }, field('detFrom'), field('detTo'), field('det')) : field(k)))),
+      h('div', { class: 'grid' }, field('day')),
+      sec(`Train and ${kind === 'cw' ? 'wagon' : 'failure'} details`),
+      h('div', { class: 'grid' }, detailKeys.map(field)),
       h('div', { id: 'repeat-hint', class: 'repeat-hint', style: 'display:none' }),
+      sec('Detention'),
+      h('div', { class: 'det-row' }, field('detFrom'), field('detTo'), field('det')),
+      sec('Sequence of events'),
+      eventsEditor(h, draft.reason, (v) => { draft.reason = v; }, { min: 4 }),
+      ...(FORM[kind].includes('plan') ? [sec('Plan of action'), eventsEditor(h, draft.plan, (v) => { draft.plan = v; }, { min: 3 })] : []),
+      sec('Goods repercussions (leave empty if none)'),
+      repEditor(h, draft.rep, (v) => { draft.rep = v; }, { asOn: draft.repAsOn, onAsOn: (v) => { draft.repAsOn = v; } }),
+      sec('Photos'),
       photoStrip(draft, build),
+      h('details', { class: 'o-panel' }, h('summary', null, 'Fill the boxes from a file, a photo or pasted text'),
+        attach, chooser, paste, pasteRow),
       h('datalist', { id: 'u-titles' }, titles.map((t) => h('option', { value: t }))),
       h('datalist', { id: 'u-locos' }, locos.map((t) => h('option', { value: t }))),
       h('div', { class: 'editor-actions' },
